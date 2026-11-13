@@ -242,6 +242,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+.translation{margin:12px 0 0;font-style:italic;font-size:17px}
 .switch{display:flex;align-items:center;gap:10px;font-size:16px}
 .switch input{width:22px;height:22px;accent-color:var(--brass);box-shadow:none}
 .keyrow{display:flex;gap:8px}.keyrow input{flex:1;min-width:0}
@@ -261,7 +262,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
       </div>
     </div>
     <div class="tools" id="shelfTools">
-      <input type="search" id="q" placeholder="Search titles, authors, series" aria-label="Search your library" autocomplete="off">
+      <input type="search" id="q" placeholder="Search titles, authors, translators" aria-label="Search your library" autocomplete="off">
       <select id="group" aria-label="Arrange shelves">
         <option value="genre">By genre</option>
         <option value="author">By author</option>
@@ -301,7 +302,7 @@ const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><d
 const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
-  persist:true,persisted:false,
+  persist:true,persisted:false,savedPhotos:0,translating:false,
   queue:new Set(),jobRunning:false,jobDone:0,jobTotal:0,suggesting:false,busySeries:new Set(),confirmDel:null,loaded:false,photoCtl:null};
 
 /* ---------- helpers ---------- */
@@ -415,21 +416,25 @@ function identifyPrompt(parts){
 ${parts>1?"The images are overlapping sections of ONE photo (left/right or top/bottom). A book visible in both sections counts once.":"The image is one photo of a shelf or a stack of books."}
 List every book whose title you can actually read on its spine or cover. Use your knowledge to complete a partly visible title or an author's full name, but never invent books you cannot see. Ignore objects that aren't books. A boxed set counts as one entry.
 Reply with only JSON in this shape:
-{"books":[{"title":"Full Title","author":"Author Name","color":"#RRGGBB","textColor":"#RRGGBB","sure":true}]}
+{"books":[{"title":"Full Title","author":"Author Name","translator":null,"publisher":null,"color":"#RRGGBB","textColor":"#RRGGBB","sure":true}]}
+"translator" is the translator's name only when it is printed and readable on the spine or cover (for example "Pevear and Volokhonsky, translators" or "A new translation by Oliver Ready"); otherwise null. "publisher" is the imprint name or logo you can read on the spine (for example "Penguin Classics", "Vintage", "Tor"); otherwise null.
 "color" is the spine's main background color as it looks in the photo; "textColor" is the color of the spine lettering. Set "sure" to false when you are guessing at hard-to-read text. Order books as they sit on the shelf.`;
 }
 function enrichPrompt(items){
   return `Give catalogue details for each book below, for a home-library app.
 Books: ${JSON.stringify(items)}
 Reply with only a JSON array, one object per book, using the same "key" values:
-[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","series":null}]
+[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null}]
+"originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
 "color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"books":[{"number":1,"title":"...","year":2001}],"complete":true}: "books" lists every main numbered entry in reading order (leave out novellas and companion books unless the series numbers them), and "complete" says whether the series has finished. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
 }
 
 /* ---------- books ---------- */
 function newBook(it){
   return{kind:"book",id:uid("b"),title:cleanStr(it.title,200),author:cleanStr(it.author,120),genre:null,year:null,blurb:"",
-    color:hex(it.color),textColor:hex(it.textColor),seriesId:null,seriesName:null,seriesNumber:null,needsDetails:true,addedAt:Date.now()};
+    color:hex(it.color),textColor:hex(it.textColor),seriesId:null,seriesName:null,seriesNumber:null,needsDetails:true,addedAt:Date.now(),
+    publisher:cleanStr(it.publisher,80)||null,translator:cleanStr(it.translator,160)||null,translatorSource:cleanStr(it.translator)?"spine":null,
+    originalLanguage:null,photoId:it.photoId||null};
 }
 async function addBooks(items){
   const recs=items.filter(i=>cleanStr(i.title)).map(newBook);
@@ -442,6 +447,16 @@ function cleanSeriesBooks(list){
   if(!Array.isArray(list))return[];
   return list.map(e=>({number:num(e&&e.number),title:cleanStr(e&&e.title,200),year:num(e&&e.year)})).filter(e=>e.title).slice(0,120);
 }
+function applyTranslation(book,d){
+  if(!d||!("originalLanguage" in d||"translator" in d))return;
+  const lang=cleanStr(d.originalLanguage,40);
+  book.originalLanguage=lang&&norm(lang)!=="english"?lang:null;
+  book.translationChecked=true;
+  const t=cleanStr(d.translator,160);
+  const locked=book.translatorSource==="spine"||book.translatorSource==="photo"||book.translatorSource==="you";
+  if(book.originalLanguage&&t&&!locked){book.translator=t;book.translatorSource=d.translatorLikely?"likely":"edition";}
+  if(!book.originalLanguage&&!locked){book.translator=null;book.translatorSource=null;}
+}
 function applyDetails(book,d,seriesMap){
   book.title=cleanStr(d.title,200)||book.title;
   book.author=cleanStr(d.author,120)||book.author;
@@ -449,6 +464,7 @@ function applyDetails(book,d,seriesMap){
   book.year=num(d.year)??book.year;
   book.blurb=cleanStr(d.blurb,1200)||book.blurb||"";
   if(!hex(book.color))book.color=hex(d.color);
+  applyTranslation(book,d);
   book.needsDetails=false;
   const s=d.series;
   if(s&&typeof s==="object"&&cleanStr(s.name)){
@@ -478,7 +494,7 @@ async function runJob(){
       const books=batch.map(i=>S.records.get(i)).filter(b=>b&&!b.deleted).map(clone);
       if(!books.length)continue;
       try{
-        const res=await AI.json(enrichPrompt(books.map((b,i)=>({key:"k"+i,title:b.title,author:b.author||""}))));
+        const res=await AI.json(enrichPrompt(books.map((b,i)=>{const o={key:"k"+i,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.translator)o.translator=b.translator;return o;})));
         const arr=Array.isArray(res)?res:(Array.isArray(res&&res.books)?res.books:[]);
         const seriesMap=new Map(),out=[];
         for(const d of arr){
@@ -623,6 +639,21 @@ async function queuePhotos(blobs){
   if(!ok&&S.persist)toast("Your phone is low on space for photos. They’ll stay until you close the app.");
   scheduleRender();return recs.length;
 }
+// Photos that have been read are kept (marked read) so they can be looked at again later.
+async function keepPhotos(entries){
+  const ids=new Map(),recs=[];
+  for(const e of entries){
+    if(e.qid){const p=S.queued.find(x=>x.id===e.qid);if(p){recs.push({...p,read:true});ids.set(e,p.id);}continue;}
+    const small=await shrink(e.blob);const rec={id:uid("p"),blob:small,addedAt:Date.now(),read:true};recs.push(rec);ids.set(e,rec.id);
+  }
+  if(recs.length){
+    const ok=await store.put(recs,"photos");
+    const read=new Set(recs.map(r=>r.id));S.queued=S.queued.filter(p=>!read.has(p.id));
+    if(ok)S.savedPhotos+=recs.length;
+    scheduleRender();
+  }
+  return ids;
+}
 async function removeQueued(ids){
   if(!ids.length)return;
   S.queued=S.queued.filter(p=>!ids.includes(p.id));await store.del(ids,"photos");scheduleRender();
@@ -649,7 +680,8 @@ async function readPhotos(entries){
       const res=await AI.json(identifyPrompt(imgs.length),{images:imgs,signal:ctl.signal});
       const arr=Array.isArray(res&&res.books)?res.books:(Array.isArray(res)?res:[]);
       for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;
-        found.push({title,author:cleanStr(r.author,120),color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false});}
+        found.push({title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),
+          color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false,entry:entries[i]});}
       ok.push(entries[i]);
     }catch(e){
       if(e&&e.code==="cancelled")break;
@@ -698,10 +730,12 @@ function review(cands,errors,ok,savedCount,n){
   btn.onclick=async()=>{
     const items=[];
     body.querySelectorAll("#cands input[type=checkbox]:checked").forEach(cb=>{const i=+cb.dataset.i;const c=cands[i];
-      items.push({title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value,color:c.color,textColor:c.textColor});});
+      items.push({title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value,color:c.color,textColor:c.textColor,
+        translator:c.translator,publisher:c.publisher,entry:c.entry});});
     closeSheet();
+    const photoIds=await keepPhotos(ok);
+    items.forEach(it=>{it.photoId=photoIds.get(it.entry)||null;delete it.entry;});
     await addBooks(items);
-    await removeQueued(ok.filter(e=>e.qid).map(e=>e.qid));
     toast(canAsk()?`Added ${plural(items.length,"book")}. Looking up details…`:`Added ${plural(items.length,"book")}.`);
   };
 }
@@ -726,6 +760,71 @@ async function openTypeFromPhoto(idx){
       del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.textContent="Tap again to delete";return;}
         await removeQueued([p.id]);if(S.queued.length)openTypeFromPhoto(Math.min(idx,S.queued.length-1));else{closeSheet();toast("Photo deleted.");}};
     });
+}
+
+/* ---------- translations ---------- */
+function translationPrompt(items){
+  return `For each book below, say which language it was first written in, and who translated this edition if it was not written in English.
+Books: ${JSON.stringify(items)}
+Reply with only a JSON array, one object per book, using the same "key" values:
+[{"key":"k0","originalLanguage":null,"translator":null,"translatorLikely":true}]
+"originalLanguage" is null for books first written in English. For translated books: if a translator is given in the input, repeat it with "translatorLikely": false. Otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, with "translatorLikely": true, and use null when you can't tell. Don't guess between several well-known translations without an edition clue.`;
+}
+function rescanPrompt(parts,titles){
+  return `${parts>1?"These images are overlapping sections of ONE photo of a bookshelf.":"This is a photo of a bookshelf."}
+Find these books on the shelf: ${JSON.stringify(titles)}
+For each one, read the translator's name if it is printed on the spine or cover, and the publisher imprint if visible. Do not guess: use null for anything you cannot read.
+Reply with only a JSON array: [{"title":"as given","translator":null,"publisher":null}]`;
+}
+const isTranslated=b=>!!b.originalLanguage;
+const translatorKnown=b=>b.translator&&["spine","photo","you"].includes(b.translatorSource);
+async function findTranslators(onStep){
+  if(!canAsk())throw{code:AI.key()?"offline":"no_key"};
+  let books=live("book").filter(b=>!b.translationChecked);
+  const res={checked:0,translated:0,fromPhotos:0};
+  // 1. which books are translations, plus edition-based guesses
+  for(let i=0;i<books.length;i+=40){
+    const batch=books.slice(i,i+40);onStep(`Checking which books are translations: ${Math.min(i+40,books.length)} of ${books.length}`);
+    const arr=await AI.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.translator)o.translator=b.translator;return o;})));
+    const out=[];
+    for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;
+      const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;const c=clone(cur);applyTranslation(c,d);out.push(c);}
+    if(out.length)await save(out);res.checked+=batch.length;
+  }
+  // 2. look again at saved photos for translators printed on spines
+  const need=live("book").filter(b=>isTranslated(b)&&!translatorKnown(b)&&b.photoId);
+  const byPhoto=new Map();need.forEach(b=>{if(!byPhoto.has(b.photoId))byPhoto.set(b.photoId,[]);byPhoto.get(b.photoId).push(b);});
+  if(byPhoto.size){
+    const photos=new Map((await store.all("photos")).map(p=>[p.id,p]));let n=0;
+    for(const[pid,list]of byPhoto){
+      n++;onStep(`Looking at your saved photos again: ${n} of ${byPhoto.size}`);
+      const p=photos.get(pid);if(!p||!p.blob)continue;
+      const imgs=await prepImages(p.blob);
+      const arr=await AI.json(rescanPrompt(imgs.length,list.map(b=>b.title)),{images:imgs});
+      const out=[];
+      for(const d of Array.isArray(arr)?arr:[]){const b=list.find(x=>titleMatch(x.title,d&&d.title));if(!b)continue;
+        const c=clone(S.records.get(b.id));const t=cleanStr(d.translator,160);
+        if(t){c.translator=t;c.translatorSource="spine";res.fromPhotos++;}
+        if(!c.publisher&&cleanStr(d.publisher))c.publisher=cleanStr(d.publisher,80);
+        out.push(c);}
+      if(out.length)await save(out);
+    }
+  }
+  res.translated=live("book").filter(isTranslated).length;
+  res.unknown=live("book").filter(b=>isTranslated(b)&&!translatorKnown(b)).length;
+  return res;
+}
+async function readTitlePage(id,file){
+  const b=S.records.get(id);if(!b)return;
+  const imgs=await prepImages(file);
+  const d=await AI.json(`This photo shows the spine, cover, title page or copyright page of "${b.title}"${b.author?` by ${b.author}`:""}. Read the translator's name and the publisher if they are shown. Do not guess: use null for anything you cannot read.
+Reply with only JSON: {"translator":null,"publisher":null,"originalLanguage":null}
+"originalLanguage" is the language the book was first written in, or null if English.`,{images:imgs,model:MODELS.smart,maxTokens:300});
+  const c=clone(S.records.get(id));const t=cleanStr(d&&d.translator,160);
+  if(t){c.translator=t;c.translatorSource="photo";}
+  if(cleanStr(d&&d.publisher))c.publisher=cleanStr(d.publisher,80);
+  const lang=cleanStr(d&&d.originalLanguage,40);if(lang&&norm(lang)!=="english")c.originalLanguage=lang;
+  await save(c);return t;
 }
 
 /* ---------- paste from Claude ---------- */
@@ -835,12 +934,14 @@ function openBook(id){
       <div class="cover" style="--c:${c};--t:${t}" aria-hidden="true">${esc(b.title)}</div>
       <div><h2 class="b-title">${esc(b.title)}</h2>
         <p class="b-author">${esc(b.author||"Author unknown")}</p>
-        <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}</p></div>
+        <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}${b.publisher?`<span class="tag soft">${esc(b.publisher)}</span>`:""}</p></div>
     </div>
+    ${isTranslated(b)?`<p class="translation">Translated from ${esc(b.originalLanguage)}${b.translator?` by ${esc(b.translator)}`:", translator unknown"}${b.translator&&b.translatorSource==="likely"?` <span class="tag soft">probably</span>`:""}</p>`:""}
     ${b.seriesName?`<button class="series-link" id="toSeries">${b.seriesNumber!=null?`Book ${esc(b.seriesNumber)} of `:"Part of "}${esc(b.seriesName)}</button>`:""}
     ${b.blurb?`<p class="blurb parch">${esc(b.blurb)}</p>`:`<p class="muted" style="margin-top:14px">${b.needsDetails?(canAsk()?"Details are on their way, or tap Look up details.":"Details get looked up once you’re online."):"No description for this one."}</p>`}
     <div class="actions">
       ${canAsk()?`<button class="btn" id="refresh">${b.needsDetails?"Look up details":"Refresh details"}</button>`:""}
+      ${canAsk()&&isTranslated(b)&&!translatorKnown(b)?`<label class="btn" style="cursor:pointer">Snap the title page<input type="file" id="tpSnap" class="vh" accept="image/*"></label>`:""}
       <button class="btn" id="edit">Edit</button>
       <button class="btn quiet danger-text" id="remove">Remove</button>
     </div>`,body=>{
@@ -848,6 +949,10 @@ function openBook(id){
         const el=document.getElementById("ser-"+b.seriesId);if(el)el.scrollIntoView({block:"start"});};
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
+      const snap=$("#tpSnap",body);if(snap)snap.onchange=async()=>{const f=snap.files[0];if(!f)return;
+        snap.closest("label").firstChild.textContent="Reading…";
+        try{const t=await readTitlePage(b.id,f);openBook(b.id);toast(t?`Translator: ${t}.`:"No translator name found in that photo. Try the title page or copyright page.");}
+        catch(e){openBook(b.id);toast(sampleMsg(e)||"That didn’t work. Try again.");}};
       const rm=$("#remove",body);
       rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);return;}
         rm.dataset.armed="1";rm.textContent="Tap again to remove";};
@@ -863,6 +968,10 @@ function editBook(id){
     <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:8px">
       <div><label for="eS">Series <span class="opt">(optional)</span></label><input id="eS" value="${esc(b.seriesName||"")}"></div>
       <div><label for="eN">Book no.</label><input id="eN" inputmode="decimal" value="${esc(b.seriesNumber??"")}"></div></div>
+    <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label for="eL">Original language</label><input id="eL" placeholder="English" value="${esc(b.originalLanguage||"")}"></div>
+      <div><label for="eP">Publisher</label><input id="eP" value="${esc(b.publisher||"")}"></div></div>
+    <div class="field"><label for="eTr">Translator <span class="opt">(if translated)</span></label><input id="eTr" value="${esc(b.translator||"")}"></div>
     <div class="field"><label for="eB">Description</label><textarea id="eB">${esc(b.blurb||"")}</textarea></div>
     <div class="actions"><button class="btn brass" id="eSave">Save changes</button><button class="btn" id="eCancel">Cancel</button></div>`;
   $("#eCancel").onclick=()=>openBook(id);
@@ -872,6 +981,10 @@ function editBook(id){
     const sn=cleanStr($("#eS").value,150);
     if(sn){c.seriesName=sn;c.seriesId="s_"+slug(sn);c.seriesNumber=num($("#eN").value);}else{c.seriesName=null;c.seriesId=null;c.seriesNumber=null;}
     c.blurb=cleanStr($("#eB").value,1200);
+    const lang=cleanStr($("#eL").value,40);c.originalLanguage=lang&&norm(lang)!=="english"?lang:null;c.translationChecked=true;
+    c.publisher=cleanStr($("#eP").value,80)||null;
+    const tr=cleanStr($("#eTr").value,160);
+    if(tr!==(b.translator||"")){c.translator=tr||null;c.translatorSource=tr?"you":null;}
     await save(c);openBook(id);toast("Saved.");
   };
 }
@@ -906,6 +1019,11 @@ function openMenu(){
     <div class="actions" style="margin-top:8px">${key?`<button class="btn small" id="testKey">Test key</button><button class="btn small quiet danger-text" id="clearKey">Remove key</button>`:""}</div>
     <label class="switch" style="margin-top:14px"><input type="checkbox" id="eco" ${LS.get("study-economy","0")==="1"?"checked":""}> Economy mode: use the cheaper model (less accurate on fancy spines)</label>
     <p class="muted">Spent so far: $${(sp.cost||0).toFixed(2)} across ${plural(sp.calls||0,"request")}.</p>
+    <h3 class="sub">Translations</h3>
+    <p class="muted" style="margin-top:0">${(()=>{const t=live("book").filter(isTranslated),u=t.filter(b=>!translatorKnown(b)).length,un=live("book").filter(b=>!b.translationChecked).length;
+      return `${plural(t.length,"translated book")} so far${u?`, ${u} without a confirmed translator`:""}.${un?` ${plural(un,"book")} not checked yet.`:""}`;})()}</p>
+    <button class="btn wide" id="findTr" ${canAsk()?"":"disabled"}>${canAsk()?"Find translators":"Find translators (needs internet and an API key)"}</button>
+    <p class="muted">${plural(S.savedPhotos,"shelf photo")} saved on this phone, so Claude can look at them again for new features.${S.savedPhotos?` <button class="btn small quiet danger-text" id="delPhotos">Delete saved photos</button>`:""}</p>
     <h3 class="sub">Backup file</h3>
     <p class="muted" style="margin-top:0">${esc(syncText())} Restoring merges a backup with what’s here; nothing gets deleted. Backups from the Claude version of The Study work too.</p>
     <div class="list-pick">
@@ -917,6 +1035,14 @@ function openMenu(){
         try{await AI.json(`Reply with {"ok":true}`,{model:MODELS.cheap,maxTokens:20});toast("Your key works.");}catch(e){toast(sampleMsg(e)||"Test cancelled.");}
         tk.disabled=false;tk.textContent="Test key";};
       const ck=$("#clearKey",body);if(ck)ck.onclick=()=>{if(!ck.dataset.armed){ck.dataset.armed="1";ck.textContent="Tap again to remove";return;}LS.del("study-api-key");toast("API key removed.");scheduleRender();openMenu();};
+      const ft=$("#findTr",body);if(ft)ft.onclick=async()=>{
+        ft.disabled=true;
+        try{const r=await findTranslators(m=>{ft.textContent=m;});
+          closeSheet();toast(`${plural(r.translated,"translated book")}. ${r.fromPhotos?`${plural(r.fromPhotos,"translator")} read from your photos. `:""}${r.unknown?`${r.unknown} still unconfirmed: open one and tap Snap the title page.`:"All translators found."}`);}
+        catch(e){ft.disabled=false;ft.textContent="Find translators";toast(sampleMsg(e)||"That didn’t finish. Try again.");}};
+      const dp=$("#delPhotos",body);if(dp)dp.onclick=async()=>{if(!dp.dataset.armed){dp.dataset.armed="1";dp.textContent="Tap again to delete";return;}
+        const ids=(await store.all("photos")).filter(p=>p.read).map(p=>p.id);await store.del(ids,"photos");S.savedPhotos=0;
+        toast("Saved photos deleted.");openMenu();};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
       $("#exp",body).onclick=async()=>{
         const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=clone(r);delete c._synced;return c;});
@@ -980,7 +1106,7 @@ function renderShelves(){
       <button class="btn brass" data-act="add">Add books</button></div>`});
   }
   const q=norm(S.q);
-  const books=q?all.filter(b=>norm([b.title,b.author,b.seriesName,b.genre].join(" ")).includes(q)):all;
+  const books=q?all.filter(b=>norm([b.title,b.author,b.seriesName,b.genre,b.translator,b.publisher,b.originalLanguage].join(" ")).includes(q)):all;
   if(!books.length)return`<p class="empty-note">Nothing on your shelves matches “${esc(S.q)}”.</p>`;
   const sortKey=b=>[lastName(b.author),norm(b.seriesName||""),String(b.seriesNumber??0).padStart(6,"0"),norm(b.title)].join("|");
   let groups;
@@ -1086,7 +1212,9 @@ window.addEventListener("offline",scheduleRender);
   try{const g=localStorage.getItem("shelves-group");if(g&&["genre","author","recent"].includes(g)){S.group=g;$("#group").value=g;}}catch(_){}
   await store.open();
   for(const r of await store.all())S.records.set(r.id,r);
-  S.queued=(await store.all("photos")).filter(p=>p&&p.blob).sort((a,b)=>a.addedAt-b.addedAt);
+  const photos=(await store.all("photos")).filter(p=>p&&p.blob);
+  S.queued=photos.filter(p=>!p.read).sort((a,b)=>a.addedAt-b.addedAt);
+  S.savedPhotos=photos.filter(p=>p.read).length;
   S.loaded=true;render();
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
