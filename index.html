@@ -204,13 +204,17 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 /* sheets */
 .backdrop{position:fixed;inset:0;background:var(--scrim);z-index:40}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;margin:0 auto;width:100%;max-width:640px;max-height:calc(92% - env(safe-area-inset-top,0px));overflow:auto;overscroll-behavior:contain;
-  border-radius:10px 10px 0 0;padding:10px 22px calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .24s ease-out}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;margin:0 auto;width:100%;max-width:640px;max-height:calc(92% - env(safe-area-inset-top,0px));overflow:hidden;
+  display:flex;flex-direction:column;border-radius:10px 10px 0 0;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .24s ease-out}
+.sheet-head{position:relative;flex:none;height:48px}
+.sheet-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:2px 10px 18px;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 18px),transparent 100%)}
 .sheet.in{transform:none}
 @media (prefers-reduced-motion: reduce){.sheet{transition:none}}
-.grab{width:40px;height:4px;border-radius:2px;background:var(--brass-lo);margin:4px auto 6px}
-.x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;border:1px solid var(--brass-lo);background:var(--leather);color:var(--brass-hi);font-size:21px;line-height:1;cursor:pointer}
-.sheet-title{font-family:var(--display);font-weight:400;font-size:25px;margin:6px 44px 12px 0;line-height:1.2;color:var(--brass-hi)}
+.grab{position:absolute;top:14px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--brass-lo)}
+.x{position:absolute;top:10px;right:6px;width:34px;height:34px;padding:0;display:grid;place-items:center;border-radius:50%;border:1px solid var(--brass-lo);background:var(--leather);color:var(--brass-hi);cursor:pointer}
+.x svg{display:block}
+.sheet-title{font-family:var(--display);font-weight:400;font-size:25px;margin:0 0 12px;line-height:1.2;color:var(--brass-hi)}
 .sub{font-size:17px;margin:20px 0 8px;font-weight:600}
 .field{margin-bottom:10px}
 .field label{display:block;font-size:15px;font-weight:600;margin-bottom:4px}
@@ -222,7 +226,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .bookhead{display:flex;gap:16px;align-items:flex-start;margin-top:4px}
 .cover{flex:none;width:72px;height:108px;border-radius:2px 4px 4px 2px;color:var(--t);font-weight:600;font-size:12px;line-height:1.2;padding:9px 6px 8px 11px;overflow:hidden;
   background:linear-gradient(90deg,rgba(0,0,0,.45) 0 5px,rgba(255,235,200,.1) 5px 7px,transparent 30%),var(--c);box-shadow:0 3px 8px rgba(0,0,0,.6)}
-.b-title{font-family:var(--display);font-weight:400;font-size:25px;line-height:1.15;margin:0 40px 4px 0;color:var(--brass-hi)}
+.b-title{font-family:var(--display);font-weight:400;font-size:25px;line-height:1.15;margin:0 0 4px 0;color:var(--brass-hi)}
 .b-author{margin:0;font-size:18px;font-style:italic}
 .b-meta{margin:6px 0 0;display:flex;gap:6px;flex-wrap:wrap}
 .series-link{display:block;margin:14px 0 0;background:none;border:0;padding:0;font-weight:600;text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:3px;cursor:pointer;text-align:left}
@@ -234,7 +238,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .cand-fields{display:grid;gap:6px}
 .cand-fields input{padding:6px 10px}
 .cand-fields .ct{font-weight:600}
-.sticky-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));padding:12px 0 calc(24px + env(safe-area-inset-bottom,0px));margin-top:8px;background:linear-gradient(transparent,var(--leather) 30%)}
+.sticky-foot{position:sticky;bottom:-18px;padding:12px 0 18px;margin-top:8px;background:linear-gradient(transparent,var(--leather) 30%)}
 .list-pick{display:grid;gap:8px}
 .photo-view{overflow:auto;max-height:46vh;border:1px solid var(--brass-lo);border-radius:2px;background:#000;margin-bottom:8px}
 .photo-view img{display:block;width:100%;max-width:none;cursor:zoom-in}
@@ -270,6 +274,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .art::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(255,235,200,.10) 26%,rgba(255,235,200,.02) 56%,rgba(0,0,0,.42))}
 .art.jacket::after{background:linear-gradient(90deg,rgba(0,0,0,.35) 0 5px,rgba(255,235,200,.08) 5px 7px,transparent 22%,transparent 92%,rgba(0,0,0,.15))}
 .art .dk{position:absolute;display:block}
+.face.front .art,.face.back .art{inset:auto;left:0;top:0;width:150px;height:225px;transform-origin:0 0;transform:scaleX(var(--sx,1))}
 .art .vt{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;text-align:center;white-space:nowrap;overflow:hidden}
 .art .hz{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
 .spine.photo{padding:0;background-size:100% 100%;background-color:#1a120c;box-shadow:inset 2px 0 0 rgba(255,235,200,.1),inset -3px 0 0 rgba(0,0,0,.35),1px 0 0 rgba(0,0,0,.55)}
@@ -480,7 +485,8 @@ function enrichPrompt(items){
   return `Give catalogue details for each book below, for a home-library app.
 Books: ${JSON.stringify(items)}
 Reply with only a JSON array, one object per book, using the same "key" values:
-[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[]}]
+[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[],"wordCount":90000,"pages":320,"format":"trade paperback"}]
+"wordCount" is the approximate number of words in the text. "pages" and "format" (one of "mass market paperback", "trade paperback", "hardcover") describe the edition the publisher suggests if one is given, otherwise the most common current edition.
 "originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
 "color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
 }
@@ -503,6 +509,21 @@ function cleanSeriesBooks(list){
   if(!Array.isArray(list))return[];
   return list.map(e=>({number:num(e&&e.number),title:cleanStr(e&&e.title,200),year:num(e&&e.year),novella:!!(e&&e.novella),upcoming:!!(e&&e.upcoming)})).filter(e=>e.title).slice(0,150);
 }
+const FORMATS={"mass market paperback":{h:17.5,w:10.8,paper:.0075,boards:.1},"trade paperback":{h:21,w:13.8,paper:.0068,boards:.1},"hardcover":{h:24,w:16,paper:.0062,boards:.5}};
+function applySize(book,d){
+  if(!d)return;const w=num(d.wordCount),p=num(d.pages),f=cleanStr(d.format,40).toLowerCase();
+  if(w&&w>500&&w<2500000)book.wordCount=Math.round(w);
+  if(p&&p>16&&p<4000)book.pages=Math.round(p);
+  if(FORMATS[f])book.format=f;
+  book.sizeChecked=true;
+}
+// Physical size in centimetres, from format and page count (or words, about 300 to a page).
+function physical(b){
+  const pages=b.pages||(b.wordCount?Math.round(b.wordCount/300):null);
+  if(!pages&&!b.format)return null;
+  const f=FORMATS[b.format]||FORMATS["trade paperback"];
+  return{h:f.h,w:f.w,t:(pages||320)*f.paper+f.boards,pages};
+}
 function applyTranslation(book,d){
   if(!d||!("originalLanguage" in d||"translator" in d))return;
   const lang=cleanStr(d.originalLanguage,40);
@@ -521,6 +542,7 @@ function applyDetails(book,d,seriesMap){
   book.blurb=cleanStr(d.blurb,1200)||book.blurb||"";
   if(!hex(book.color))book.color=hex(d.color);
   applyTranslation(book,d);
+  applySize(book,d);
   book.needsDetails=false;
   if(Array.isArray(d.contains))book.contains=d.contains.map(x=>cleanStr(typeof x==="string"?x:x&&x.title,200)).filter(Boolean).slice(0,30);
   applySeries(book,d.series,seriesMap);
@@ -568,6 +590,24 @@ async function runJob(){
       S.jobDone+=books.length;scheduleRender();
     }
   }finally{S.jobRunning=false;S.queue.clear();S.jobDone=0;S.jobTotal=0;scheduleRender();}
+}
+
+async function measureBooks(){
+  if(S.measuring||!canAsk())return;const todo=live("book").filter(b=>!b.sizeChecked&&!b.needsDetails);if(!todo.length)return;
+  S.measuring=true;
+  try{
+    for(let i=0;i<todo.length;i+=40){
+      const batch=todo.slice(i,i+40);
+      const arr=await AI.json(`For each book, give its approximate word count and the page count and format of its most common current edition (or the edition the publisher suggests, if given).
+Books: ${JSON.stringify(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.contains&&b.contains.length)o.omnibusOf=b.contains;return o;}))}
+Reply with only a JSON array: [{"key":"k0","wordCount":90000,"pages":320,"format":"trade paperback"}]
+"format" is one of "mass market paperback", "trade paperback", "hardcover". An omnibus counts every book inside it.`,{model:MODELS.smart,maxTokens:4000});
+      const out=[];
+      for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;
+        const c=clone(cur);applySize(c,d);out.push(c);}
+      if(out.length)await save(out);
+    }
+  }catch(e){}finally{S.measuring=false;}
 }
 
 /* ---------- series ---------- */
@@ -1103,8 +1143,14 @@ function styleOf(b){
     /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other";
   const list=STYLE_SETS[set];return list[hash(b.seriesId||b.id)%list.length];   // a series shares one design, like real editions
 }
-function spineDims(b){const h=hash(b.id+b.title);const H=118+(h%30);const len=(b.title||"").length;
-  const W=Math.min(54,24+((h>>5)%12)+(len>16?6:0)+(len>28?8:0));return{W,H};}
+const PX_PER_CM=5.8;   // a 24 cm hardcover stands 139 px tall on the shelf
+function spineDims(b){
+  const ph=physical(b);
+  // Heights are true to scale. Thickness keeps true proportions, nudged up a little so short titles stay readable.
+  if(ph)return{H:Math.min(148,Math.round(ph.h*PX_PER_CM)),W:Math.max(13,Math.min(72,Math.round(ph.t*PX_PER_CM*1.3)))};
+  const h=hash(b.id+b.title);const H=118+(h%30);const len=(b.title||"").length;
+  return{H,W:Math.min(54,24+((h>>5)%12)+(len>16?6:0)+(len>28?8:0))};
+}
 const vt=(text,top,L,f,W,maxFs,thick=.74)=>{if(!text||L<12)return"";const str=f.up?text.toUpperCase():text;const r=fitVertical(str,f,L*.94,W*thick,maxFs);
   if(maxFs<=9&&r.fs<5.5)return"";   // an author name that can't be read at this size is left off
   return`<span class="vt" style="top:${top}px;height:${L}px;font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.08 ${f.fam};letter-spacing:${f.ls||0}em;color:${f.col}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
@@ -1193,9 +1239,11 @@ function backArt(b){
     ${b.publisher?`<span class="hz" style="left:16px;bottom:16px;width:70px;height:16px;justify-content:flex-start;font:italic 400 9px/1 ${F_SERIF};color:${ink}">${esc(b.publisher)}</span>`:""}</span>`;
 }
 function book3dHTML(b){
-  const{W,H}=spineDims(b);const T=Math.round(Math.max(18,Math.min(60,225*W/H)));
+  const ph=physical(b);let T,BW=150;
+  if(ph){T=Math.round(Math.max(10,Math.min(80,225*ph.t/ph.h)));BW=Math.round(225*ph.w/ph.h);}
+  else{const{W,H}=spineDims(b);T=Math.round(Math.max(18,Math.min(60,225*W/H)));}
   return`<div class="stage" id="stage" role="img" aria-label="${esc(b.title)}: drag to turn the book, tap to flip it">
-    <div class="book3d" id="b3d" style="--bt:${T}px">
+    <div class="book3d" id="b3d" style="--bt:${T}px;--bw:${BW}px;--sx:${(BW/150).toFixed(3)}">
       <div class="face front">${coverArt(b)}</div>
       <div class="face back">${backArt(b)}</div>
       <div class="face spine3">${spineArt(b,T,225)}</div>
@@ -1380,7 +1428,7 @@ function openSheet(html,mount){
   closeSheet(true);
   const bd=document.createElement("div");bd.className="backdrop";bd.id="backdrop";bd.onclick=()=>closeSheet();
   const sh=document.createElement("div");sh.className="sheet leather";sh.id="sheet";sh.setAttribute("role","dialog");sh.setAttribute("aria-modal","true");
-  sh.innerHTML=`<div class="grab" aria-hidden="true"></div><button class="x" aria-label="Close">×</button><div class="sheet-body">${html}</div>`;
+  sh.innerHTML=`<div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="x" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div><div class="sheet-body">${html}</div>`;
   sh.querySelector(".x").onclick=()=>closeSheet();
   if(!S.lastFocus||!document.contains(S.lastFocus))S.lastFocus=document.activeElement;
   document.body.append(bd,sh);document.body.classList.add("locked");
@@ -1427,7 +1475,8 @@ function openBook(id){
   openSheet(`${book3dHTML(b)}<div class="bookhead">
       <div><h2 class="b-title">${esc(b.title)}</h2>
         <p class="b-author">${esc(b.author||"Author unknown")}</p>
-        <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}${b.publisher?`<span class="tag soft">${esc(b.publisher)}</span>`:""}</p></div>
+        <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}${b.publisher?`<span class="tag soft">${esc(b.publisher)}</span>`:""}</p>
+        ${b.wordCount||b.pages||b.format?`<p class="b-meta">${b.format?`<span class="tag soft">${esc(b.format[0].toUpperCase()+b.format.slice(1))}</span>`:""}${b.pages?`<span class="tag soft">${b.pages.toLocaleString()} pages</span>`:""}${b.wordCount?`<span class="tag soft">about ${(Math.round(b.wordCount/1000)*1000).toLocaleString()} words</span>`:""}</p>`:""}</div>
     </div>
     ${isTranslated(b)?`<p class="translation">Translated from ${esc(b.originalLanguage)}${b.translator?` by ${esc(b.translator)}`:", translator unknown"}${b.translator&&b.translatorSource==="likely"?` <span class="tag soft">probably</span>`:""}${b.edition?`<br><span class="muted" style="font-size:15px">${esc(b.edition)}</span>`:""}</p>`:""}
     ${b.seriesName?`<button class="series-link" id="toSeries">${b.seriesNumber!=null?`Book ${esc(b.seriesNumber)} of `:"Part of "}${esc(b.seriesName)}</button>`:""}
@@ -1462,6 +1511,10 @@ function editBook(id){
     <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div><label for="eL">Original language</label><input id="eL" placeholder="English" value="${esc(b.originalLanguage||"")}"></div>
       <div><label for="eP">Publisher</label><input id="eP" value="${esc(b.publisher||"")}"></div></div>
+    <div class="field" style="display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px">
+      <div><label for="eW">Words</label><input id="eW" inputmode="numeric" value="${esc(b.wordCount??"")}"></div>
+      <div><label for="ePg">Pages</label><input id="ePg" inputmode="numeric" value="${esc(b.pages??"")}"></div>
+      <div><label for="eF">Format</label><select id="eF" style="width:100%"><option value="">Unknown</option>${Object.keys(FORMATS).map(f=>`<option${f===b.format?" selected":""} value="${f}">${f[0].toUpperCase()+f.slice(1)}</option>`).join("")}</select></div></div>
     <div class="field"><label for="eTr">Translator <span class="opt">(if translated)</span></label><input id="eTr" value="${esc(b.translator||"")}"></div>
     <div class="field"><label for="eB">Description</label><textarea id="eB">${esc(b.blurb||"")}</textarea></div>
     <div class="actions"><button class="btn brass" id="eSave">Save changes</button><button class="btn" id="eCancel">Cancel</button></div>`;
@@ -1474,6 +1527,7 @@ function editBook(id){
     c.blurb=cleanStr($("#eB").value,1200);
     const lang=cleanStr($("#eL").value,40);c.originalLanguage=lang&&norm(lang)!=="english"?lang:null;c.translationChecked=true;
     c.publisher=cleanStr($("#eP").value,80)||null;
+    c.wordCount=num($("#eW").value.replace(/[^0-9.]/g,""))||null;c.pages=num($("#ePg").value.replace(/[^0-9]/g,""))||null;c.format=$("#eF").value||null;c.sizeChecked=true;
     const tr=cleanStr($("#eTr").value,160);
     if(tr!==(b.translator||"")){c.translator=tr||null;c.translatorSource=tr?"you":null;}
     await save(c);openBook(id);toast("Saved.");
@@ -1788,7 +1842,7 @@ $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
 $("#group").addEventListener("change",e=>{S.group=e.target.value;try{localStorage.setItem("shelves-group",S.group);}catch(_){}render();});
-window.addEventListener("online",()=>{scheduleRender();if(S.queued.length&&AI.key())toast(`Back online. ${plural(S.queued.length,"photo")} ready to read.`);});
+window.addEventListener("online",()=>{scheduleRender();setTimeout(measureBooks,1500);if(S.queued.length&&AI.key())toast(`Back online. ${plural(S.queued.length,"photo")} ready to read.`);});
 window.addEventListener("offline",scheduleRender);
 
 (async function init(){
@@ -1802,6 +1856,7 @@ window.addEventListener("offline",scheduleRender);
   S.loaded=true;render();
   try{document.fonts.ready.then(()=>{_fit.clear();scheduleRender();});}catch(_){}
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
+  setTimeout(measureBooks,1500);
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
