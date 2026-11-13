@@ -2058,7 +2058,9 @@ function topCardHTML(t,listed){
   });
   const foot=ed?`${t.custom?"":`<button class="btn small" data-add-entry="${t.id}">Add a book or novella</button>`}${t.custom?`<button class="btn small" data-add-custom="${t.id}">Add to this series</button><button class="btn small quiet danger-text" data-del-custom="${t.id}">${S.confirmDel===t.id?"Tap again to delete":"Delete series"}</button>`
       :`<button class="btn small quiet" data-hide-top="${t.id}">${t.hiddenTop?"Show this series again":"Hide this whole series"}</button>`}${t.hiddenCount?`<button class="btn small quiet" data-reset-top="${t.id}">Put everything back</button>`:""}`
-    :t.custom?"":`<button class="btn small" data-refresh-top="${t.id}" ${busy?"disabled":""}>${busy?"Checking…":t.catalogued?"Check for newer books":"Load the full series"}</button>`;
+    :(t.custom?"":`<button class="btn small" data-refresh-top="${t.id}" ${busy?"disabled":""}>${busy?"Checking…":t.catalogued?"Check for newer books":"Load the full series"}</button>`)+
+     (t.missing.length&&canRead()&&seriesPhotos(t).length?`<button class="btn small" data-relook="${t.id}" ${S.relooking===t.id?"disabled":""}>${S.relooking===t.id?"Looking…":"Look for these in my photos"}</button>`:"")+
+     (t.missing.length>1?`<button class="btn small quiet" data-have-all="${t.id}">${S.confirmDel==="all:"+t.id?`Tap again to add ${t.missing.length} books`:"I have all of these"}</button>`:"");
   return`<div class="ledger leather${t.hiddenTop?" dim":""}${ed?" editing":""}" id="ser-${t.id}">
     <button class="card-edit${ed?" on":""}" data-edit-top="${t.id}" aria-label="${ed?"Finish editing":"Edit"} ${esc(t.name)}">${ed?"Done":`${PEN} Edit`}</button>
     <button class="card-head" data-toggle-series="${t.id}" aria-expanded="${open}">
@@ -2096,12 +2098,52 @@ function findEntry(key){
   const g=t.groups.find(x=>x.name===gname);const e=g&&g.entries.find(x=>(x.orig||x.title)===title);
   return{t,g,e,tid};
 }
-async function haveBook(key){
-  const{t,g,e,tid}=findEntry(key);if(!e||e.book)return;
+// Saved shelf photos that show books from this series: the most likely place to find the ones it missed.
+function seriesPhotos(t){
+  const ids=new Set();for(const g of t.groups)for(const e of g.entries)if(e.book&&e.book.photoId)ids.add(e.book.photoId);
+  return[...ids];
+}
+// Add a series book to the shelves (from "I have this book", "I have all of these" or a second look at a photo).
+async function addSeriesBook(t,g,e,extra={}){
   const sb=(t.subs||[]).find(x=>norm(x.name)===norm(g.name))||(t.subs||[])[0];
-  const mate=live("book").find(b=>nodeOf(b)==="s:"+tid)||(sb&&sb.owned[0]);
-  const b=newBook({title:e.title,author:t.author||(mate&&mate.author)});
-  if(sb){b.seriesId=sb.sid;b.seriesName=sb.name;}b.seriesNumber=e.novella?null:e.number;if(mate){b.genre=mate.genre;b.format=mate.format;}
+  const mate=live("book").find(b=>nodeOf(b)==="s:"+t.id)||(sb&&sb.owned[0]);
+  const b=newBook({title:e.title,author:t.author||(mate&&mate.author),...extra});
+  if(sb){b.seriesId=sb.sid;b.seriesName=sb.name;}b.seriesNumber=e.novella?null:e.number;if(mate){b.genre=mate.genre;b.format=b.format||mate.format;}
+  return b;
+}
+async function haveAll(tid){
+  const t=topsView().find(x=>x.id===tid);if(!t)return;
+  const add=[];for(const g of t.groups){if(g.hidden)continue;for(const e of g.entries)if(!e.book&&!e.hidden&&!e.upcoming)add.push(await addSeriesBook(t,g,e));}
+  if(!add.length)return;await save(add);fillDetails(add.map(b=>b.id));toast(`Added ${plural(add.length,"book")} from ${t.name}.`);
+}
+// A second, targeted look: tell Claude exactly which titles to search for in the photos that already show this series.
+async function relookSeries(tid){
+  const t=topsView().find(x=>x.id===tid);if(!t||!canRead())return;
+  const missing=[];for(const g of t.groups){if(g.hidden)continue;for(const e of g.entries)if(!e.book&&!e.hidden&&!e.upcoming)missing.push({g,e});}
+  if(!missing.length)return;
+  S.relooking=tid;render();
+  const photos=new Map((await store.all("photos")).map(p=>[p.id,p]));const found=new Map();
+  try{
+    for(const pid of seriesPhotos(t)){
+      const p=photos.get(pid);if(!p||!p.blob)continue;
+      const want=missing.filter(m=>!found.has(norm(m.e.title))).map(m=>m.e.title);if(!want.length)break;
+      const imgs=await prepImages(p.blob);
+      const res=await Claude.json(`${imgs.length>1?"These images are overlapping sections of ONE photo of a bookshelf.":"This is a photo of a bookshelf."}
+Look carefully at every spine, including small, worn, faded or partly hidden ones, and books lying flat or facing out.
+Which of these books are in the photo? ${JSON.stringify(want)}
+Reply with only JSON: {"found":["title exactly as written in the list"]}
+Include a book only if you can actually see it.`,{images:imgs,model:MODELS.smart,maxTokens:2000});
+      for(const ttl of Array.isArray(res&&res.found)?res.found:[]){const m=missing.find(x=>titleMatch(x.e.title,ttl));if(m&&!found.has(norm(m.e.title)))found.set(norm(m.e.title),{...m,pid});}
+    }
+    const add=[];for(const m of found.values())add.push(await addSeriesBook(t,m.g,m.e,{photoId:m.pid}));
+    if(add.length){await save(add);fillDetails(add.map(b=>b.id));}
+    toast(add.length?`Found ${plural(add.length,"more book")} from ${t.name} in your photos.`:`No more ${t.name} books in those photos. If you own them, try I have all of these, or rescan that shelf closer.`);
+  }catch(e){toast(sampleMsg(e)||"That didn’t finish. Try again.");}
+  finally{S.relooking=null;scheduleRender();}
+}
+async function haveBook(key){
+  const{t,g,e}=findEntry(key);if(!e||e.book)return;
+  const b=await addSeriesBook(t,g,e);
   await save(b);fillDetails([b.id]);toast(`Added ${e.title} to your shelves.`);
 }
 function openRename(key){
@@ -2254,6 +2296,9 @@ $("#main").addEventListener("click",e=>{
   if(d.have)return haveBook(d.have);
   if(d.rename)return openRename(d.rename);
   if(d.addEntry)return openAddEntry(d.addEntry);
+  if(d.relook)return relookSeries(d.relook);
+  if(d.haveAll){const id=d.haveAll,k="all:"+id;if(S.confirmDel!==k){S.confirmDel=k;render();setTimeout(()=>{if(S.confirmDel===k){S.confirmDel=null;scheduleRender();}},5000);return;}
+    S.confirmDel=null;return haveAll(id);}
   if(d.hideBook){const{e,tid}=findEntry(d.hideBook);if(!e)return;
     const k=norm(e.orig||e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
   if(d.hideGroup){const[tid,gn]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups.find(x=>x.name===decodeURIComponent(gn));if(!g)return;
