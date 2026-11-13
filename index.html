@@ -1033,6 +1033,56 @@ async function removeQueued(ids){
   S.queued=S.queued.filter(p=>!ids.includes(p.id));await store.del(ids,"photos");scheduleRender();
 }
 function isOwned(c){return live("book").some(b=>titleMatch(b.title,c.title)&&(!c.author||!b.author||lastName(b.author)===lastName(c.author)));}
+// Photos are saved first, then read one after another while you keep using the app.
+// If the app is closed, whatever's left resumes the next time it opens online.
+let wake=null;
+async function holdScreen(on){try{if(on&&!wake&&navigator.wakeLock)wake=await navigator.wakeLock.request("screen");if(!on&&wake){await wake.release();wake=null;}}catch(e){wake=null;}}
+async function processQueue(){
+  if(S.reading||!canRead()||!S.queued.length)return;
+  S.reading={done:0,total:S.queued.length};S.readFail=S.readFail||new Set();scheduleRender();holdScreen(true);
+  let added=0,checks=0,note="";
+  try{
+    while(canRead()){
+      const p=S.queued.find(x=>!S.readFail.has(x.id));if(!p)break;
+      S.reading.total=Math.max(S.reading.total,S.reading.done+S.queued.filter(x=>!S.readFail.has(x.id)).length);scheduleRender();
+      let arr;
+      try{const imgs=await prepImages(p.blob);const res=await AI.json(identifyPrompt(imgs.length,imgs.split),{images:imgs});
+        arr=Array.isArray(res&&res.books)?res.books:(Array.isArray(res)?res:[]);}
+      catch(e){if(stopsRun(e)){note=sampleMsg(e);break;}S.readFail.add(p.id);note=sampleMsg(e)||note;S.reading.done++;continue;}
+      const seen=new Map();
+      for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;const c={title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false};
+        const k=norm(c.title)+"|"+lastName(c.author);const prev=seen.get(k);if(!prev||(!prev.sure&&c.sure))seen.set(k,c);}
+      const cands=[...seen.values()].filter(c=>!isOwned(c));
+      const checkAll=LS.get("study-check-all","0")==="1";
+      const sure=checkAll?[]:cands.filter(c=>c.sure),unsure=checkAll?cands:cands.filter(c=>!c.sure);
+      // the photo is kept (marked read) before anything else, so nothing is lost if the app closes now
+      await store.put([{...p,read:true}],"photos");S.queued=S.queued.filter(x=>x.id!==p.id);S.savedPhotos++;
+      if(sure.length){await addBooks(sure.map(c=>({...c,photoId:p.id})));added+=sure.length;}
+      if(unsure.length){await save({kind:"pending",id:"r_"+p.id,photoId:p.id,items:unsure,createdAt:Date.now()});checks+=unsure.length;}
+      S.reading.done++;scheduleRender();
+    }
+  }finally{
+    S.reading=null;holdScreen(false);scheduleRender();
+    const bits=[added&&`Added ${plural(added,"book")}`,checks&&`${plural(checks,"book")} to check`].filter(Boolean);
+    if(bits.length||note)toast(bits.join(", ")+(bits.length?".":"")+(note?` ${note}`:""));
+  }
+}
+function openPending(){
+  const recs=live("pending");const items=[];recs.forEach(r=>(r.items||[]).forEach(it=>items.push({...it,rid:r.id,photoId:r.photoId})));
+  if(!items.length)return;
+  openSheet(`<h2 class="sheet-title">Check these books</h2>
+    <p class="muted" style="margin-top:-6px">Claude wasn’t sure about these. Untick anything wrong and fix any misread title.</p>
+    <div id="cands">${items.map((c,i)=>{const{c:col}=colors({id:c.title,color:c.color});return`<div class="cand">
+      <input type="checkbox" data-i="${i}" checked aria-label="Add ${esc(c.title)}"><div class="swatch" style="background:${col}"></div>
+      <div class="cand-fields"><input class="ct" data-i="${i}" value="${esc(c.title)}" aria-label="Title"><input class="ca" data-i="${i}" value="${esc(c.author)}" placeholder="Author" aria-label="Author"></div></div>`;}).join("")}</div>
+    <div class="sticky-foot"><div class="actions" style="margin:0"><button class="btn brass" id="pAdd">Add checked books</button><button class="btn quiet danger-text" id="pDrop">Discard all</button></div></div>`,body=>{
+      $("#pAdd",body).onclick=async()=>{const add=[];body.querySelectorAll("#cands input[type=checkbox]:checked").forEach(cb=>{const i=+cb.dataset.i,c=items[i];
+          add.push({...c,title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value});});
+        closeSheet();await save(recs.map(r=>({kind:"pending",id:r.id,deleted:true})));if(add.length)await addBooks(add.map(({rid,sure,...x})=>x));toast(`Added ${plural(add.length,"book")}.`);};
+      const dr=$("#pDrop",body);dr.onclick=async()=>{if(!dr.dataset.armed){dr.dataset.armed="1";dr.textContent="Tap again to discard";return;}
+        closeSheet();await save(recs.map(r=>({kind:"pending",id:r.id,deleted:true})));toast("Discarded.");};
+    });
+}
 function startReading(entries){
   openSheet(`<h2 class="sheet-title">Reading your shelves</h2><p class="progress-line">Getting started…</p>`);
   readPhotos(entries);
@@ -1177,10 +1227,14 @@ function wrapFit(text,f,maxW,maxH,maxFs,minFs){
 const surname=a=>{const p=String(a||"").trim().split(/\s+/);return p.length?p[p.length-1]:"";};
 function palette(b){const h=hash(b.id);const base=hex(b.color)||PALETTE[h%PALETTE.length];
   return{c:base,dark:shade(base,-.45),deep:shade(base,-.7),light:shade(base,.35),acc:ACCENTS[(hash(nodeOf(b))>>>3)%ACCENTS.length],ink:inkOn(base)};}
-const STYLE_SETS={classic:["gilt","hubs","label","minimal","penguin","deco"],fantasy:["gilt","gradient","deco","hubs","twotone","monogram","label"],
-  scifi:["pulp","minimal","gradient","twotone","stripes","deco"],dark:["pulp","twotone","stripes","deco","gradient","monogram"],
-  young:["paperback","stripes","pulp","twotone","monogram"],other:["paperback","twotone","minimal","stripes","label","penguin","monogram","gradient"]};
-const ALL_STYLES=["gilt","hubs","label","paperback","twotone","penguin","deco","pulp","minimal","gradient","stripes","monogram"];
+const STYLE_SETS={classic:["gilt","hubs","label","minimal","penguin","deco","labeltop","cloth","marbled","caps","frame","pinstripe"],
+  fantasy:["gilt","gradient","deco","hubs","twotone","monogram","label","sunburst","marbled","seal","caps","labeltop","frame"],
+  scifi:["pulp","minimal","gradient","twotone","stripes","deco","band","chevron","slab","sunburst","frame","dots"],
+  dark:["pulp","twotone","stripes","deco","gradient","monogram","slab","band","sunburst","seal","chevron"],
+  young:["paperback","stripes","pulp","twotone","monogram","dots","chevron","band","seal","frame"],
+  other:["paperback","twotone","minimal","stripes","label","penguin","monogram","gradient","cloth","pinstripe","dots","band","frame","slab"]};
+const ALL_STYLES=["gilt","hubs","label","paperback","twotone","penguin","deco","pulp","minimal","gradient","stripes","monogram",
+  "frame","band","labeltop","sunburst","dots","chevron","cloth","marbled","slab","pinstripe","seal","caps"];
 // A "node" is a whole sub-series (all its books share one design) or a single standalone book.
 const nodeOf=b=>b.seriesId?"s:"+b.seriesId:"b:"+b.id;
 function setForGenre(g){g=g||"";return STYLE_SETS[/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
@@ -1270,6 +1324,36 @@ function spineArt(b,W,H){
       out=vt(t,18,H-46,{fam:F_DISPLAY,col:ink,bg:g},W,15)+vt(au,H-26,22,{fam:F_SERIF,it:1,col:ink,bg:g.slice(1)},W,7);break;}
     case"stripes":bg=p.c;deco=[.06,.1,.86,.9].map(f=>box(`top:${f*H}px;left:0;right:0;height:${Math.max(2,.02*H)}px;background:${p.acc}`)).join("");
       out=vt(t,.14*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},W,14)+vt(au,.72*H,.12*H,{fam:F_SANS,wt:500,col:p.ink,up:1,bg:under(p.c)},W,7);break;
+    case"frame":{bg=p.c;const fc=readable(goldOn(p.c),[p.c]);deco=box(`top:5px;bottom:5px;left:3px;right:3px;border:1px solid ${fc};opacity:.85`);
+      out=vt(t,14,H-40,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},W*.9,14)+vt(au,H-24,14,{fam:F_SERIF,it:1,col:p.ink,bg:under(p.c)},W*.9,7);break;}
+    case"band":bg=p.c;deco=box(`top:${.3*H}px;height:${.44*H}px;left:0;right:0;background:${p.acc};box-shadow:0 1px 0 rgba(0,0,0,.25),0 -1px 0 rgba(0,0,0,.25)`);
+      out=vt(au,6,.26*H,{fam:F_SANS,wt:600,col:p.ink,up:1,ls:.06,bg:under(p.c)},W,8)+vt(t,.31*H,.42*H,{fam:F_SERIF,wt:600,col:inkOn(p.acc),bg:under(p.acc)},W,13);break;
+    case"labeltop":bg=p.c;deco=box(`top:${.07*H}px;height:${.4*H}px;left:0;right:0;background:${p.deep};border-top:2px solid ${GOLD};border-bottom:2px solid ${GOLD}`)+
+        [.84,.87].map(f=>box(`top:${f*H}px;left:0;right:0;height:1px;background:${readable(GOLD,[p.c])}`)).join("");
+      out=vt(t,.08*H+2,.38*H-4,{fam:F_DISPLAY,col:GOLD,bg:under(p.deep)},W,12)+vt(au,.52*H,.28*H,{fam:F_SERIF,it:1,col:goldOn(p.c),bg:under(p.c)},W,8);break;
+    case"sunburst":bg=`repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,235,200,.06) 0 6deg,transparent 6deg 14deg),${p.deep}`;
+      out=vt(t,14,H-38,{fam:F_DISPLAY,col:CREAM,bg:under(shade(p.deep,.06))},W,15)+vt(au,H-22,16,{fam:F_SANS,wt:500,col:GOLD,up:1,ls:.1,bg:under(p.deep)},W,6);break;
+    case"dots":bg=p.c;{const z=`radial-gradient(circle,${p.acc} 1.4px,transparent 1.9px) 0 0/6px 6px`;
+      deco=box(`top:0;left:0;right:0;height:${.2*H}px;background:${z}`)+box(`bottom:0;left:0;right:0;height:${.14*H}px;background:${z}`);}
+      out=vt(t,.22*H,.5*H,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},W,14)+vt(au,.73*H,.11*H,{fam:F_SANS,wt:500,col:p.ink,up:1,bg:under(p.c)},W,7);break;
+    case"chevron":bg=p.c;{const z=`repeating-linear-gradient(135deg,${p.acc} 0 3px,transparent 3px 6px),repeating-linear-gradient(45deg,${p.acc} 0 3px,transparent 3px 6px)`;
+      deco=box(`top:0;left:0;right:0;height:${.12*H}px;background:${z};opacity:.8`)+box(`bottom:0;left:0;right:0;height:${.12*H}px;background:${z};opacity:.8`);}
+      out=vt(t,.15*H,.56*H,{fam:F_COND,wt:700,col:p.ink,up:1,bg:under(p.c)},W,14)+vt(au,.72*H,.13*H,{fam:F_COND,wt:600,col:p.ink,up:1,bg:under(p.c)},W,7);break;
+    case"cloth":bg=`repeating-linear-gradient(0deg,rgba(0,0,0,.09) 0 1px,transparent 1px 2px),repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,transparent 1px 2px),${p.c}`;
+      out=vt(t,12,H-36,{fam:F_SERIF,wt:500,col:p.ink,ls:.04,bg:under(p.c)},W,13)+vt(au,H-21,15,{fam:F_SERIF,it:1,col:p.ink,bg:under(p.c)},W,7);break;
+    case"marbled":{bg=p.c;const m=`radial-gradient(ellipse at 20% 30%,${p.acc} 0 22%,transparent 23%),radial-gradient(ellipse at 75% 65%,${p.light} 0 18%,transparent 19%),radial-gradient(ellipse at 40% 85%,${p.dark} 0 24%,transparent 25%),${p.deep}`;
+      deco=box(`top:0;left:0;right:0;height:${.18*H}px;background:${m};background-size:26px 34px,18px 22px,31px 27px,auto`)+box(`bottom:0;left:0;right:0;height:${.16*H}px;background:${m};background-size:26px 34px,18px 22px,31px 27px,auto`)+
+        [.18,.84].map(f=>box(`top:${f*H}px;left:0;right:0;height:2px;background:${readable(GOLD,[p.c])}`)).join("");
+      out=vt(t,.21*H,.48*H,{fam:F_SERIF,wt:600,col:goldOn(p.c),bg:under(p.c)},W,13)+vt(au,.7*H,.12*H,{fam:F_SERIF,it:1,col:goldOn(p.c),bg:under(p.c)},W,7);break;}
+    case"slab":bg=p.deep;
+      out=vt(au,6,.42*H,{fam:F_COND,wt:800,col:p.acc,up:1,bg:under(p.deep)},W,16)+vt(t,.46*H,.5*H,{fam:F_SANS,wt:500,col:CREAM,bg:under(p.deep)},W,11);break;
+    case"pinstripe":bg=`repeating-linear-gradient(90deg,rgba(255,255,255,.09) 0 1px,transparent 1px 5px),${p.c}`;
+      deco=[9,H-13].map(y=>box(`top:${y}px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:${readable(GOLD,[p.c])}`)).join("");
+      out=vt(t,18,H-48,{fam:F_SERIF,it:1,wt:500,col:p.ink,bg:under(p.c)},W,14)+vt(au,H-30,14,{fam:F_SANS,wt:500,col:p.ink,up:1,bg:under(p.c)},W,6);break;
+    case"seal":{bg=p.c;const d=Math.min(W*.72,20);deco=box(`bottom:8px;left:50%;width:${d}px;height:${d}px;margin-left:-${d/2}px;border-radius:50%;background:${p.acc};box-shadow:inset 0 0 0 2px ${shade(p.acc,-.25)},0 1px 2px rgba(0,0,0,.4)`);
+      out=vt(t,8,H-d-22,{fam:F_DISPLAY,col:p.ink,bg:under(p.c)},W,15);break;}
+    case"caps":bg=p.c;deco=[[0,.09],[.91,.09]].map(([y,h])=>box(`top:${y*H}px;height:${h*H}px;left:0;right:0;background:${p.deep};border-${y?"top":"bottom"}:1px solid ${GOLD}`)).join("");
+      out=vt(t,.12*H,.6*H,{fam:F_SERIF,wt:600,col:goldOn(p.c),bg:under(p.c)},W,14)+vt(au,.74*H,.14*H,{fam:F_SERIF,it:1,col:goldOn(p.c),bg:under(p.c)},W,7);break;
     default:{bg=p.dark;const d=Math.min(W*.7,20);deco=box(`top:6px;left:50%;width:${d}px;height:${d}px;margin-left:-${d/2}px;border-radius:50%;border:1px solid ${GOLD}`);
       out=`<span class="vt" style="top:6px;height:${d}px;font:400 ${d*.62}px/1 ${F_DISPLAY};color:${readable(GOLD,[p.dark])};writing-mode:horizontal-tb">${esc(au.slice(0,1))}</span>`+vt(t,d+12,H-d-20,{fam:F_SERIF,wt:600,col:inkOn(p.dark),bg:under(p.dark)},W,13);}
   }
@@ -1305,6 +1389,35 @@ function coverArt(b){
     case"gradient":{const g=gradStops(p.c),ink=lum(g[1])>.3?"#1E1A14":CREAM;bg=`radial-gradient(circle at 50% 30%,${g[0]},${g[1]} 45%,${g[2]})`;
       o=`<span class="hz" style="left:0;right:0;top:16px;height:16px;justify-content:center;font:12px/1 serif;color:${readable(ink,g)}">✦</span>`+
         hz(t,{fam:F_DISPLAY,col:ink,bg:g},14,44,122,110,28,10)+hz(a,{fam:F_SERIF,it:1,col:ink,bg:g.slice(1)},14,180,122,30,13,8);break;}
+    case"frame":bg=p.c;d=box(`inset:12px;border:1px solid ${readable(goldOn(p.c),[p.c])}`);
+      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},22,54,106,100,24,10)+hz(a,{fam:F_SERIF,it:1,col:p.ink,bg:under(p.c)},22,172,106,30,12,8);break;
+    case"band":bg=p.c;d=box(`left:0;right:0;top:78px;height:84px;background:${p.acc}`);
+      o=hz(a,{fam:F_SANS,wt:600,col:p.ink,up:1,ls:.08,bg:[p.c]},14,26,122,40,12,7)+hz(t,{fam:F_SERIF,wt:600,col:inkOn(p.acc),bg:[p.acc]},12,82,126,76,22,9);break;
+    case"labeltop":bg=p.c;d=box(`left:16px;right:16px;top:28px;height:96px;background:${p.deep};border-top:2px solid ${GOLD};border-bottom:2px solid ${GOLD}`);
+      o=hz(t,{fam:F_DISPLAY,col:GOLD,bg:[p.deep]},22,34,106,84,22,9)+hz(a,{fam:F_SERIF,it:1,col:goldOn(p.c),bg:under(p.c)},16,150,118,40,13,8);break;
+    case"sunburst":bg=`repeating-conic-gradient(from 0deg at 50% 42%,rgba(255,235,200,.08) 0 6deg,transparent 6deg 14deg),${p.deep}`;
+      o=hz(t,{fam:F_DISPLAY,col:CREAM,bg:under(shade(p.deep,.08))},14,50,122,110,28,10)+hz(a,{fam:F_SANS,wt:500,col:GOLD,up:1,ls:.1,bg:[p.deep]},14,182,122,26,10,7);break;
+    case"dots":bg=p.c;d=box(`left:0;right:0;top:0;height:58px;background:radial-gradient(circle,${p.acc} 2.2px,transparent 2.8px) 0 0/10px 10px`);
+      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},14,70,122,96,26,10)+hz(a,{fam:F_SANS,wt:500,col:p.ink,up:1,ls:.06,bg:[p.c]},14,176,122,34,11,7);break;
+    case"chevron":bg=p.c;{const z=`repeating-linear-gradient(135deg,${p.acc} 0 5px,transparent 5px 10px),repeating-linear-gradient(45deg,${p.acc} 0 5px,transparent 5px 10px)`;
+      d=box(`left:0;right:0;top:0;height:36px;background:${z};opacity:.8`)+box(`left:0;right:0;bottom:0;height:36px;background:${z};opacity:.8`);}
+      o=hz(t,{fam:F_COND,wt:800,col:p.ink,up:1,bg:under(p.c)},14,48,122,104,26,10)+hz(a,{fam:F_COND,wt:600,col:p.ink,up:1,bg:[p.c]},14,156,122,26,12,7);break;
+    case"cloth":bg=`repeating-linear-gradient(0deg,rgba(0,0,0,.09) 0 1px,transparent 1px 2px),repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,transparent 1px 2px),${p.c}`;
+      d=box(`left:40px;right:40px;top:136px;height:1px;background:${p.ink};opacity:.5`);
+      o=hz(t,{fam:F_SERIF,wt:500,col:p.ink,ls:.03,bg:under(p.c)},16,40,118,92,24,10)+hz(a,{fam:F_SERIF,it:1,col:p.ink,bg:under(p.c)},16,146,118,30,13,8);break;
+    case"marbled":bg=`radial-gradient(ellipse at 20% 30%,${p.acc} 0 22%,transparent 23%),radial-gradient(ellipse at 75% 65%,${p.light} 0 18%,transparent 19%),radial-gradient(ellipse at 40% 85%,${p.dark} 0 24%,transparent 25%),${p.deep}`;
+      d=`<i class="dk" style="inset:0;background:inherit;background-size:58px 70px,40px 46px,66px 52px,auto"></i>`+box(`left:20px;right:20px;top:58px;height:104px;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 3px ${PAPER},inset 0 0 0 4px ${p.dark}`);
+      o=hz(t,{fam:F_SERIF,wt:600,col:"#2B1E12",bg:[PAPER]},28,64,94,70,20,9)+hz(a,{fam:F_SERIF,it:1,col:"#2B1E12",bg:[PAPER]},28,134,94,22,11,7);break;
+    case"slab":bg=p.deep;
+      o=hz(surname(a),{fam:F_COND,wt:800,col:p.acc,up:1,bg:[p.deep]},12,18,126,90,40,14)+hz(t,{fam:F_SANS,wt:500,col:CREAM,bg:[p.deep]},14,120,122,84,18,9);break;
+    case"pinstripe":bg=`repeating-linear-gradient(90deg,rgba(255,255,255,.09) 0 1px,transparent 1px 6px),${p.c}`;
+      o=hz(t,{fam:F_SERIF,it:1,wt:500,col:p.ink,bg:under(p.c)},16,30,118,100,26,10)+hz(a,{fam:F_SANS,wt:500,col:p.ink,up:1,ls:.1,bg:under(p.c)},16,168,118,30,10,7);break;
+    case"seal":bg=p.c;d=box(`left:51px;top:150px;width:48px;height:48px;border-radius:50%;background:${p.acc};box-shadow:inset 0 0 0 3px ${shade(p.acc,-.25)},0 2px 3px rgba(0,0,0,.4)`);
+      o=hz(t,{fam:F_DISPLAY,col:p.ink,bg:under(p.c)},14,22,122,96,26,10)+hz(a,{fam:F_SERIF,it:1,col:p.ink,bg:[p.c]},14,120,122,24,12,8)+
+        `<span class="hz" style="left:51px;top:150px;width:48px;height:48px;justify-content:center;font:400 22px/1 ${F_DISPLAY};color:${inkOn(p.acc)}">${esc(surname(a).slice(0,1))}</span>`;break;
+    case"caps":bg=p.c;d=box(`left:0;top:0;bottom:0;width:22px;background:${p.deep};border-right:1px solid ${GOLD}`)+
+        box(`right:0;top:0;width:34px;height:34px;background:linear-gradient(225deg,${p.deep} 50%,transparent 50%)`)+box(`right:0;bottom:0;width:34px;height:34px;background:linear-gradient(315deg,${p.deep} 50%,transparent 50%)`);
+      o=hz(t,{fam:F_SERIF,wt:600,col:goldOn(p.c),bg:under(p.c)},30,52,104,100,24,10)+hz(a,{fam:F_SERIF,it:1,col:goldOn(p.c),bg:[p.c]},30,160,104,30,12,8);break;
     default:bg=p.dark;d=box(`left:50px;top:20px;width:50px;height:50px;border-radius:50%;border:1px solid ${GOLD}`);
       o=`<span class="hz" style="left:50px;top:20px;width:50px;height:50px;justify-content:center;font:400 32px/1 ${F_DISPLAY};color:${readable(GOLD,[p.dark])}">${esc(surname(a).slice(0,1))}</span>`+
         hz(t,{fam:F_SERIF,wt:600,col:inkOn(p.dark),bg:[p.dark]},14,84,122,90,24,10)+hz(a,{fam:F_SERIF,it:1,col:GOLD,bg:[p.dark]},14,186,122,26,12,7);
@@ -1312,7 +1425,7 @@ function coverArt(b){
   return`<span class="art jacket" style="background:${bg}">${d}${o}</span>`;
 }
 function backArt(b){
-  const p=palette(b),st=styleOf(b);const bg=st==="minimal"?PAPER:st==="penguin"?CREAM:st==="deco"||st==="twotone"||st==="monogram"?p.deep:p.c;const ink=inkOn(bg);
+  const p=palette(b),st=styleOf(b);const bg=st==="minimal"?PAPER:st==="penguin"?CREAM:["deco","twotone","monogram","sunburst","slab","marbled"].includes(st)?p.deep:p.c;const ink=inkOn(bg);
   const blurb=b.blurb||b.title||"";const r=wrapFit(blurb,{fam:F_SERIF},118,150,11,6.5);
   return`<span class="art jacket" style="background:${bg}"><span class="hz" style="left:16px;top:18px;width:118px;height:150px;align-items:flex-start;justify-content:flex-start;text-align:left;font:400 ${r.fs}px/1.4 ${F_SERIF};color:${readable(ink,[bg])}">${r.lines.map(esc).join(" ")}</span>
     <i class="dk" style="right:14px;bottom:14px;width:44px;height:26px;background:#fff;padding:0"></i><i class="dk" style="right:17px;bottom:17px;width:38px;height:16px;background:repeating-linear-gradient(90deg,#111 0 1px,#fff 1px 2px,#111 2px 4px,#fff 4px 5px,#111 5px 6px,#fff 6px 8px)"></i>
@@ -1533,7 +1646,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#sheet"))closeSh
 
 function openAdd(){
   let note;
-  if(canRead())note="One shelf per photo reads best. You can pick several at once.";
+  if(canRead())note="One shelf per photo reads best. Pick as many as you like: they’re read in the background while you keep using the app.";
   else if(navigator.onLine===false)note="You’re offline. Photos go to a waiting pile and Claude reads them when you’re back online. You can also type from them yourself.";
   else note="Easiest: send photos to Claude in chat and use Paste books from Claude. Photos saved here wait in a pile until you add an API key in Settings.";
   openSheet(`<h2 class="sheet-title">Add books</h2>
@@ -1547,8 +1660,9 @@ function openAdd(){
       $("#toPaste",body).onclick=openPaste;
       const pi=$("#photoIn",body);
       pi.onchange=async()=>{const f=[...pi.files];if(!f.length)return;
-        if(canRead())startReading(f.map(b=>({blob:b,qid:null})));
-        else{closeSheet();const k=await queuePhotos(f);toast(`${plural(k,"photo")} saved. ${canAsk()?"Tap Type them in on your shelves.":"Claude will read them once you’re back online."}`);}};
+        closeSheet();const k=await queuePhotos(f);
+        if(canRead()){toast(`Reading ${plural(k,"photo")} in the background. Keep using the app.`);processQueue();}
+        else toast(`${plural(k,"photo")} saved. ${AI.key()?"They’ll be read automatically once you’re back online.":"Add your API key in Settings and they’ll be read automatically."}`);};
       $("#mAdd",body).onclick=async()=>{const items=parseLines($("#mList",body).value);if(!items.length){$("#mList",body).focus();return;}
         closeSheet();const k=await addBooks(items);toast(`Added ${plural(k,"book")}.${canAsk()?"":" Details fill in once you’re online."}`);};
     });
@@ -1647,6 +1761,7 @@ function openMenu(){
     <div class="keyrow"><input id="apiKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(key)}"><button class="btn brass" id="saveKey">Save</button></div>
     <div class="actions" style="margin-top:8px">${key?`<button class="btn small" id="testKey">Test key</button><button class="btn small quiet danger-text" id="clearKey">Remove key</button>`:""}</div>
     <label class="switch" style="margin-top:14px"><input type="checkbox" id="eco" ${LS.get("study-economy","0")==="1"?"checked":""}> Economy mode: use the cheaper model (less accurate on fancy spines)</label>
+    <label class="switch" style="margin-top:10px"><input type="checkbox" id="checkAll" ${LS.get("study-check-all","0")==="1"?"checked":""}> Let me check every book before it’s added</label>
     <p class="muted">Spent so far: $${(sp.cost||0).toFixed(2)} across ${plural(sp.calls||0,"request")}.</p>
     <h3 class="sub">Stored on this phone</h3>
     <p class="muted" style="margin-top:0">${(()=>{const g=stockGaps();const left=[g.details&&plural(g.details,"book")+" waiting for details",g.sizes&&plural(g.sizes,"book size"),g.languages&&plural(g.languages,"language check"),g.translations&&plural(g.translations,"translation list"),g.series&&plural(g.series,"series list"),g.wider&&plural(g.wider,"wider series","wider series")].filter(Boolean);
@@ -1689,9 +1804,10 @@ function openMenu(){
         if(!ca.dataset.armed){ca.dataset.armed="1";ca.textContent="Tap again to erase everything";ca.classList.add("armed");
           setTimeout(()=>{if(ca.isConnected&&ca.dataset.armed){delete ca.dataset.armed;ca.textContent="Clear everything";ca.classList.remove("armed");}},5000);return;}
         for(const t of["records","photos","images"])await store.clear(t);
-        S.records.clear();S.queued=[];S.savedPhotos=0;S.queue.clear();S.openSeries.clear();S.openLists.clear();S.uniTried.clear();
+        S.records.clear();S.queued=[];S.reading=null;S.readFail=new Set();S.savedPhotos=0;S.queue.clear();S.openSeries.clear();S.openLists.clear();S.uniTried.clear();
         S.q="";S.sq="";S.editSeries=false;S.gapsOnly=false;S.tab="shelves";_fit.clear();
         closeSheet();render();window.scrollTo(0,0);toast("Everything cleared.");};
+      $("#checkAll",body).onchange=e=>{LS.set("study-check-all",e.target.checked?"1":"0");};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
       $("#exp",body).onclick=async()=>{
         const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=clone(r);delete c._synced;return c;});
@@ -1730,11 +1846,15 @@ function bookcase(label,count,inner,opts={}){
 function banners(){
   if(S.tab!=="shelves")return"";
   let out="";
-  if(S.queued.length){
+  if(S.reading){const{done,total}=S.reading;
+    out+=`<div class="banner leather"><div style="flex:1"><div>Reading your shelves: photo ${Math.min(done+1,total)} of ${total}</div><div class="bar"><span style="width:${Math.round(done/Math.max(total,1)*100)}%"></span></div><div class="muted" style="font-size:14px;margin-top:4px">Keep using the app. If you close it, the rest picks up next time.</div></div></div>`;}
+  else if(S.queued.length){
     const n=S.queued.length;
-    out+=`<div class="banner leather"><span>${plural(n,"photo")} waiting to be read.${canRead()?"":AI.key()?" Claude can read them once you’re online.":" Add your API key in Settings and Claude can read them."}</span>
-      <span class="banner-btns">${canRead()?`<button class="btn small brass" data-act="readQueue">Read now</button>`:""}<button class="btn small" data-act="typeQueue">Type them in</button></span></div>`;
+    out+=`<div class="banner leather"><span>${plural(n,"photo")} waiting to be read.${canRead()?" Starting…":AI.key()?" They’ll be read automatically once you’re online.":" Add your API key in Settings and they’ll be read automatically."}</span>
+      <span class="banner-btns"><button class="btn small" data-act="typeQueue">Type them in</button></span></div>`;
   }
+  const pend=live("pending").reduce((n,r)=>n+(r.items||[]).length,0);
+  if(pend)out+=`<div class="banner leather"><span>${plural(pend,"book")} Claude wasn’t sure about.</span><button class="btn small brass" data-act="checkPending">Check them</button></div>`;
   if(S.jobRunning){const tot=Math.max(S.jobTotal,1),done=Math.min(S.jobDone,tot);
     out+=`<div class="banner leather"><div style="flex:1"><div>Looking up details: ${done} of ${tot}</div><div class="bar"><span style="width:${Math.round(done/tot*100)}%"></span></div></div></div>`;}
   else{
@@ -1933,7 +2053,7 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="newList")return openNewList();
   if(d.act==="fill")return fillDetails(live("book").filter(b=>b.needsDetails).map(b=>b.id));
   if(d.act==="add")return openAdd();
-  if(d.act==="readQueue")return startReading(S.queued.map(p=>({blob:p.blob,qid:p.id})));
+  if(d.act==="checkPending")return openPending();
   if(d.act==="typeQueue")return openTypeFromPhoto(0);
   if(d.act==="gapsOnly"){S.gapsOnly=!S.gapsOnly;return render();}
   if(d.act==="editSeries"){S.editSeries=!S.editSeries;return render();}
@@ -1944,7 +2064,8 @@ $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
 $("#group").addEventListener("change",e=>{S.group=e.target.value;try{localStorage.setItem("shelves-group",S.group);}catch(_){}render();});
-window.addEventListener("online",()=>{scheduleRender();setTimeout(stockUp,1500);if(S.queued.length&&AI.key())toast(`Back online. ${plural(S.queued.length,"photo")} ready to read.`);});
+window.addEventListener("online",()=>{scheduleRender();setTimeout(stockUp,1500);setTimeout(processQueue,800);});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){setTimeout(processQueue,600);if(S.reading)holdScreen(true);}});
 window.addEventListener("offline",scheduleRender);
 
 (async function init(){
@@ -1958,7 +2079,7 @@ window.addEventListener("offline",scheduleRender);
   S.loaded=true;render();
   try{document.fonts.ready.then(()=>{_fit.clear();scheduleRender();});}catch(_){}
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
-  setTimeout(stockUp,1500);
+  setTimeout(stockUp,1500);setTimeout(processQueue,700);
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
