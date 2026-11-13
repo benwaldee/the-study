@@ -487,7 +487,8 @@ function enrichPrompt(items){
   return `Give catalogue details for each book below, for a home-library app.
 Books: ${JSON.stringify(items)}
 Reply with only a JSON array, one object per book, using the same "key" values:
-[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[],"wordCount":90000,"pages":320,"format":"trade paperback"}]
+[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[],"translations":[],"wordCount":90000,"pages":320,"format":"trade paperback"}]
+"translations" is only for books first written in another language: the English translations in print or commonly found, most common first, as [{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]; otherwise [].
 "wordCount" is the approximate number of words in the text. "pages" and "format" (one of "mass market paperback", "trade paperback", "hardcover") describe the edition the publisher suggests if one is given, otherwise the most common current edition.
 "originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
 "color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
@@ -526,7 +527,9 @@ function physical(b){
   const f=FORMATS[b.format]||FORMATS["trade paperback"];
   return{h:f.h,w:f.w,t:(pages||320)*f.paper+f.boards,pages};
 }
+const cleanTranslations=list=>(Array.isArray(list)?list:[]).map(x=>({translator:cleanStr(x&&x.translator,160),publisher:cleanStr(x&&x.publisher,80),year:num(x&&x.year),note:cleanStr(x&&x.note,200)})).filter(x=>x.translator).slice(0,12);
 function applyTranslation(book,d){
+  if(d&&Array.isArray(d.translations)&&d.translations.length)book.translations=cleanTranslations(d.translations);
   if(!d||!("originalLanguage" in d||"translator" in d))return;
   const lang=cleanStr(d.originalLanguage,40);
   book.originalLanguage=lang&&norm(lang)!=="english"?lang:null;
@@ -591,9 +594,46 @@ async function runJob(){
       }catch(e){const m=sampleMsg(e);if(m)toast(m);if(stopsRun(e))break;}
       S.jobDone+=books.length;scheduleRender();
     }
-  }finally{S.jobRunning=false;S.queue.clear();S.jobDone=0;S.jobTotal=0;scheduleRender();}
+  }finally{S.jobRunning=false;S.queue.clear();S.jobDone=0;S.jobTotal=0;scheduleRender();setTimeout(stockUp,500);}
 }
 
+// Everything the app might need later is text, so it's fetched once and kept on the phone.
+function stockGaps(){
+  const books=live("book");
+  return{sizes:books.filter(b=>!b.sizeChecked&&!b.needsDetails).length,
+    languages:books.filter(b=>!b.translationChecked&&!b.needsDetails).length,
+    translations:books.filter(b=>isTranslated(b)&&!(b.translations&&b.translations.length)&&!b.translationsChecked).length,
+    series:[...new Set(books.map(b=>b.seriesId).filter(Boolean))].filter(id=>{const r=S.records.get(id);return!r||r.catalogVersion!==2;}).length,
+    wider:[...new Set(books.map(b=>b.seriesId).filter(Boolean).map(id=>S.records.get(id)).filter(r=>r&&r.universe).map(r=>"u_"+slug(r.universe)))].filter(id=>!S.records.get(id)).length,
+    details:books.filter(b=>b.needsDetails).length};
+}
+async function stockUp(){
+  if(S.stocking||!canAsk())return;S.stocking=true;
+  try{
+    S.detailTried=S.detailTried||new Set();   // one try per book per session, so a failing book can't loop
+    const pend=live("book").filter(b=>b.needsDetails&&!S.detailTried.has(b.id)).map(b=>b.id);pend.forEach(id=>S.detailTried.add(id));if(pend.length)fillDetails(pend);
+    await measureBooks();
+    // which books are translations (and the likely translator)
+    const langs=live("book").filter(b=>!b.translationChecked&&!b.needsDetails);
+    for(let i=0;i<langs.length&&canAsk();i+=40){const batch=langs.slice(i,i+40);
+      try{const arr=await AI.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
+        const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=clone(S.records.get(b.id));applyTranslation(c,d);c.translationChecked=true;out.push(c);}
+        if(out.length)await save(out);}catch(e){break;}}
+    // every translation of every translated book, for picking yours offline
+    const tr=live("book").filter(b=>isTranslated(b)&&!(b.translations&&b.translations.length)&&!b.translationsChecked);
+    for(let i=0;i<tr.length&&canAsk();i+=10){const batch=tr.slice(i,i+10);
+      try{const arr=await AI.json(`For each book, list the English translations that are in print or commonly found, most common first.
+Books: ${JSON.stringify(batch.map((b,k)=>({key:"k"+k,title:b.title,author:b.author||""})))}
+Reply with only a JSON array: [{"key":"k0","translations":[{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]}]
+List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:6000});
+        const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=clone(S.records.get(b.id));
+          c.translations=cleanTranslations(d.translations);c.translationsChecked=true;out.push(c);}
+        if(out.length)await save(out);}catch(e){break;}}
+    // full series lists and the wider series they belong to
+    queueSeriesRefresh([...new Set(live("book").map(b=>b.seriesId).filter(Boolean))]);
+    for(const r of new Map(live("book").map(b=>S.records.get(b.seriesId)).filter(r=>r&&r.universe).map(r=>[r.universe,r])).values())queueUniverse(r.universe,r.author);
+  }finally{S.stocking=false;scheduleRender();}
+}
 async function measureBooks(){
   if(S.measuring||!canAsk())return;const todo=live("book").filter(b=>!b.sizeChecked&&!b.needsDetails);if(!todo.length)return;
   S.measuring=true;
@@ -1176,9 +1216,24 @@ function spineDims(b){
   const h=hash(b.id+b.title);const H=118+(h%30);const len=(b.title||"").length;
   return{H,W:Math.min(54,24+((h>>>5)%12)+(len>16?6:0)+(len>28?8:0))};
 }
+// Never let text wash out: check the colour against every background it sits on (WCAG 4.5:1) and swap it if it fails.
+const INKS=["#F3ECDB","#1E1A14",GOLD,"#5A4310","#FFFFFF","#000000"];
+function readable(pref,bgs){
+  bgs=[].concat(bgs||[]).filter(Boolean);if(!bgs.length)return pref;
+  const worst=c=>Math.min(...bgs.map(b=>ratio(c,b)));
+  if(worst(pref)>=4.5)return pref;
+  const sameSide=INKS.filter(c=>(lum(c)>.3)===(lum(pref)>.3)).find(c=>worst(c)>=4.5);
+  return sameSide||INKS.reduce((best,c)=>worst(c)>worst(best)?c:best,INKS[0]);
+}
+const under=c=>[c,shade(c,.08),shade(c,-.06)];   // the spine's own shading moves the colour a little
+// Gradients stay within one band of lightness, so a single text colour can read on all of it.
+function gradStops(c){const L=lum(c);
+  if(L>.3)return[shade(c,.12),c,shade(c,-.16)];
+  if(L<.1)return[shade(c,.28),c,shade(c,-.5)];
+  const d=shade(c,-.35);return[shade(d,.2),d,shade(d,-.4)];}
 const vt=(text,top,L,f,W,maxFs,thick=.74)=>{if(!text||L<12)return"";const str=f.up?text.toUpperCase():text;const r=fitVertical(str,f,L*.94,W*thick,maxFs);
   if(maxFs<=9&&r.fs<5.5)return"";   // an author name that can't be read at this size is left off
-  return`<span class="vt" style="top:${top}px;height:${L}px;font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.08 ${f.fam};letter-spacing:${f.ls||0}em;color:${f.col}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
+  return`<span class="vt" style="top:${top}px;height:${L}px;font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.08 ${f.fam};letter-spacing:${f.ls||0}em;color:${readable(f.col,f.bg)}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
 const box=(st)=>`<i class="dk" style="${st}"></i>`;
 // One spine, drawn at any size (shelf or 3D book).
 function spineArt(b,W,H){
@@ -1186,80 +1241,80 @@ function spineArt(b,W,H){
   const k=H/130;   // scale decorations with spine height
   switch(st){
     case"gilt":bg=p.c;deco=[8,H-22].map(y=>box(`top:${y*1}px;height:${14*k}px;left:0;right:0;background:linear-gradient(${GOLD} 0 1px,transparent 1px 3px,rgba(0,0,0,.45) 3px 4px,rgba(255,235,200,.22) 4px 7px,rgba(0,0,0,.45) 7px 8px,transparent 8px 10px,${GOLD} 10px 11px,transparent 11px)`)).join("");
-      out=vt(t,26*k,H-52*k,{fam:F_DISPLAY,col:goldOn(p.c)},W,15);break;
+      out=vt(t,26*k,H-52*k,{fam:F_DISPLAY,col:goldOn(p.c),bg:under(p.c)},W,15);break;
     case"hubs":{bg=p.deep;const ys=[.12,.3,.7,.88].map(f=>f*H);deco=ys.map(y=>box(`top:${y-3}px;height:6px;left:0;right:0;background:linear-gradient(rgba(0,0,0,.5),rgba(255,235,200,.25) 45%,rgba(0,0,0,.5))`)).join("")+
       box(`top:${.33*H}px;height:${.34*H}px;left:12%;right:12%;background:${p.c};box-shadow:inset 0 0 0 1px ${GOLD}`);
-      out=vt(t,.34*H,.32*H,{fam:F_SERIF,wt:600,col:goldOn(p.c)},W*.76,11)+vt(au,.13*H+4,.16*H,{fam:F_SERIF,it:1,col:GOLD},W,7);break;}
+      out=vt(t,.34*H,.32*H,{fam:F_SERIF,wt:600,col:goldOn(p.c),bg:under(p.c)},W*.76,11)+vt(au,.13*H+4,.16*H,{fam:F_SERIF,it:1,col:GOLD,bg:under(p.deep)},W,7);break;}
     case"label":bg=`repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),${p.c}`;
       deco=box(`top:${.1*H}px;height:${.46*H}px;left:14%;right:14%;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 2px ${PAPER},inset 0 0 0 3px ${p.dark}`)+
         box(`bottom:${.08*H}px;height:${.1*H}px;left:22%;right:22%;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3)`);
-      out=vt(t,.12*H,.42*H,{fam:F_SERIF,wt:600,col:"#2B1E12"},W*.72,12);
+      out=vt(t,.12*H,.42*H,{fam:F_SERIF,wt:600,col:"#2B1E12",bg:[PAPER]},W*.72,12);
       out+=`<span class="vt" style="top:${.82*H}px;height:${.1*H}px;font:600 ${Math.min(8,W*.3)}px/1 ${F_SERIF};color:#2B1E12">${esc(au.slice(0,2))}</span>`;break;
     case"paperback":bg=p.c;deco=box(`bottom:6px;left:50%;width:${Math.min(14,W*.45)}px;height:${Math.min(14,W*.45)}px;margin-left:-${Math.min(7,W*.225)}px;border-radius:50%;background:${p.ink};opacity:.85`);
-      out=vt(au,6,.28*H,{fam:F_SANS,wt:600,col:p.ink,ls:.06,up:1},W,8)+vt(t,.3*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink},W,14);break;
+      out=vt(au,6,.28*H,{fam:F_SANS,wt:600,col:p.ink,ls:.06,up:1,bg:under(p.c)},W,8)+vt(t,.3*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},W,14);break;
     case"twotone":bg=`linear-gradient(${p.deep} 0 36%,${p.c} 36%)`;
-      out=vt(au,6,.36*H-10,{fam:F_SANS,wt:500,col:GOLD,ls:.08,up:1},W,8)+vt(t,.38*H,.58*H,{fam:F_SERIF,wt:600,col:p.ink},W,14);break;
+      out=vt(au,6,.36*H-10,{fam:F_SANS,wt:500,col:GOLD,ls:.08,up:1,bg:under(p.deep)},W,8)+vt(t,.38*H,.58*H,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},W,14);break;
     case"penguin":bg=`linear-gradient(${p.acc} 0 22%,${CREAM} 22% 80%,${p.acc} 80%)`;
       deco=box(`bottom:${.07*H}px;left:50%;width:${Math.min(10,W*.4)}px;height:${Math.min(14,W*.5)}px;margin-left:-${Math.min(5,W*.2)}px;border-radius:50%;background:${CREAM}`);
-      out=vt(t,.24*H,.54*H,{fam:F_SANS,wt:600,col:"#1E1A14"},W,12)+vt(au,4,.22*H-8,{fam:F_SANS,wt:500,col:inkOn(p.acc)},W,7);break;
+      out=vt(t,.24*H,.54*H,{fam:F_SANS,wt:600,col:"#1E1A14",bg:under(CREAM)},W,12)+vt(au,4,.22*H-8,{fam:F_SANS,wt:500,col:inkOn(p.acc),bg:under(p.acc)},W,7);break;
     case"deco":bg=`linear-gradient(90deg,${p.deep},${shade(p.deep,.08)} 50%,${p.deep})`;
       deco=box(`top:4px;bottom:4px;left:3px;right:3px;border-left:1px solid ${GOLD};border-right:1px solid ${GOLD};opacity:.8`)+
         [10,H-18].map(y=>box(`top:${y}px;left:50%;width:7px;height:7px;margin-left:-3.5px;background:${GOLD};transform:rotate(45deg)`)).join("");
-      out=vt(t,22,H-44,{fam:F_SANS,wt:500,col:GOLD,ls:.14,up:1},W,10,.62);break;
+      out=vt(t,22,H-44,{fam:F_SANS,wt:500,col:GOLD,ls:.14,up:1,bg:under(p.deep)},W,10,.62);break;
     case"pulp":bg=p.c;deco=box(`top:0;left:0;right:0;height:${.2*H}px;background:${p.acc}`)+box(`bottom:0;left:0;right:0;height:${.06*H}px;background:${p.deep}`);
-      out=vt(au,3,.2*H-6,{fam:F_COND,wt:700,col:inkOn(p.acc),up:1},W,8)+vt(t,.22*H,.68*H,{fam:F_COND,wt:800,col:p.ink,up:1},W,15);break;
+      out=vt(au,3,.2*H-6,{fam:F_COND,wt:700,col:inkOn(p.acc),up:1,bg:under(p.acc)},W,8)+vt(t,.22*H,.68*H,{fam:F_COND,wt:800,col:p.ink,up:1,bg:under(p.c)},W,15);break;
     case"minimal":bg=PAPER;deco=[.1,.88].map(f=>box(`top:${f*H}px;left:0;right:0;height:2px;background:${p.c}`)).join("");
-      out=vt(t,.14*H,.6*H,{fam:F_SERIF,it:1,col:shade(p.c,-.3)},W,13)+vt(au,.76*H,.1*H,{fam:F_SANS,wt:500,col:"#3A3229",up:1,ls:.05},W,6);break;
-    case"gradient":bg=`linear-gradient(${p.light},${p.c} 45%,${p.deep})`;
-      deco=box(`top:7px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${CREAM};box-shadow:0 0 6px ${CREAM}`);
-      out=vt(t,18,H-46,{fam:F_DISPLAY,col:CREAM},W,15)+vt(au,H-26,22,{fam:F_SERIF,it:1,col:CREAM},W,7);break;
+      out=vt(t,.14*H,.6*H,{fam:F_SERIF,it:1,col:shade(p.c,-.55),bg:under(PAPER)},W,13)+vt(au,.76*H,.1*H,{fam:F_SANS,wt:500,col:"#3A3229",up:1,ls:.05,bg:under(PAPER)},W,6);break;
+    case"gradient":{const g=gradStops(p.c),ink=lum(g[1])>.3?"#1E1A14":CREAM;bg=`linear-gradient(${g[0]},${g[1]} 45%,${g[2]})`;
+      deco=box(`top:7px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${ink};box-shadow:0 0 6px ${ink}`);
+      out=vt(t,18,H-46,{fam:F_DISPLAY,col:ink,bg:g},W,15)+vt(au,H-26,22,{fam:F_SERIF,it:1,col:ink,bg:g.slice(1)},W,7);break;}
     case"stripes":bg=p.c;deco=[.06,.1,.86,.9].map(f=>box(`top:${f*H}px;left:0;right:0;height:${Math.max(2,.02*H)}px;background:${p.acc}`)).join("");
-      out=vt(t,.14*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink},W,14)+vt(au,.72*H,.12*H,{fam:F_SANS,wt:500,col:p.ink,up:1},W,7);break;
+      out=vt(t,.14*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},W,14)+vt(au,.72*H,.12*H,{fam:F_SANS,wt:500,col:p.ink,up:1,bg:under(p.c)},W,7);break;
     default:{bg=p.dark;const d=Math.min(W*.7,20);deco=box(`top:6px;left:50%;width:${d}px;height:${d}px;margin-left:-${d/2}px;border-radius:50%;border:1px solid ${GOLD}`);
-      out=`<span class="vt" style="top:6px;height:${d}px;font:400 ${d*.62}px/1 ${F_DISPLAY};color:${GOLD};writing-mode:horizontal-tb">${esc(au.slice(0,1))}</span>`+vt(t,d+12,H-d-20,{fam:F_SERIF,wt:600,col:inkOn(p.dark)},W,13);}
+      out=`<span class="vt" style="top:6px;height:${d}px;font:400 ${d*.62}px/1 ${F_DISPLAY};color:${readable(GOLD,[p.dark])};writing-mode:horizontal-tb">${esc(au.slice(0,1))}</span>`+vt(t,d+12,H-d-20,{fam:F_SERIF,wt:600,col:inkOn(p.dark),bg:under(p.dark)},W,13);}
   }
   return`<span class="art" style="background:${bg}">${deco}${out}</span>`;
 }
 const hz=(text,f,x,y,w,h,maxFs,minFs,align="center")=>{if(!text)return"";const r=wrapFit(f.up?String(text).toUpperCase():text,f,w,h,maxFs,minFs);
-  return`<span class="hz" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;justify-content:${align==="left"?"flex-start":"center"};text-align:${align};font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.12 ${f.fam};letter-spacing:${f.ls||0}em;color:${f.col};${f.up?"text-transform:uppercase;":""}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
+  return`<span class="hz" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;justify-content:${align==="left"?"flex-start":"center"};text-align:${align};font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.12 ${f.fam};letter-spacing:${f.ls||0}em;color:${readable(f.col,f.bg)};${f.up?"text-transform:uppercase;":""}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
 function coverArt(b){
   const p=palette(b),st=styleOf(b),t=b.title||"",a=b.author||"";let bg,d="",o="";
   switch(st){
     case"gilt":case"hubs":case"label":bg=st==="label"?`repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),${p.c}`:p.c;
       d=box(`inset:9px;border:1px solid ${goldOn(p.c)}`)+box(`inset:13px;border:1px solid ${goldOn(p.c)};opacity:.6`);
       if(st==="label")d+=box(`left:22px;right:22px;top:46px;height:88px;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 3px ${PAPER},inset 0 0 0 4px ${p.dark}`);
-      o=st==="label"?hz(t,{fam:F_SERIF,wt:600,col:"#2B1E12"},30,52,90,76,20,9):hz(t,{fam:F_DISPLAY,col:goldOn(p.c)},20,48,110,92,24,10);
-      o+=`<span class="hz" style="left:0;right:0;top:142px;height:22px;justify-content:center;font:400 18px/1 ${F_DISPLAY};color:${goldOn(p.c)}">❧</span>`+hz(a,{fam:F_SERIF,it:1,col:goldOn(p.c)},20,170,110,30,13,8);break;
+      o=st==="label"?hz(t,{fam:F_SERIF,wt:600,col:"#2B1E12",bg:[PAPER]},30,52,90,76,20,9):hz(t,{fam:F_DISPLAY,col:goldOn(p.c),bg:under(p.c)},20,48,110,92,24,10);
+      o+=`<span class="hz" style="left:0;right:0;top:142px;height:22px;justify-content:center;font:400 18px/1 ${F_DISPLAY};color:${readable(goldOn(p.c),under(p.c))}">❧</span>`+hz(a,{fam:F_SERIF,it:1,col:goldOn(p.c),bg:under(p.c)},20,170,110,30,13,8);break;
     case"penguin":bg=`linear-gradient(${p.acc} 0 30%,${CREAM} 30% 72%,${p.acc} 72%)`;
       d=box(`left:63px;top:184px;width:24px;height:30px;border-radius:50%;background:${CREAM}`);
-      o=hz(t,{fam:F_SANS,wt:600,col:"#1E1A14"},14,74,122,60,20,9)+hz(a,{fam:F_SANS,wt:400,col:"#1E1A14"},14,136,122,22,12,8);break;
+      o=hz(t,{fam:F_SANS,wt:600,col:"#1E1A14",bg:[CREAM]},14,74,122,60,20,9)+hz(a,{fam:F_SANS,wt:400,col:"#1E1A14",bg:[CREAM]},14,136,122,22,12,8);break;
     case"twotone":bg=`linear-gradient(${p.deep} 0 40%,${p.c} 40%)`;
-      o=hz(a,{fam:F_SANS,wt:500,col:GOLD,ls:.12,up:1},14,26,122,50,13,7)+hz(t,{fam:F_SERIF,wt:600,col:p.ink},14,104,122,100,26,10);break;
+      o=hz(a,{fam:F_SANS,wt:500,col:GOLD,ls:.12,up:1,bg:[p.deep]},14,26,122,50,13,7)+hz(t,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},14,104,122,100,26,10);break;
     case"pulp":bg=`linear-gradient(160deg,${p.c} 0 62%,${p.acc} 62% 70%,${p.c} 70%)`;
       d=box(`left:10px;top:10px;padding:0;width:70px;height:20px;background:${p.acc}`);
-      o=hz(surname(a),{fam:F_COND,wt:700,col:inkOn(p.acc),up:1},12,10,66,20,11,7,"left")+hz(t,{fam:F_COND,wt:800,col:p.ink,up:1},12,40,126,110,30,10,"left");break;
+      o=hz(surname(a),{fam:F_COND,wt:700,col:inkOn(p.acc),up:1,bg:[p.acc]},12,10,66,20,11,7,"left")+hz(t,{fam:F_COND,wt:800,col:p.ink,up:1,bg:[p.c,p.acc]},12,40,126,110,30,10,"left");break;
     case"stripes":bg=p.c;d=[96,104,112].map(y=>box(`left:0;right:0;top:${y}px;height:4px;background:${p.acc}`)).join("");
-      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink},14,20,122,70,24,10)+hz(a,{fam:F_SANS,wt:500,col:p.ink,up:1,ls:.06},14,130,122,40,12,7);break;
+      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},14,20,122,70,24,10)+hz(a,{fam:F_SANS,wt:500,col:p.ink,up:1,ls:.06,bg:under(p.c)},14,130,122,40,12,7);break;
     case"paperback":bg=p.c;d=box(`left:20px;right:20px;top:132px;height:1px;background:${p.ink};opacity:.6`)+box(`left:68px;top:198px;width:14px;height:14px;border-radius:50%;background:${p.ink};opacity:.8`);
-      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink},14,26,122,100,26,10)+hz(a,{fam:F_SERIF,it:1,col:p.ink},14,142,122,40,14,8);break;
+      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink,bg:under(p.c)},14,26,122,100,26,10)+hz(a,{fam:F_SERIF,it:1,col:p.ink,bg:under(p.c)},14,142,122,40,14,8);break;
     case"minimal":bg=PAPER;d=box(`inset:10px;border:2px solid ${p.c}`);
-      o=hz(t,{fam:F_SERIF,it:1,col:shade(p.c,-.35)},22,60,106,80,22,9)+hz(a,{fam:F_SANS,wt:500,col:"#3A3229",up:1,ls:.08},22,160,106,30,10,6);break;
+      o=hz(t,{fam:F_SERIF,it:1,col:shade(p.c,-.55),bg:[PAPER]},22,60,106,80,22,9)+hz(a,{fam:F_SANS,wt:500,col:"#3A3229",up:1,ls:.08,bg:[PAPER]},22,160,106,30,10,6);break;
     case"deco":bg=`repeating-conic-gradient(from 0deg at 50% 46%,rgba(217,184,100,.12) 0 4deg,transparent 4deg 12deg),${p.deep}`;
       d=box(`inset:8px;border:1px solid ${GOLD}`)+box(`left:50%;top:22px;width:10px;height:10px;margin-left:-5px;background:${GOLD};transform:rotate(45deg)`);
-      o=hz(t,{fam:F_SANS,wt:500,col:GOLD,ls:.14,up:1},18,56,114,90,18,8)+hz(a,{fam:F_SANS,wt:400,col:GOLD,ls:.1,up:1},18,170,114,30,9,6);break;
-    case"gradient":bg=`radial-gradient(circle at 50% 30%,${p.light},${p.c} 45%,${p.deep})`;
-      o=`<span class="hz" style="left:0;right:0;top:16px;height:16px;justify-content:center;font:12px/1 serif;color:${CREAM}">✦</span>`+
-        hz(t,{fam:F_DISPLAY,col:CREAM},14,44,122,110,28,10)+hz(a,{fam:F_SERIF,it:1,col:CREAM},14,180,122,30,13,8);break;
+      o=hz(t,{fam:F_SANS,wt:500,col:GOLD,ls:.14,up:1,bg:under(p.deep)},18,56,114,90,18,8)+hz(a,{fam:F_SANS,wt:400,col:GOLD,ls:.1,up:1,bg:under(p.deep)},18,170,114,30,9,6);break;
+    case"gradient":{const g=gradStops(p.c),ink=lum(g[1])>.3?"#1E1A14":CREAM;bg=`radial-gradient(circle at 50% 30%,${g[0]},${g[1]} 45%,${g[2]})`;
+      o=`<span class="hz" style="left:0;right:0;top:16px;height:16px;justify-content:center;font:12px/1 serif;color:${readable(ink,g)}">✦</span>`+
+        hz(t,{fam:F_DISPLAY,col:ink,bg:g},14,44,122,110,28,10)+hz(a,{fam:F_SERIF,it:1,col:ink,bg:g.slice(1)},14,180,122,30,13,8);break;}
     default:bg=p.dark;d=box(`left:50px;top:20px;width:50px;height:50px;border-radius:50%;border:1px solid ${GOLD}`);
-      o=`<span class="hz" style="left:50px;top:20px;width:50px;height:50px;justify-content:center;font:400 32px/1 ${F_DISPLAY};color:${GOLD}">${esc(surname(a).slice(0,1))}</span>`+
-        hz(t,{fam:F_SERIF,wt:600,col:inkOn(p.dark)},14,84,122,90,24,10)+hz(a,{fam:F_SERIF,it:1,col:GOLD},14,186,122,26,12,7);
+      o=`<span class="hz" style="left:50px;top:20px;width:50px;height:50px;justify-content:center;font:400 32px/1 ${F_DISPLAY};color:${readable(GOLD,[p.dark])}">${esc(surname(a).slice(0,1))}</span>`+
+        hz(t,{fam:F_SERIF,wt:600,col:inkOn(p.dark),bg:[p.dark]},14,84,122,90,24,10)+hz(a,{fam:F_SERIF,it:1,col:GOLD,bg:[p.dark]},14,186,122,26,12,7);
   }
   return`<span class="art jacket" style="background:${bg}">${d}${o}</span>`;
 }
 function backArt(b){
   const p=palette(b),st=styleOf(b);const bg=st==="minimal"?PAPER:st==="penguin"?CREAM:st==="deco"||st==="twotone"||st==="monogram"?p.deep:p.c;const ink=inkOn(bg);
   const blurb=b.blurb||b.title||"";const r=wrapFit(blurb,{fam:F_SERIF},118,150,11,6.5);
-  return`<span class="art jacket" style="background:${bg}"><span class="hz" style="left:16px;top:18px;width:118px;height:150px;align-items:flex-start;justify-content:flex-start;text-align:left;font:400 ${r.fs}px/1.4 ${F_SERIF};color:${ink}">${r.lines.map(esc).join(" ")}</span>
+  return`<span class="art jacket" style="background:${bg}"><span class="hz" style="left:16px;top:18px;width:118px;height:150px;align-items:flex-start;justify-content:flex-start;text-align:left;font:400 ${r.fs}px/1.4 ${F_SERIF};color:${readable(ink,[bg])}">${r.lines.map(esc).join(" ")}</span>
     <i class="dk" style="right:14px;bottom:14px;width:44px;height:26px;background:#fff;padding:0"></i><i class="dk" style="right:17px;bottom:17px;width:38px;height:16px;background:repeating-linear-gradient(90deg,#111 0 1px,#fff 1px 2px,#111 2px 4px,#fff 4px 5px,#111 5px 6px,#fff 6px 8px)"></i>
     ${b.publisher?`<span class="hz" style="left:16px;bottom:16px;width:70px;height:16px;justify-content:flex-start;font:italic 400 9px/1 ${F_SERIF};color:${ink}">${esc(b.publisher)}</span>`:""}</span>`;
 }
@@ -1362,14 +1417,18 @@ async function findTranslators(onStep){
   return res;
 }
 async function translationsOf(b){
+  if(b.translations&&b.translations.length)return b.translations;   // stored when the book was added: works offline
+  if(!canAsk())return[];
   const res=await AI.json(`List the English translations of "${b.title}" by ${b.author||"its author"} that are in print or commonly found, most common first.
 Reply with only JSON: {"translations":[{"translator":"","publisher":"","year":2003,"note":"what the edition looks like or is known for"}]}
 List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:1500});
-  return(Array.isArray(res&&res.translations)?res.translations:[]).map(x=>({translator:cleanStr(x&&x.translator,160),publisher:cleanStr(x&&x.publisher,80),year:num(x&&x.year),note:cleanStr(x&&x.note,200)})).filter(x=>x.translator).slice(0,12);
+  const list=cleanTranslations(res&&res.translations);
+  if(list.length){const c=clone(S.records.get(b.id));c.translations=list;await save(c);}
+  return list;
 }
 async function openPickTranslation(id){
   const b=S.records.get(id);if(!b)return;
-  if(!canAsk()){toast("Listing translations needs a connection to Claude.");return;}
+  if(!(b.translations&&b.translations.length)&&!canAsk()){toast("The translations for this book haven’t been saved yet. They’ll download next time you’re online.");return;}
   openSheet(`<h2 class="sheet-title">Which translation is yours?</h2><p class="progress-line">Looking up the translations of ${esc(b.title)}…</p>`);
   let list=[];try{list=await translationsOf(b);}catch(e){}
   const body=$("#sheet .sheet-body");if(!body)return;
@@ -1508,7 +1567,7 @@ function openBook(id){
     ${b.blurb?`<p class="blurb parch">${esc(b.blurb)}</p>`:`<p class="muted" style="margin-top:14px">${b.needsDetails?(canAsk()?"Details are on their way, or tap Look up details.":"Details get looked up once you’re online."):"No description for this one."}</p>`}
     <div class="actions">
       ${canAsk()?`<button class="btn" id="refresh">${b.needsDetails?"Look up details":"Refresh details"}</button>`:""}
-      ${canAsk()&&isTranslated(b)&&!translatorKnown(b)?`<button class="btn" id="pickTr">Pick the translation</button>`:""}
+      ${isTranslated(b)&&!translatorKnown(b)&&(canAsk()||(b.translations&&b.translations.length))?`<button class="btn" id="pickTr">Pick the translation</button>`:""}
       <button class="btn" id="edit">Edit</button>
       <button class="btn quiet danger-text" id="remove">Remove</button>
     </div>`,body=>{
@@ -1589,6 +1648,9 @@ function openMenu(){
     <div class="actions" style="margin-top:8px">${key?`<button class="btn small" id="testKey">Test key</button><button class="btn small quiet danger-text" id="clearKey">Remove key</button>`:""}</div>
     <label class="switch" style="margin-top:14px"><input type="checkbox" id="eco" ${LS.get("study-economy","0")==="1"?"checked":""}> Economy mode: use the cheaper model (less accurate on fancy spines)</label>
     <p class="muted">Spent so far: $${(sp.cost||0).toFixed(2)} across ${plural(sp.calls||0,"request")}.</p>
+    <h3 class="sub">Stored on this phone</h3>
+    <p class="muted" style="margin-top:0">${(()=>{const g=stockGaps();const left=[g.details&&plural(g.details,"book")+" waiting for details",g.sizes&&plural(g.sizes,"book size"),g.languages&&plural(g.languages,"language check"),g.translations&&plural(g.translations,"translation list"),g.series&&plural(g.series,"series list"),g.wider&&plural(g.wider,"wider series","wider series")].filter(Boolean);
+      return left.length?`Still to download: ${left.join(", ")}. It happens on its own whenever you’re online.`:"Everything is stored: details, sizes, translations and full series lists all work offline. Only adding books, suggestions and checking for new releases need internet.";})()}</p>
     <h3 class="sub">Series</h3>
     <p class="muted" style="margin-top:0">Rechecks every book: splits box sets into their books, counts omnibus volumes as every book inside them, adds novellas and links sub-series to their wider series. Uses the more careful model, roughly 50 cents for a library your size.</p>
     <button class="btn wide" id="rebuildSeries" ${canAsk()?"":"disabled"}>${canAsk()?"Rebuild series":"Rebuild series (needs internet and an API key)"}</button>
@@ -1882,7 +1944,7 @@ $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
 $("#group").addEventListener("change",e=>{S.group=e.target.value;try{localStorage.setItem("shelves-group",S.group);}catch(_){}render();});
-window.addEventListener("online",()=>{scheduleRender();setTimeout(measureBooks,1500);if(S.queued.length&&AI.key())toast(`Back online. ${plural(S.queued.length,"photo")} ready to read.`);});
+window.addEventListener("online",()=>{scheduleRender();setTimeout(stockUp,1500);if(S.queued.length&&AI.key())toast(`Back online. ${plural(S.queued.length,"photo")} ready to read.`);});
 window.addEventListener("offline",scheduleRender);
 
 (async function init(){
@@ -1896,7 +1958,7 @@ window.addEventListener("offline",scheduleRender);
   S.loaded=true;render();
   try{document.fonts.ready.then(()=>{_fit.clear();scheduleRender();});}catch(_){}
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
-  setTimeout(measureBooks,1500);
+  setTimeout(stockUp,1500);
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
