@@ -1,7 +1,7 @@
 // The Study: keeps the app on the phone so it opens with no signal.
 // Online: always fetches the newest version first (so updates show on the next open).
 // Offline or slow signal: opens instantly from the copy saved on the phone.
-const VERSION = "study-v5";
+const VERSION = "study-v6";
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-180.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"
