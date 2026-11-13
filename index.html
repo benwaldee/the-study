@@ -246,6 +246,23 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+.count-row{display:flex;align-items:center;justify-content:space-between;margin:12px 16px 0}
+.count-row .count{margin:0}
+.spine.picked{outline:3px solid var(--brass-hi);outline-offset:1px;transform:translateY(-8px);box-shadow:0 8px 10px rgba(0,0,0,.5)}
+.spine{transition:transform .15s ease}
+.select-bar{position:fixed;left:12px;right:12px;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;border-radius:6px;background:var(--pebble),linear-gradient(var(--leather-2),var(--leather));box-shadow:inset 0 0 0 1px var(--brass-lo),0 8px 20px rgba(0,0,0,.6);color:var(--text);font-size:16px}
+.sb-btns{display:flex;gap:6px}
+.genre-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.genre-grid .btn{justify-content:flex-start;text-align:left}
+.spoiler{position:relative;overflow:hidden}
+.spoiler p{margin:0;filter:blur(7px);user-select:none;transition:filter .5s ease}
+.spoil-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;cursor:pointer;
+  background:radial-gradient(ellipse at center,rgba(234,221,189,.55),rgba(215,197,153,.85));color:var(--parch-ink);font-family:var(--display);font-size:20px;transition:opacity .5s ease}
+.spoil-cover small{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--parch-ink-2)}
+.spoiler.revealed p{filter:none}
+.spoiler.revealed .spoil-cover{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion: reduce){.spoiler p,.spoil-cover{transition:none}}
 #clearAll.armed{background:#5a1f17;color:#fff;border-color:var(--danger)}
 .btn.pick{flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
 .pk-t{font-size:17px}.pk-s{font-weight:400;font-size:14px;color:var(--text-2);font-style:italic}
@@ -260,6 +277,13 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .uni-group small{font-weight:400;color:var(--text-2);font-style:italic;margin-left:6px}
 .uni-group.here{color:var(--brass-hi)}
 #group[hidden]{display:none}
+.ledger{position:relative}
+.card-edit{position:absolute;top:14px;right:14px;z-index:2;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--brass-lo);background:rgba(0,0,0,.25);color:var(--brass-hi);font-size:14px;font-weight:600;cursor:pointer}
+.card-edit.on{background:linear-gradient(var(--brass-hi),var(--brass));color:var(--brass-ink);border-color:#5A4318}
+.ledger .card-head{padding-right:96px}
+.ledger.editing{box-shadow:inset 0 0 0 5px var(--leather),inset 0 0 0 6px var(--brass),inset 0 0 0 9px var(--leather),inset 0 0 0 10px rgba(196,154,69,.5),0 8px 18px rgba(0,0,0,.45)}
+.edit-hint{margin:10px 0 4px;color:var(--text-2);font-style:italic;font-size:15px}
+.linkish{background:none;border:0;padding:0;color:var(--brass-hi);text-decoration:underline;text-underline-offset:3px;font:inherit;cursor:pointer}
 .btn.editbtn{background:linear-gradient(var(--leather-2),var(--leather));color:var(--brass-hi);border-color:var(--brass);gap:7px}
 .edit-note{margin:4px 14px 10px;padding:12px 14px;border:1px dashed var(--brass);border-radius:3px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .edit-note p{margin:0;flex:1 1 220px;color:var(--text-2);font-style:italic;font-size:15px}
@@ -357,14 +381,14 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 <script>
 "use strict";
-const GENRES=["Fantasy","Science fiction","Mystery & thriller","Horror","Romance","Literary fiction","Historical fiction","Young adult","Children’s","Classics","Graphic novels & comics","Poetry","Biography & memoir","History","Science & nature","Business & money","Self-help","Philosophy & religion","Politics & society","Cooking","Arts & music","Reference","Other nonfiction"];
+const GENRES=["Fantasy","Science fiction","Mystery & thriller","Horror","Romance","Literary fiction","Historical fiction","Western","Young adult","Children’s","Classics","Graphic novels & comics","Poetry","Biography & memoir","History","Science & nature","Business & money","Self-help","Philosophy & religion","Politics & society","Cooking","Arts & music","Reference","Other nonfiction"];
 const PALETTE=["#6E2420","#243E5C","#2F4B2D","#8E6A2C","#4A3157","#2A221C","#7D4422","#2D5752","#B9AE92","#5A1A2C","#1C3148","#6D6A2C"];
 const WISHLIST="Wishlist",PICKS="Suggested by Claude";
 const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><div class="cove"></div><div class="dentil"></div><div class="bead"></div></div>`;
 const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
-  persist:true,persisted:false,savedPhotos:0,translating:false,imgs:new Map(),sq:"",editSeries:false,uniTried:new Set(),
+  persist:true,persisted:false,revealed:new Set(),editing:new Set(),showHidden:false,selecting:false,selected:new Set(),savedPhotos:0,translating:false,imgs:new Map(),sq:"",editSeries:false,uniTried:new Set(),
   queue:new Set(),jobRunning:false,jobDone:0,jobTotal:0,suggesting:false,busySeries:new Set(),confirmDel:null,loaded:false,photoCtl:null};
 
 /* ---------- helpers ---------- */
@@ -408,7 +432,7 @@ const store={
   async del(ids,name="records"){if(!this.db||!ids.length)return;try{await new Promise((res,rej)=>{const tx=this.db.transaction(name,"readwrite");const os=tx.objectStore(name);for(const i of ids)os.delete(i);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}catch(e){}}
 };
 async function save(recs){
-  recs=[].concat(recs);const now=Date.now();
+  recs=[].concat(recs);const now=Date.now();S.version=(S.version||0)+1;
   for(const r of recs){r.updatedAt=Math.max(now,(r.updatedAt||0)+1);S.records.set(r.id,r);}
   await store.put(recs);scheduleRender();pushDirty();
 }
@@ -542,7 +566,7 @@ function applyTranslation(book,d){
 function applyDetails(book,d,seriesMap){
   book.title=cleanStr(d.title,200)||book.title;
   book.author=cleanStr(d.author,120)||book.author;
-  book.genre=genreOf(d.genre)||book.genre||"Other nonfiction";
+  if(!book.genreLocked)book.genre=genreOf(d.genre)||book.genre||"Other nonfiction";
   book.year=num(d.year)??book.year;
   book.blurb=cleanStr(d.blurb,1200)||book.blurb||"";
   if(!hex(book.color))book.color=hex(d.color);
@@ -594,7 +618,9 @@ async function runJob(){
       }catch(e){const m=sampleMsg(e);if(m)toast(m);if(stopsRun(e))break;}
       S.jobDone+=books.length;scheduleRender();
     }
-  }finally{S.jobRunning=false;S.queue.clear();S.jobDone=0;S.jobTotal=0;scheduleRender();setTimeout(stockUp,500);}
+  }finally{S.jobRunning=false;S.queue.clear();S.jobDone=0;S.jobTotal=0;
+    const m=await mergeDuplicates();if(m)toast(`Removed ${plural(m,"duplicate")} from overlapping photos.`);
+    scheduleRender();setTimeout(stockUp,500);}
 }
 
 // Everything the app might need later is text, so it's fetched once and kept on the phone.
@@ -673,8 +699,9 @@ const byNumber=(a,b)=>(a.number??999)-(b.number??999)||(a.year||0)-(b.year||0);
 function topsView(){
   const books=live("book");const owner=ownerIndex(books);const tops=new Map();
   const ensure=(id,base)=>{if(!tops.has(id))tops.set(id,{id,subs:[],...base});return tops.get(id);};
-  for(const sid of new Set(books.map(b=>b.seriesId).filter(Boolean))){
-    const rec=S.records.get(sid),ok=rec&&!rec.deleted,owned=books.filter(b=>b.seriesId===sid);
+  const keyed=new Map();for(const b of books){const k=seriesKeyOf(b);if(k){if(!keyed.has(k))keyed.set(k,[]);keyed.get(k).push(b);}}
+  for(const[sid,owned]of keyed){
+    const rec=S.records.get(sid),ok=rec&&!rec.deleted;
     const name=(ok&&rec.name)||owned[0].seriesName||"Untitled series",author=(ok&&rec.author)||owned[0].author||"";
     const sub={sid,name,books:ok&&Array.isArray(rec.books)?rec.books:[],owned,complete:ok?rec.complete:null};
     if(ok&&rec.universe)ensure("u_"+slug(rec.universe),{name:rec.universe,author,universe:true}).subs.push(sub);
@@ -1032,6 +1059,32 @@ async function removeQueued(ids){
   if(!ids.length)return;
   S.queued=S.queued.filter(p=>!ids.includes(p.id));await store.del(ids,"photos");scheduleRender();
 }
+// Overlapping shelf photos can catch the same book twice. Two entries are merged only when they look like
+// the same physical copy: same title and author, similar spine colour, and no conflicting edition details.
+// Two genuinely different editions you own (a red Les Misérables and a white one) are left alone.
+function colorDist(a,b){a=hex(a);b=hex(b);if(!a||!b)return 0;const x=parseInt(a.slice(1),16),y=parseInt(b.slice(1),16);
+  return Math.hypot((x>>16)-(y>>16),(x>>8&255)-(y>>8&255),(x&255)-(y&255));}
+function sameCopy(a,b){
+  if(!titleMatch(a.title,b.title))return false;
+  if(a.author&&b.author&&lastName(a.author)!==lastName(b.author))return false;
+  if(a.photoId&&b.photoId&&a.photoId===b.photoId&&norm(a.title)===norm(b.title)&&colorDist(a.color,b.color)<40)return true;  // the two halves of one photo
+  if(a.photoId&&b.photoId&&a.photoId===b.photoId)return false;   // two copies side by side in one photo are real
+  if(!a.photoId||!b.photoId)return false;                          // only books that came from two different photos
+  if(colorDist(a.color,b.color)>=70)return false;
+  for(const f of["publisher","translator","format"])if(a[f]&&b[f]&&norm(a[f])!==norm(b[f]))return false;
+  return true;
+}
+async function mergeDuplicates(){
+  const books=live("book").sort((x,y)=>(x.addedAt||0)-(y.addedAt||0));const gone=new Set(),out=[];
+  for(let i=0;i<books.length;i++){if(gone.has(books[i].id))continue;let keep=null;
+    for(let j=i+1;j<books.length;j++){const b=books[j];if(gone.has(b.id)||!sameCopy(books[i],b))continue;
+      keep=keep||clone(books[i]);for(const[k,v]of Object.entries(b))if((keep[k]==null||keep[k]===""||(Array.isArray(keep[k])&&!keep[k].length))&&v!=null&&!["id","addedAt","updatedAt","_synced"].includes(k))keep[k]=v;
+      if(keep.needsDetails&&!b.needsDetails){keep.needsDetails=false;}
+      gone.add(b.id);out.push({kind:"book",id:b.id,deleted:true});}
+    if(keep)out.push(keep);}
+  if(out.length)await save(out);
+  return gone.size;
+}
 function isOwned(c){return live("book").some(b=>titleMatch(b.title,c.title)&&(!c.author||!b.author||lastName(b.author)===lastName(c.author)));}
 // Photos are saved first, then read one after another while you keep using the app.
 // If the app is closed, whatever's left resumes the next time it opens online.
@@ -1051,7 +1104,8 @@ async function processQueue(){
       catch(e){if(stopsRun(e)){note=sampleMsg(e);break;}S.readFail.add(p.id);note=sampleMsg(e)||note;S.reading.done++;continue;}
       const seen=new Map();
       for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;const c={title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false};
-        const k=norm(c.title)+"|"+lastName(c.author);const prev=seen.get(k);if(!prev||(!prev.sure&&c.sure))seen.set(k,c);}
+        const k=[...seen.keys()].find(x=>{const o=seen.get(x);return titleMatch(o.title,c.title)&&(!o.author||!c.author||lastName(o.author)===lastName(c.author))&&colorDist(o.color,c.color)<70;})||norm(c.title)+"|"+lastName(c.author);
+        const prev=seen.get(k);if(!prev||(!prev.sure&&c.sure))seen.set(k,c);}
       const cands=[...seen.values()].filter(c=>!isOwned(c));
       const checkAll=LS.get("study-check-all","0")==="1";
       const sure=checkAll?[]:cands.filter(c=>c.sure),unsure=checkAll?cands:cands.filter(c=>!c.sure);
@@ -1063,6 +1117,7 @@ async function processQueue(){
     }
   }finally{
     S.reading=null;holdScreen(false);scheduleRender();
+    const merged=await mergeDuplicates();if(merged)added=Math.max(0,added-merged);
     const bits=[added&&`Added ${plural(added,"book")}`,checks&&`${plural(checks,"book")} to check`].filter(Boolean);
     if(bits.length||note)toast(bits.join(", ")+(bits.length?".":"")+(note?` ${note}`:""));
   }
@@ -1227,7 +1282,7 @@ function wrapFit(text,f,maxW,maxH,maxFs,minFs){
 const surname=a=>{const p=String(a||"").trim().split(/\s+/);return p.length?p[p.length-1]:"";};
 function palette(b){const h=hash(b.id);const base=hex(b.color)||PALETTE[h%PALETTE.length];
   return{c:base,dark:shade(base,-.45),deep:shade(base,-.7),light:shade(base,.35),acc:ACCENTS[(hash(nodeOf(b))>>>3)%ACCENTS.length],ink:inkOn(base)};}
-const STYLE_SETS={classic:["gilt","hubs","label","minimal","penguin","deco","labeltop","cloth","marbled","caps","frame","pinstripe"],
+const STYLE_SETS={western:["paperback","pulp","stripes","cloth","band","slab","seal","frame","caps"],classic:["gilt","hubs","label","minimal","penguin","deco","labeltop","cloth","marbled","caps","frame","pinstripe"],
   fantasy:["gilt","gradient","deco","hubs","twotone","monogram","label","sunburst","marbled","seal","caps","labeltop","frame"],
   scifi:["pulp","minimal","gradient","twotone","stripes","deco","band","chevron","slab","sunburst","frame","dots"],
   dark:["pulp","twotone","stripes","deco","gradient","monogram","slab","band","sunburst","seal","chevron"],
@@ -1236,13 +1291,34 @@ const STYLE_SETS={classic:["gilt","hubs","label","minimal","penguin","deco","lab
 const ALL_STYLES=["gilt","hubs","label","paperback","twotone","penguin","deco","pulp","minimal","gradient","stripes","monogram",
   "frame","band","labeltop","sunburst","dots","chevron","cloth","marbled","slab","pinstripe","seal","caps"];
 // A "node" is a whole sub-series (all its books share one design) or a single standalone book.
-const nodeOf=b=>b.seriesId?"s:"+b.seriesId:"b:"+b.id;
-function setForGenre(g){g=g||"";return STYLE_SETS[/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
+// Series that are really the same set (different names for it, or a book whose series wasn't recorded)
+// are folded together by the titles their lists share, so every book in a set gets one design.
+let _canon=null,_canonAt=-1;
+function canonMaps(){
+  if(_canon&&_canonAt===S.version)return _canon;
+  const parent=new Map(),find=x=>{while(parent.get(x)!==x){parent.set(x,parent.get(parent.get(x)));x=parent.get(x);}return x;};
+  const union=(a,b)=>{a=find(a);b=find(b);if(a!==b)parent.set(b,a);};
+  const recs=[...S.records.values()].filter(r=>r.kind==="series"&&!r.deleted);
+  for(const r of recs)parent.set(r.id,r.id);
+  for(const b of live("book"))if(b.seriesId&&!parent.has(b.seriesId))parent.set(b.seriesId,b.seriesId);
+  const byTitle=new Map();
+  for(const r of recs)for(const e of r.books||[]){const k=norm(e.title);if(!k)continue;if(byTitle.has(k))union(byTitle.get(k),r.id);else byTitle.set(k,r.id);}
+  const bySeries=new Map();for(const b of live("book"))if(b.seriesId){const k=norm(b.seriesName||"");if(k){if(bySeries.has(k))union(bySeries.get(k),b.seriesId);else bySeries.set(k,b.seriesId);}}
+  _canon={find,byTitle};_canonAt=S.version;return _canon;
+}
+function seriesKeyOf(b){
+  const c=canonMaps();
+  if(b.seriesId)return c.find(b.seriesId);
+  const hit=c.byTitle.get(norm(b.title))||(b.contains||[]).map(t=>c.byTitle.get(norm(t))).find(Boolean);
+  return hit?c.find(hit):null;
+}
+const nodeOf=b=>{const k=seriesKeyOf(b);return k?"s:"+k:"b:"+b.id;};
+function setForGenre(g){g=g||"";return STYLE_SETS[/Western/.test(g)?"western":/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
   /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other"];}
 // A sub-series takes its genre from its first book, so every book in it lands in the same style family.
 function nodeGenre(b){
-  if(!b.seriesId)return b.genre;
-  const mates=live("book").filter(x=>x.seriesId===b.seriesId).sort((x,y)=>(x.seriesNumber??999)-(y.seriesNumber??999)||String(x.id).localeCompare(String(y.id)));
+  const key=seriesKeyOf(b);if(!key)return b.genre;
+  const mates=live("book").filter(x=>seriesKeyOf(x)===key).sort((x,y)=>(x.seriesNumber??999)-(y.seriesNumber??999)||String(x.id).localeCompare(String(y.id)));
   return(mates[0]||b).genre;
 }
 function preferredStyle(node,b){const set=setForGenre(nodeGenre(b));return set[hash(node)%set.length];}
@@ -1667,6 +1743,12 @@ function openAdd(){
         closeSheet();const k=await addBooks(items);toast(`Added ${plural(k,"book")}.${canAsk()?"":" Details fill in once you’re online."}`);};
     });
 }
+// Anything after the first book of its series hides its description until tapped.
+function isLaterInSeries(b){
+  if(b.seriesNumber!=null)return Number(b.seriesNumber)>1;
+  const key=seriesKeyOf(b);if(!key)return false;const r=S.records.get(key);
+  const e=r&&(r.books||[]).find(x=>titleMatch(x.title,b.title));return!!(e&&e.number!=null&&Number(e.number)>1);
+}
 function openBook(id){
   const b=S.records.get(id);if(!b||b.deleted)return;
   const{c,t}=colors(b);
@@ -1677,18 +1759,21 @@ function openBook(id){
         ${b.wordCount||b.pages||b.format?`<p class="b-meta">${b.format?`<span class="tag soft">${esc(b.format[0].toUpperCase()+b.format.slice(1))}</span>`:""}${b.pages?`<span class="tag soft">${b.pages.toLocaleString()} pages</span>`:""}${b.wordCount?`<span class="tag soft">about ${(Math.round(b.wordCount/1000)*1000).toLocaleString()} words</span>`:""}</p>`:""}</div>
     </div>
     ${isTranslated(b)?`<p class="translation">Translated from ${esc(b.originalLanguage)}${b.translator?` by ${esc(b.translator)}`:", translator unknown"}${b.translator&&b.translatorSource==="likely"?` <span class="tag soft">probably</span>`:""}${b.edition?`<br><span class="muted" style="font-size:15px">${esc(b.edition)}</span>`:""}</p>`:""}
-    ${b.seriesName?`<button class="series-link" id="toSeries">${b.seriesNumber!=null?`Book ${esc(b.seriesNumber)} of `:"Part of "}${esc(b.seriesName)}</button>`:""}
-    ${b.blurb?`<p class="blurb parch">${esc(b.blurb)}</p>`:`<p class="muted" style="margin-top:14px">${b.needsDetails?(canAsk()?"Details are on their way, or tap Look up details.":"Details get looked up once you’re online."):"No description for this one."}</p>`}
+    ${(()=>{const k=seriesKeyOf(b);if(!k)return"";const r=S.records.get(k);const nm=(r&&!r.deleted&&r.name)||b.seriesName;
+      const e=r&&(r.books||[]).find(x=>titleMatch(x.title,b.title));const n=b.seriesNumber!=null?b.seriesNumber:e&&!e.novella?e.number:null;
+      return nm?`<button class="series-link" id="toSeries">${n!=null?`Book ${esc(n)} of `:"Part of "}${esc(nm)}</button>`:"";})()}
+    ${b.blurb?(isLaterInSeries(b)&&!S.revealed.has(b.id)?`<div class="blurb parch spoiler" id="spoiler"><p>${esc(b.blurb)}</p><button class="spoil-cover" id="spoilBtn"><span>Spoilers ahead</span><small>Tap to reveal</small></button></div>`:`<p class="blurb parch">${esc(b.blurb)}</p>`):`<p class="muted" style="margin-top:14px">${b.needsDetails?(canAsk()?"Details are on their way, or tap Look up details.":"Details get looked up once you’re online."):"No description for this one."}</p>`}
     <div class="actions">
       ${canAsk()?`<button class="btn" id="refresh">${b.needsDetails?"Look up details":"Refresh details"}</button>`:""}
       ${isTranslated(b)&&!translatorKnown(b)&&(canAsk()||(b.translations&&b.translations.length))?`<button class="btn" id="pickTr">Pick the translation</button>`:""}
       <button class="btn" id="edit">Edit</button>
       <button class="btn quiet danger-text" id="remove">Remove</button>
     </div>`,body=>{
-      const ts=$("#toSeries",body);if(ts)ts.onclick=()=>{closeSheet();S.tab="series";const tid=topIdOf(b.seriesId);S.openSeries.add(tid);render();
+      const ts=$("#toSeries",body);if(ts)ts.onclick=()=>{closeSheet();S.tab="series";const tid=topIdOf(seriesKeyOf(b));S.openSeries.add(tid);render();
         const el=document.getElementById("ser-"+tid);if(el)el.scrollIntoView({block:"start"});};
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
+      const sb=$("#spoilBtn",body);if(sb)sb.onclick=()=>{S.revealed.add(b.id);$("#spoiler",body).classList.add("revealed");};
       const pt=$("#pickTr",body);if(pt)pt.onclick=()=>openPickTranslation(b.id);
       mountTurner($("#stage",body),$("#b3d",body));
       const rm=$("#remove",body);
@@ -1805,7 +1890,7 @@ function openMenu(){
           setTimeout(()=>{if(ca.isConnected&&ca.dataset.armed){delete ca.dataset.armed;ca.textContent="Clear everything";ca.classList.remove("armed");}},5000);return;}
         for(const t of["records","photos","images"])await store.clear(t);
         S.records.clear();S.queued=[];S.reading=null;S.readFail=new Set();S.savedPhotos=0;S.queue.clear();S.openSeries.clear();S.openLists.clear();S.uniTried.clear();
-        S.q="";S.sq="";S.editSeries=false;S.gapsOnly=false;S.tab="shelves";_fit.clear();
+        S.q="";S.sq="";S.gapsOnly=false;S.tab="shelves";_fit.clear();
         closeSheet();render();window.scrollTo(0,0);toast("Everything cleared.");};
       $("#checkAll",body).onchange=e=>{LS.set("study-check-all",e.target.checked?"1":"0");};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
@@ -1837,7 +1922,7 @@ let rq=false;
 function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=false;render();});}
 function spine(b){
   const{W,H}=spineDims(b);
-  return`<div class="slot"><button class="spine drawn${b.needsDetails?" pending":""}" style="--h:${H}px;--w:${W}px" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}">${spineArt(b,W,H)}</button></div>`;
+  return`<div class="slot"><button class="spine drawn${b.needsDetails?" pending":""}${S.selecting&&S.selected.has(b.id)?" picked":""}" style="--h:${H}px;--w:${W}px" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}">${spineArt(b,W,H)}</button></div>`;
 }
 function bookcase(label,count,inner,opts={}){
   return`<section class="case">${CORNICE}<div class="plate-row">${SCROLL("")}<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>${SCROLL(" r")}</div>
@@ -1873,7 +1958,7 @@ function renderShelves(){
   }
   const{books,groups}=shelfLayout();const q=norm(S.q);
   if(!books.length)return`<p class="empty-note">Nothing on your shelves matches “${esc(S.q)}”.</p>`;
-  return`<p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p>`+
+  return`<div class="count-row"><p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p><button class="btn small ${S.selecting?"brass":""}" data-act="selectMode">${S.selecting?"Done":"Select"}</button></div>`+
     groups.map(([label,list])=>bookcase(label,list.length,list.map(spine).join(""))).join("");
 }
 function shelfLayout(){
@@ -1894,7 +1979,7 @@ function shelfLayout(){
 }
 const PEN=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>`;
 function entryHTML(t,gi,ei,e,listed){
-  const ed=S.editSeries,num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
+  const ed=S.editing.has(t.id),num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
   const key=`${t.id}|${gi}|${ei}`;
   let right;
   if(ed)right=`<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button>`;
@@ -1906,7 +1991,7 @@ function entryHTML(t,gi,ei,e,listed){
   return`<div class="entry${e.book?"":" missing"}${e.novella?" nov":""}${e.hidden?" gone":""}"><span class="num">${num}</span>${e.book&&!ed?`<button class="link" data-book="${e.book.id}">${title}</button>`:`<div>${title}</div>`}${right}</div>`;
 }
 function topCardHTML(t,listed){
-  const open=S.openSeries.has(t.id),ed=S.editSeries;
+  const open=S.openSeries.has(t.id),ed=S.editing.has(t.id);
   const counts=t.catalogued?[`you own ${t.ownedMain} of ${plural(t.main.length,"book")}`,t.nov.length?`${t.ownedNov} of ${plural(t.nov.length,"novella")}`:""].filter(Boolean).join(", "):"";
   const visGroups=t.groups.filter(g=>!g.hidden);
   const sub=[t.author,visGroups.length>1?plural(visGroups.length,"series","series"):"",counts,t.writing?"still being written":""].filter(Boolean).join(", ");
@@ -1924,28 +2009,29 @@ function topCardHTML(t,listed){
   const foot=ed?`${t.custom?`<button class="btn small" data-add-custom="${t.id}">Add to this series</button><button class="btn small quiet danger-text" data-del-custom="${t.id}">${S.confirmDel===t.id?"Tap again to delete":"Delete series"}</button>`
       :`<button class="btn small quiet" data-hide-top="${t.id}">${t.hiddenTop?"Show this series again":"Hide this whole series"}</button>`}${t.hiddenCount?`<button class="btn small quiet" data-reset-top="${t.id}">Put everything back</button>`:""}`
     :t.custom?"":`<button class="btn small" data-refresh-top="${t.id}" ${busy?"disabled":""}>${busy?"Checking…":t.catalogued?"Check for newer books":"Load the full series"}</button>`;
-  return`<div class="ledger leather${t.hiddenTop?" dim":""}" id="ser-${t.id}">
+  return`<div class="ledger leather${t.hiddenTop?" dim":""}${ed?" editing":""}" id="ser-${t.id}">
+    <button class="card-edit${ed?" on":""}" data-edit-top="${t.id}" aria-label="${ed?"Finish editing":"Edit"} ${esc(t.name)}">${ed?"Done":`${PEN} Edit`}</button>
     <button class="card-head" data-toggle-series="${t.id}" aria-expanded="${open}">
       <p class="card-title">${esc(t.name)}${t.custom?` <span class="tag kindmark">yours</span>`:""}</p>
       <p class="card-sub">${esc(sub)}</p>
       <div class="progress-row"><div class="pips" aria-hidden="true">${t.groups.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden)).slice(0,80).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?"":" miss"}${e.upcoming?" up":""}"${e.book?` style="background:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
     </button>
-    ${open||ed?`<div class="card-body">${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
+    ${open||ed?`<div class="card-body">${ed?`<p class="edit-hint">Remove books or sub-series you don’t plan to read; the series then counts as complete without them. Nothing leaves your shelves.</p>`:""}${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
   </div>`;
 }
 function renderSeries(){
-  let all=topsView();const ed=S.editSeries;
+  let all=topsView();
   if(canAsk())for(const t of all)if(t.universe&&!S.records.get(t.id)&&!S.uniTried.has(t.id))queueUniverse(t.name,t.author);
-  const head=`<div class="section-head"><p>${all.length?plural(all.filter(t=>!t.hiddenTop).length,"series","series"):"No series yet."}</p>
+  const hiddenN=all.filter(t=>t.hiddenTop).length;
+  const head=`<div class="section-head"><p>${all.length?plural(all.length-hiddenN,"series","series"):"No series yet."}${hiddenN?` <button class="linkish" data-act="showHidden">${S.showHidden?"hide":"show"} ${hiddenN} hidden</button>`:""}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${ed?"":`<button class="chip" data-act="gapsOnly" aria-pressed="${S.gapsOnly}">Only with gaps</button>`}
-      <button class="btn small ${ed?"brass":"editbtn"}" data-act="editSeries">${ed?"Done":`${PEN} Edit series`}</button></div></div>
-    ${ed?`<div class="edit-note"><p>Remove books or whole sub-series you don’t plan to read, and the series counts as complete without them. Nothing is deleted from your shelves.</p><button class="btn small brass" data-act="newSeries">New series</button></div>`:""}`;
-  if(!all.length)return head+`<p class="empty-note">Series show up here once you add books that belong to one. You can also make your own with Edit series, then New series.</p>`;
+      <button class="chip" data-act="gapsOnly" aria-pressed="${S.gapsOnly}">Only with gaps</button>
+      <button class="btn small editbtn" data-act="newSeries">New series</button></div></div>`;
+  if(!all.length)return head+`<p class="empty-note">Series show up here once you add books that belong to one. You can also make your own with New series.</p>`;
   const q=norm(S.sq);
   if(q)all=all.filter(t=>norm([t.name,t.author,...t.groups.map(g=>g.name),...t.groups.flatMap(g=>g.entries.map(e=>e.title))].join(" ")).includes(q));
-  if(!ed)all=all.filter(t=>!t.hiddenTop);
-  const shown=S.gapsOnly&&!ed?all.filter(t=>t.missing.length):all;
+  all=all.filter(t=>!t.hiddenTop||S.showHidden||S.editing.has(t.id));
+  const shown=S.gapsOnly?all.filter(t=>t.missing.length||S.editing.has(t.id)):all;
   const listed=listItemsIndex();
   return head+(shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+shown.map(t=>topCardHTML(t,listed)).join("");
 }
@@ -2005,6 +2091,27 @@ function renderLists(){
         <button class="btn small quiet danger-text" data-del-list="${l.id}">${S.confirmDel===l.id?"Tap again to delete":"Delete list"}</button></div></div>`:""}
     </div>`;}).join("");
 }
+function selectBar(){
+  let bar=$("#selectBar");
+  if(!(S.selecting&&S.tab==="shelves")){if(bar)bar.remove();return;}
+  if(!bar){bar=document.createElement("div");bar.id="selectBar";bar.className="select-bar";document.body.append(bar);
+    bar.addEventListener("click",e=>{const a=e.target.closest("button");if(!a)return;
+      if(a.dataset.sa==="all"){shelfLayout().books.forEach(b=>S.selected.add(b.id));render();}
+      if(a.dataset.sa==="none"){S.selected.clear();render();}
+      if(a.dataset.sa==="move")openMoveTo();});}
+  const n=S.selected.size;
+  bar.innerHTML=`<span>${n?plural(n,"book")+" selected":"Tap books to select them"}</span>
+    <span class="sb-btns"><button class="btn small" data-sa="${n?"none":"all"}">${n?"Clear":"Select all shown"}</button><button class="btn small brass" data-sa="move" ${n?"":"disabled"}>Move to…</button></span>`;
+}
+function openMoveTo(){
+  const ids=[...S.selected];if(!ids.length)return;
+  openSheet(`<h2 class="sheet-title">Move ${plural(ids.length,"book")} to…</h2>
+    <div class="genre-grid">${GENRES.map(g=>`<button class="btn" data-g="${esc(g)}">${esc(g)}</button>`).join("")}</div>`,body=>{
+      body.querySelectorAll("[data-g]").forEach(btn=>btn.onclick=async()=>{const g=btn.dataset.g;
+        await save(ids.map(id=>S.records.get(id)).filter(b=>b&&!b.deleted).map(b=>({...clone(b),genre:g,genreLocked:true})));
+        closeSheet();S.selected.clear();S.selecting=false;render();toast(`Moved ${plural(ids.length,"book")} to ${g}.`);});
+    });
+}
 function render(){
   if(!S.loaded)return;
   document.querySelectorAll(".nav [data-tab]").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab?"page":"false"));
@@ -2016,6 +2123,7 @@ function render(){
   assignStyles(shelfLayout().groups.map(g=>g[1]));
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
+  selectBar();
   const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
   const bd=$("#seriesBadge");bd.textContent=miss>99?"99+":String(miss);bd.hidden=!miss;
 }
@@ -2023,7 +2131,8 @@ function render(){
 /* ---------- events ---------- */
 $("#main").addEventListener("click",e=>{
   const t=e.target.closest("button,[data-book]");if(!t)return;const d=t.dataset;
-  if(d.book)return openBook(d.book);
+  if(d.book){if(S.selecting&&S.tab==="shelves"){S.selected.has(d.book)?S.selected.delete(d.book):S.selected.add(d.book);return render();}return openBook(d.book);}
+  if(d.act==="selectMode"){S.selecting=!S.selecting;S.selected.clear();return render();}
   if(d.toggleSeries){S.openSeries.has(d.toggleSeries)?S.openSeries.delete(d.toggleSeries):S.openSeries.add(d.toggleSeries);return render();}
   if(d.toggleList){S.openLists.has(d.toggleList)?S.openLists.delete(d.toggleList):S.openLists.add(d.toggleList);return render();}
   if(d.want){const[tid,gi,ei]=d.want.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[+gi];const m=g&&g.entries[+ei];
@@ -2056,10 +2165,11 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="checkPending")return openPending();
   if(d.act==="typeQueue")return openTypeFromPhoto(0);
   if(d.act==="gapsOnly"){S.gapsOnly=!S.gapsOnly;return render();}
-  if(d.act==="editSeries"){S.editSeries=!S.editSeries;return render();}
+  if(d.editTop){const id=d.editTop;if(S.editing.has(id))S.editing.delete(id);else{S.editing.add(id);S.openSeries.add(id);}return render();}
+  if(d.act==="showHidden"){S.showHidden=!S.showHidden;return render();}
   if(d.act==="newSeries")return openNewSeries();
 });
-document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render();window.scrollTo(0,0);});
+document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;if(S.tab!=="shelves"){S.selecting=false;S.selected.clear();}render();window.scrollTo(0,0);});
 $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
@@ -2079,6 +2189,7 @@ window.addEventListener("offline",scheduleRender);
   S.loaded=true;render();
   try{document.fonts.ready.then(()=>{_fit.clear();scheduleRender();});}catch(_){}
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
+  setTimeout(async()=>{const m=await mergeDuplicates();if(m)toast(`Removed ${plural(m,"duplicate")} from overlapping photos.`);},400);
   setTimeout(stockUp,1500);setTimeout(processQueue,700);
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
