@@ -242,6 +242,9 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+.list-section{margin:14px 0 2px;font-family:var(--display);font-size:19px;color:var(--rule)}
+.index-card .tag.kindtag{color:var(--parch-ink-2);border:1px solid rgba(43,30,18,.3);font-weight:500;font-size:12px;vertical-align:2px}
+.index-card .tag.ownedtag{color:#2F5A35;border:1px solid currentColor;font-weight:600;align-self:center}
 .translation{margin:12px 0 0;font-style:italic;font-size:17px}
 .switch{display:flex;align-items:center;gap:10px;font-size:16px}
 .switch input{width:22px;height:22px;accent-color:var(--brass);box-shadow:none}
@@ -433,7 +436,7 @@ Reply with only a JSON array, one object per book, using the same "key" values:
 function newBook(it){
   return{kind:"book",id:uid("b"),title:cleanStr(it.title,200),author:cleanStr(it.author,120),genre:null,year:null,blurb:"",
     color:hex(it.color),textColor:hex(it.textColor),seriesId:null,seriesName:null,seriesNumber:null,needsDetails:true,addedAt:Date.now(),
-    publisher:cleanStr(it.publisher,80)||null,translator:cleanStr(it.translator,160)||null,translatorSource:cleanStr(it.translator)?"spine":null,
+    publisher:cleanStr(it.publisher,80)||null,translator:cleanStr(it.translator,160)||null,translatorSource:cleanStr(it.translator)?(it.translatorSource||"spine"):null,
     originalLanguage:null,photoId:it.photoId||null};
 }
 async function addBooks(items){
@@ -569,10 +572,59 @@ async function removeItem(key,quiet){
   const c=clone(list);c.items=c.items.filter(i=>i.id!==item.id);await save(c);
   if(!quiet)toast(`Removed “${item.title}”.`);
 }
+// Turn any pasted text into list items. Claude tidies it when online; a simple line-by-line reading works offline.
+function listPrompt(text){
+  return `Someone pasted this into a reading list in their library app:
+"""
+${text}
+"""
+Turn it into list items. Keep every item, in order. Do not add, merge, correct into different works, or drop items. Headings (like "Russian classics:") are not items; use them as "section" for the items under them.
+Reply with only a JSON array: [{"title":"","author":null,"kind":"book","translator":null,"note":null,"section":null}]
+"kind" is "series" for a series, trilogy or saga, "book" for a single book, "other" for anything else (an author, a topic). "translator" is a specific translation they asked for, if any. "note" holds anything else they wrote about the item (an edition, who recommended it, a reason). Fill in an author's full name only when you're sure of it.`;
+}
+function parseListOffline(text){
+  const items=[];let section=null;
+  for(let raw of String(text||"").split(/\n+/)){
+    let l=raw.trim();if(!l)continue;
+    l=l.replace(/^(?:[-*•–]|\d+[.)]|\[.?\])\s*/,"").trim();if(!l)continue;
+    if(/:$/.test(l)&&l.length<60){section=l.replace(/:$/,"").trim();continue;}
+    let translator=null,note=null;
+    const tm=l.match(/\(?\s*(?:trans(?:lated)?\.?(?:\s+by)?|tr\.)\s+([^)\n]+?)\s*\)?$/i)||l.match(/[,(–-]\s*([A-Z][^,()–-]+?)\s+(?:translation|trans\.?)\s*\)?$/i);
+    if(tm){translator=tm[1].trim();l=l.slice(0,tm.index).replace(/[,(–-]\s*$/,"").trim();}
+    const nm=l.match(/\s*\(([^)]+)\)\s*$/);if(nm){note=nm[1].trim();l=l.slice(0,nm.index).trim();}
+    const m=l.match(/^(.+?)\s(?:by|—|–|-)\s(.+)$/i);
+    const title=(m?m[1]:l).replace(/^["“”]|["“”]$/g,"").replace(/\s+(series|saga)$/i,"").trim(),author=m?m[2].trim():null;
+    items.push({title,author,kind:/\b(series|trilogy|saga|cycle|chronicles|quartet|duology)\b/i.test(raw)?"series":"book",translator,note,section,text:raw.trim()});
+  }
+  return items;
+}
+async function parseListText(text){
+  if(canAsk()){
+    try{const arr=await AI.json(listPrompt(text.slice(0,20000)),{maxTokens:8000});
+      if(Array.isArray(arr)&&arr.length)return{items:arr,tidy:true};}catch(e){}
+  }
+  return{items:parseListOffline(text),tidy:false};
+}
+function cleanItem(it){
+  const kind=["book","series","other"].includes(it&&it.kind)?it.kind:"book";
+  return{id:uid("i"),title:cleanStr(it&&it.title,200),author:cleanStr(it&&it.author,120),kind,translator:cleanStr(it&&it.translator,160),
+    note:cleanStr(it&&it.note,400),section:cleanStr(it&&it.section,80),addedAt:Date.now()};
+}
+async function addTextToList(listId,name,text){
+  const{items,tidy}=await parseListText(text);
+  let list=listId?S.records.get(listId):null;
+  list=list&&!list.deleted?clone(list):{kind:"list",id:uid("l"),name,items:[],createdAt:Date.now()};
+  let n=0;
+  for(const raw of items){const it=cleanItem(raw);if(!it.title)continue;
+    if(list.items.some(x=>norm(x.title)===norm(it.title)&&(x.kind||"book")===it.kind))continue;
+    list.items.push(it);n++;}
+  await save(list);S.openLists.add(list.id);
+  return{n,tidy,list};
+}
 async function gotIt(key){
   const{item}=findItem(key);if(!item)return;
   await removeItem(key,true);
-  await addBooks([{title:item.title,author:item.author}]);
+  await addBooks([{title:item.title,author:item.author,translator:item.translator}]);
   toast(`“${item.title}” is on your shelves now.`);
 }
 async function delList(id){
@@ -859,7 +911,7 @@ async function importFromClaude(text){
     list=list?clone(list):{kind:"list",id:uid("l"),name,items:[],createdAt:Date.now()};
     for(const it of Array.isArray(l.items)?l.items:[]){
       const t=cleanStr(it&&it.title,200);if(!t||list.items.some(i=>norm(i.title)===norm(t)))continue;
-      list.items.push({id:uid("i"),title:t,author:cleanStr(it.author,120),note:cleanStr(it.note,400),addedAt:Date.now()});listed++;
+      list.items.push(cleanItem(it));listed++;
     }
     await save(list);
   }
@@ -988,27 +1040,27 @@ function editBook(id){
     await save(c);openBook(id);toast("Saved.");
   };
 }
-function openItemSheet(listId){
-  const l=S.records.get(listId);if(!l)return;
-  openSheet(`<h2 class="sheet-title">Add to ${esc(l.name)}</h2>
-    <div class="field"><label for="iT">Title</label><input id="iT" autocomplete="off"></div>
-    <div class="field"><label for="iA">Author <span class="opt">(optional)</span></label><input id="iA" autocomplete="off"></div>
-    <div class="field"><label for="iN">Note <span class="opt">(who recommended it, or why)</span></label><input id="iN" autocomplete="off"></div>
-    <button class="btn brass wide" id="iAdd">Add to list</button>`,body=>{
-      $("#iAdd",body).onclick=async()=>{const t=cleanStr($("#iT",body).value);if(!t){$("#iT",body).focus();return;}
-        const item={title:t,author:$("#iA",body).value,note:$("#iN",body).value};closeSheet();await addToList(l.name,item);S.openLists.add(l.id);scheduleRender();};
+function listSheet({listId,title,needName}){
+  openSheet(`<h2 class="sheet-title">${esc(title)}</h2>
+    ${needName?`<div class="field"><label for="lN">List name</label><input id="lN" placeholder="Fantasy series to read" autocomplete="off"></div>`:""}
+    <div class="field"><label for="lT">Paste or type anything${needName?` <span class="opt">(optional)</span>`:""}</label>
+      <textarea id="lT" style="min-height:220px" placeholder="One per line, any way you like:&#10;The Wheel of Time&#10;Malazan Book of the Fallen (Erikson)&#10;The Brothers Karamazov, Pevear and Volokhonsky translation&#10;War and Peace — Maude translation, Dad's pick"></textarea></div>
+    <p class="muted" style="margin-top:-4px">${canAsk()?"Claude tidies it into titles, authors, series and translations.":"Offline, each line is saved as is. It still keeps titles, authors and translations it can spot."}</p>
+    <button class="btn brass wide" id="lGo">${needName?"Create list":"Add to list"}</button>`,body=>{
+      const go=async()=>{
+        const name=needName?cleanStr($("#lN",body).value,80):null;const text=$("#lT",body).value;
+        if(needName&&!name){$("#lN",body).focus();return;}
+        if(needName&&live("list").some(l=>norm(l.name)===norm(name))){toast(`You already have a list called ${name}.`);return;}
+        if(!needName&&!text.trim()){$("#lT",body).focus();return;}
+        const btn=$("#lGo",body);btn.disabled=true;btn.textContent=text.trim()&&canAsk()?"Tidying your list…":"Saving…";
+        const r=await addTextToList(listId,name,text);
+        closeSheet();toast(r.n?`Saved ${plural(r.n,"item")} to ${r.list.name}.`:`${r.list.name} is ready.`);
+      };
+      $("#lGo",body).onclick=go;
     });
 }
-function openNewList(){
-  openSheet(`<h2 class="sheet-title">New list</h2>
-    <div class="field"><label for="lN">Name</label><input id="lN" placeholder="From Dad, or Summer reading" autocomplete="off"></div>
-    <button class="btn brass wide" id="lAdd">Create list</button>`,body=>{
-      const go=async()=>{const n=cleanStr($("#lN",body).value,80);if(!n){$("#lN",body).focus();return;}
-        if(live("list").some(l=>norm(l.name)===norm(n))){toast(`You already have a list called ${n}.`);return;}
-        const l={kind:"list",id:uid("l"),name:n,items:[],createdAt:Date.now()};closeSheet();S.openLists.add(l.id);await save(l);};
-      $("#lAdd",body).onclick=go;$("#lN",body).onkeydown=e=>{if(e.key==="Enter")go();};
-    });
-}
+function openItemSheet(listId){const l=S.records.get(listId);if(l)listSheet({listId,title:`Add to ${l.name}`});}
+function openNewList(){listSheet({title:"New list",needName:true});}
 function openMenu(){
   const sp=spend();const key=AI.key();
   openSheet(`<h2 class="sheet-title">Settings</h2>
@@ -1150,21 +1202,33 @@ function renderSeries(){
       </div>`:""}
     </div>`;}).join("");
 }
+function listItemHTML(l,it){
+  const kind=it.kind||"book";let status="";
+  if(kind==="book"&&live("book").some(b=>titleMatch(b.title,it.title)))status=`<span class="tag ownedtag">On your shelves</span>`;
+  if(kind==="series"){const sv=seriesView().find(x=>titleMatch(x.name,it.title)||norm(x.name).includes(norm(it.title)));
+    if(sv)status=`<span class="tag ownedtag">You own ${sv.entries.filter(e=>e.book).length}${sv.catalogued?` of ${sv.entries.length}`:""}</span>`;}
+  return`<div class="item">
+    <div class="it">${esc(it.title||it.text||"")}${kind==="series"?` <span class="tag kindtag">series</span>`:""}</div>
+    ${it.author?`<div class="ia">${esc(it.author)}</div>`:""}
+    ${it.translator?`<div class="in">Translated by ${esc(it.translator)}</div>`:""}
+    ${it.note?`<div class="in">${esc(it.note)}</div>`:""}
+    <div class="ib">${status}${kind==="book"&&!status?`<button class="btn small" data-gotit="${l.id}|${it.id}">I own it now</button>`:""}<button class="btn small quiet" data-remove-item="${l.id}|${it.id}">Remove</button></div></div>`;
+}
 function renderLists(){
   const lists=live("list").sort((a,b)=>(a.name===WISHLIST?-1:b.name===WISHLIST?1:0)||(a.createdAt||0)-(b.createdAt||0));
-  const head=`<div class="section-head"><p>${lists.length?plural(lists.length,"list"):"Books people recommend, and books you want."}</p>
+  const head=`<div class="section-head"><p>${lists.length?plural(lists.length,"list"):"Anything you want to read, in any form."}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${canAsk()?`<button class="btn small" data-act="suggest" ${S.suggesting?"disabled":""}>${S.suggesting?"Thinking…":"Suggest books for me"}</button>`:""}
     <button class="btn small brass" data-act="newList">New list</button></div></div>`;
-  if(!lists.length)return head+`<p class="empty-note">No lists yet. Start one, or tap a missing book in Series to add it to your ${WISHLIST}.</p>`;
+  if(!lists.length)return head+`<p class="empty-note">No lists yet. Tap New list and paste anything: series you want to start, classics in the translations you like, recommendations from friends.</p>`;
   return head+lists.map(l=>{
     const open=S.openLists.has(l.id);const items=l.items||[];
+    const series=items.filter(i=>i.kind==="series").length;
+    let body="",sec=null;
+    for(const it of items){if((it.section||null)!==sec){sec=it.section||null;if(sec)body+=`<p class="list-section">${esc(sec)}</p>`;}body+=listItemHTML(l,it);}
     return`<div class="index-card"><button class="card-head" data-toggle-list="${l.id}" aria-expanded="${open}">
-      <p class="card-title">${esc(l.name)}</p><p class="card-sub">${plural(items.length,"book")}</p></button>
-      ${open?`<div class="card-body">${items.length?items.map(it=>`<div class="item">
-          <div class="it">${esc(it.title)}</div>${it.author?`<div class="ia">${esc(it.author)}</div>`:""}${it.note?`<div class="in">${esc(it.note)}</div>`:""}
-          <div class="ib"><button class="btn small" data-gotit="${l.id}|${it.id}">I own it now</button><button class="btn small quiet" data-remove-item="${l.id}|${it.id}">Remove</button></div></div>`).join("")
-        :`<p style="color:var(--parch-ink-2);font-style:italic">This list is empty.</p>`}
-        <div class="card-foot"><button class="btn small" data-add-item="${l.id}">Add a book</button>
+      <p class="card-title">${esc(l.name)}</p><p class="card-sub">${plural(items.length,"item")}${series?`, ${plural(series,"series","series")}`:""}</p></button>
+      ${open?`<div class="card-body">${items.length?body:`<p style="color:var(--parch-ink-2);font-style:italic">This list is empty.</p>`}
+        <div class="card-foot"><button class="btn small" data-add-item="${l.id}">Add to this list</button>
         <button class="btn small quiet danger-text" data-del-list="${l.id}">${S.confirmDel===l.id?"Tap again to delete":"Delete list"}</button></div></div>`:""}
     </div>`;}).join("");
 }
