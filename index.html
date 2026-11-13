@@ -246,6 +246,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+#clearAll.armed{background:#5a1f17;color:#fff;border-color:var(--danger)}
 .btn.pick{flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
 .pk-t{font-size:17px}.pk-s{font-weight:400;font-size:14px;color:var(--text-2);font-style:italic}
 /* series extras */
@@ -403,6 +404,7 @@ const store={
     r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}catch(e){this.db=null;S.persist=false;}},
   async all(name="records"){if(!this.db)return[];try{return await new Promise((res,rej)=>{const q=this.db.transaction(name).objectStore(name).getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error);});}catch(e){return[];}},
   async put(recs,name="records"){if(!this.db||!recs.length)return true;try{await new Promise((res,rej)=>{const tx=this.db.transaction(name,"readwrite");const os=tx.objectStore(name);for(const r of recs)os.put(r);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error);});return true;}catch(e){return false;}},
+  async clear(name){if(!this.db)return;try{await new Promise((res,rej)=>{const tx=this.db.transaction(name,"readwrite");tx.objectStore(name).clear();tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}catch(e){}},
   async del(ids,name="records"){if(!this.db||!ids.length)return;try{await new Promise((res,rej)=>{const tx=this.db.transaction(name,"readwrite");const os=tx.objectStore(name);for(const i of ids)os.delete(i);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}catch(e){}}
 };
 async function save(recs){
@@ -1577,7 +1579,10 @@ function openMenu(){
     <div class="list-pick">
       <button class="btn wide" id="exp">Save a backup file</button>
       <label class="btn wide" style="cursor:pointer">Restore from a backup file<input type="file" id="imp" class="vh" accept="application/json,.json"></label>
-    </div>`,body=>{
+    </div>
+    <h3 class="sub">Testing</h3>
+    <p class="muted" style="margin-top:0">Erases every book, series, list and saved photo on this phone. Your API key and settings stay.</p>
+    <button class="btn wide danger-text" id="clearAll">Clear everything</button>`,body=>{
       $("#saveKey",body).onclick=()=>{const v=$("#apiKey",body).value.trim();if(!v){$("#apiKey",body).focus();return;}LS.set("study-api-key",v);toast("API key saved.");scheduleRender();openMenu();};
       const tk=$("#testKey",body);if(tk)tk.onclick=async()=>{tk.disabled=true;tk.textContent="Testing…";
         try{await AI.json(`Reply with {"ok":true}`,{model:MODELS.cheap,maxTokens:20});toast("Your key works.");}catch(e){toast(sampleMsg(e)||"Test cancelled.");}
@@ -1595,6 +1600,13 @@ function openMenu(){
         try{const r=await rebuildSeries(m=>{rb.textContent=m;});closeSheet();
           toast(`Rebuilt ${plural(r.series,"series","series")}.${r.split?` Split ${plural(r.split,"box set")} into separate books.`:""}`);}
         catch(e){rb.disabled=false;rb.textContent="Rebuild series";toast(sampleMsg(e)||"That didn’t finish. Try again.");}};
+      const ca=$("#clearAll",body);ca.onclick=async()=>{
+        if(!ca.dataset.armed){ca.dataset.armed="1";ca.textContent="Tap again to erase everything";ca.classList.add("armed");
+          setTimeout(()=>{if(ca.isConnected&&ca.dataset.armed){delete ca.dataset.armed;ca.textContent="Clear everything";ca.classList.remove("armed");}},5000);return;}
+        for(const t of["records","photos","images"])await store.clear(t);
+        S.records.clear();S.queued=[];S.savedPhotos=0;S.queue.clear();S.openSeries.clear();S.openLists.clear();S.uniTried.clear();
+        S.q="";S.sq="";S.editSeries=false;S.gapsOnly=false;S.tab="shelves";_fit.clear();
+        closeSheet();render();window.scrollTo(0,0);toast("Everything cleared.");};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
       $("#exp",body).onclick=async()=>{
         const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=clone(r);delete c._synced;return c;});
