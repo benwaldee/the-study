@@ -467,8 +467,18 @@ function ratio(a,b){const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min
 function colors(b){const h=hash(b.id);const c=hex(b.color)||PALETTE[h%PALETTE.length];let t=hex(b.textColor);if(!t||ratio(c,t)<3)t=lum(c)>.3?"#1E1A14":"#F1E8D2";return{c,t};}
 function genreOf(g){if(!g)return null;const n=norm(g);return GENRES.find(x=>norm(x)===n)||null;}
 function num(v){const n=parseFloat(v);return Number.isFinite(n)?n:null;}
-// Loose author check: "Robert Jordan and Brandon Sanderson" still matches "Robert Jordan".
-function sameAuthor(a,b){if(!a||!b)return true;const x=norm(a),y=norm(b),la=lastName(a),lb=lastName(b);return!!(la&&y.includes(la))||!!(lb&&x.includes(lb));}
+// The one author rule used everywhere: two credits match when any person in one is a person in the other.
+// "Robert Jordan and Brandon Sanderson" matches "Robert Jordan"; "Iain M. Banks" matches "Iain Banks";
+// "Terry Brooks" never matches "Max Brooks". An unknown author can't be told apart, so it isn't blocked.
+const people=a=>norm(a).split(/\b(?:and|with|translated by|edited by)\b/).map(p=>p.trim().split(" ").filter(Boolean)).filter(p=>p.length);
+function samePerson(p,q){
+  if(!p.includes(q[q.length-1])||!q.includes(p[p.length-1]))return false;   // surnames must agree (either name order)
+  if(p.length<2||q.length<2)return true;                                      // just a surname
+  const sub=(x,y)=>x.every(w=>y.includes(w));if(sub(p,q)||sub(q,p))return true;   // "Le Guin" / "Ursula K Le Guin"
+  return p[0][0]===q[0][0];                                                   // "JRR Tolkien" / "J R R Tolkien", not "Christopher Tolkien"
+}
+function sameAuthor(a,b){if(!norm(a)||!norm(b))return true;const P=people(a),Q=people(b);return P.some(p=>Q.some(q=>samePerson(p,q)));}
+const knownSameAuthor=(a,b)=>!!norm(a)&&!!norm(b)&&sameAuthor(a,b);
 function titleMatch(a,b){const x=norm(a),y=norm(b);return !!x&&(x===y||(x.length>5&&y.length>5&&(x.startsWith(y+" ")||y.startsWith(x+" "))));}
 const live=kind=>[...S.records.values()].filter(r=>r.kind===kind&&!r.deleted);
 const plural=(n,w,p)=>`${n} ${n===1?w:(p||w+"s")}`;
@@ -668,23 +678,27 @@ function applyDetails(book,d,seriesMap){
 }
 // Claude can call the same wider series slightly different things on different days ("The Cosmere",
 // "Brandon Sanderson's Cosmere"). Reuse the name already in the library so the card never jumps or vanishes.
-function stableUniverse(name){
+function stableUniverse(name,author){
   const n=cleanStr(name,150);if(!n)return null;const b=seriesBase(n);
-  const known=[...S.records.values()].filter(r=>!r.deleted&&(r.kind==="universe"||r.kind==="series")).map(r=>r.kind==="universe"?r.name:r.universe).filter(Boolean);
+  // Only reuse a name the same author's series already use: another author's world is never borrowed.
+  const known=[...S.records.values()].filter(r=>!r.deleted&&(r.kind==="universe"||r.kind==="series")&&sameAuthor(r.author,author)).map(r=>r.kind==="universe"?r.name:r.universe).filter(Boolean);
   const words=x=>new Set(seriesBase(x).split(" ").filter(w=>w.length>2));
   for(const k of known){const kb=seriesBase(k);if(kb===b)return k;const a=words(k),c=words(n);const shared=[...a].filter(w=>c.has(w)).length;if(shared&&shared>=Math.min(a.size,c.size))return k;}
   return n;
 }
 function applySeries(book,s,seriesMap){
   if(!s||typeof s!=="object"||!cleanStr(s.name))return;
-  const name=cleanStr(s.name,150),sid="s_"+slug(name);
+  const name=cleanStr(s.name,150);
+  // A series name another author already uses gets its own record, so their books never mix.
+  const taken=id=>{const r=seriesMap.get(id)||S.records.get(id);return!!(r&&!r.deleted&&!sameAuthor(r.author,book.author));};
+  let sid="s_"+slug(name);if(taken(sid))sid="s_"+slug(name+" "+lastName(book.author));
   book.seriesId=sid;book.seriesName=name;book.seriesNumber=book.contains&&book.contains.length>1?null:num(s.number);
   const fresh={kind:"series",id:sid,name,author:book.author,books:[],complete:null};
   let rec=seriesMap.get(sid)||(S.records.get(sid)?clone(S.records.get(sid)):fresh);
   if(rec.deleted)rec=fresh;
   const books=cleanSeriesBooks(s.books);   // only used if a full list came along (pasted from a chat)
   if(books.length&&rec.catalogVersion!==2&&books.length>=(rec.books||[]).length){rec.books=books;if(typeof s.complete==="boolean")rec.complete=s.complete;}
-  if(!rec.universe&&cleanStr(s.universe)&&norm(s.universe)!==norm(name))rec.universe=stableUniverse(s.universe);
+  if(!rec.universe&&cleanStr(s.universe)&&norm(s.universe)!==norm(name))rec.universe=stableUniverse(s.universe,rec.author||book.author);
   rec.name=rec.name||name;rec.author=rec.author||book.author;
   seriesMap.set(sid,rec);
 }
@@ -811,15 +825,18 @@ Reply with only a JSON array: [{"key":"k0","wordCount":90000,"pages":320,"format
 // A book owns a series entry directly, or through an omnibus volume that contains it.
 // Fast "do I own this title?" lookups across the whole library (direct, inside an omnibus, or under another title).
 const aliasOf=t=>canonMaps().aliasOf(t);
+// Every kind of match checks the author: a same-titled book by someone else never counts as yours for this series.
 function ownerIndex(books){
   const direct=new Map(),inside=new Map(),alias=new Map();
-  for(const b of books){const k=aliasOf(b.title);if(!alias.has(k))alias.set(k,b);}
+  const add=(m,k,b)=>{if(!k)return;if(!m.has(k))m.set(k,[]);if(!m.get(k).includes(b))m.get(k).push(b);};
   const bare=x=>x.replace(/\bvolume /g,"");   // "Berserk 3" and "Berserk, Vol. 3" are the same book
-  for(const b of books){const n=norm(b.title);direct.set(n,b);direct.set(bare(n),direct.get(bare(n))||b);for(const t of b.contains||[]){const m=norm(t);inside.set(m,b);inside.set(bare(m),b);}}
-  // A partial title ("The Castle" vs "The Castle of Dreaming Books") only counts when the author matches too.
-  return(title,author)=>{const n=norm(title);for(const k of[n,bare(n)]){if(direct.has(k))return{book:direct.get(k),via:null};if(inside.has(k))return{book:inside.get(k),via:inside.get(k).title};}
-    const ak=aliasOf(title);if(alias.has(ak))return{book:alias.get(ak),via:null};
-    if(n.length>5)for(const b of books){const x=norm(b.title);if(x.length>5&&(x.startsWith(n+" ")||n.startsWith(x+" "))&&author&&b.author&&sameAuthor(author,b.author))return{book:b,via:null};}
+  for(const b of books){const n=norm(b.title);add(direct,n,b);add(direct,bare(n),b);add(alias,aliasOf(b.title),b);
+    for(const t of b.contains||[]){const m=norm(t);add(inside,m,b);add(inside,bare(m),b);}}
+  return(title,author)=>{const n=norm(title);const ok=b=>sameAuthor(author,b.author);
+    for(const k of[n,bare(n)]){const d=(direct.get(k)||[]).find(ok);if(d)return{book:d,via:null};const i=(inside.get(k)||[]).find(ok);if(i)return{book:i,via:i.title};}
+    const a=(alias.get(aliasOf(title))||[]).find(ok);if(a)return{book:a,via:null};
+    // A partial title ("The Castle" vs "The Castle of Dreaming Books") needs a known author on both sides.
+    if(n.length>5)for(const b of books){const x=norm(b.title);if(x.length>5&&(x.startsWith(n+" ")||n.startsWith(x+" "))&&knownSameAuthor(author,b.author))return{book:b,via:null};}
     return null;};
 }
 const topIdOf=sid=>{const r=S.records.get(sid);return r&&!r.deleted&&r.universe?"u_"+slug(r.universe):sid;};
@@ -858,26 +875,39 @@ function topsView(){
     const rec=bestRecord(key,owned),ok=rec&&!rec.deleted,sid=ok?rec.id:key;
     const name=(ok&&rec.name)||owned[0].seriesName||"Untitled series",author=(ok&&rec.author)||owned[0].author||"";
     const sub={sid,name,books:ok&&Array.isArray(rec.books)?rec.books:[],owned,complete:ok?rec.complete:null};
-    if(ok&&rec.universe)ensure("u_"+slug(rec.universe),{name:rec.universe,author,universe:true}).subs.push(sub);
+    // A series joins a wider-series card only when it's the same author's.
+    const uid=ok&&rec.universe?"u_"+slug(rec.universe):null,ur=uid&&S.records.get(uid),ut=uid&&tops.get(uid);
+    if(uid&&(!ut||sameAuthor(ut.author,author))&&(!ur||ur.deleted||sameAuthor(ur.author,author)))ensure(uid,{name:rec.universe,author,universe:true}).subs.push(sub);
     else ensure(sid,{name,author}).subs.push(sub);
   }
-  // Cards that share most of their books, or whose names match a sub-series of the other, are one series
-  // (for example a "Shannara" card that was filed without its wider "Shannara Cycle").
+  // Never the same series twice. Two cards by the same author are one series when they share any book or their
+  // names match (one name inside the other counts: "Shannara" and "The Shannara Cycle"); the bigger card wins.
+  // Cards by different authors never merge. With an author unknown, it takes most of the books in common.
   const raw=[...tops.values()];const keySet=t=>{const ks=new Set();const add=x=>{const k=aliasOf(x);if(k)ks.add(k);};
-    const u=t.universe&&S.records.get(t.id);if(u&&!u.deleted)for(const g of u.groups||[])for(const e of g.books||[])add(e.title);
+    const u=t.universe&&S.records.get(t.id);if(u&&!u.deleted&&sameAuthor(u.author,t.author))for(const g of u.groups||[])for(const e of g.books||[])add(e.title);
     for(const sb of t.subs){for(const e of sb.books||[])add(e.title);for(const b of sb.owned)add(b.title);}return ks;};
   const names=t=>{const ns=new Set([seriesBase(t.name),...t.subs.map(sb=>seriesBase(sb.name))]);const u=t.universe&&S.records.get(t.id);
-    if(u&&!u.deleted)for(const g of u.groups||[])ns.add(seriesBase(g.name));ns.delete("");return ns;};
+    if(u&&!u.deleted&&sameAuthor(u.author,t.author))for(const g of u.groups||[])ns.add(seriesBase(g.name));ns.delete("");return ns;};
   const K=new Map(raw.map(t=>[t.id,keySet(t)])),N=new Map(raw.map(t=>[t.id,names(t)]));
+  const C=new Map(raw.map(t=>[t.id,[...N.get(t.id)].map(coreWords).filter(w=>w.some(x=>x.length>3))]));
+  const within=(x,y)=>x.every(w=>y.includes(w));
+  const authorOfTop=t=>t.author||t.subs.flatMap(sb=>sb.owned).map(b=>b.author).find(Boolean)||"";
   const par=new Map(raw.map(t=>[t.id,t.id])),fp=x=>{while(par.get(x)!==x){par.set(x,par.get(par.get(x)));x=par.get(x);}return x;};
+  const CA=new Map(raw.map(t=>[t.id,authorOfTop(t)]));
   for(let i=0;i<raw.length;i++)for(let j=i+1;j<raw.length;j++){const a=raw[i],b=raw[j];
+    const aa=authorOfTop(a),ab=authorOfTop(b);if(!sameAuthor(aa,ab))continue;          // another author's series is never the same series
     const ka=K.get(a.id),kb=K.get(b.id);let shared=0;for(const k of ka)if(kb.has(k))shared++;
     const small=Math.min(ka.size,kb.size),nameHit=[...N.get(a.id)].some(n=>N.get(b.id).has(n));
-    if((small&&shared>=Math.max(1,Math.ceil(small*.5)))||(nameHit&&shared>0)||(nameHit&&(a.universe||b.universe)&&sameAuthor(a.author,b.author)))par.set(fp(b.id),fp(a.id));}
+    const nameIn=C.get(a.id).some(x=>C.get(b.id).some(y=>within(x,y)||within(y,x)));
+    const same=knownSameAuthor(aa,ab)?(shared>0||nameHit||nameIn)
+      :((small&&shared>=Math.max(1,Math.ceil(small*.5)))||(nameHit&&shared>0));
+    if(!same)continue;const ra=fp(a.id),rb=fp(b.id);if(ra===rb)continue;
+    if(!sameAuthor(CA.get(ra),CA.get(rb)))continue;   // no chain through an unknown author joins two different authors
+    par.set(rb,ra);if(!CA.get(ra))CA.set(ra,CA.get(rb));}
   const clusters=new Map();for(const t of raw){const r=fp(t.id);if(!clusters.has(r))clusters.set(r,[]);clusters.get(r).push(t);}
   S.idAlias=new Map();
   const merged=[...clusters.values()].map(list=>{if(list.length===1)return{...list[0],mergedIds:[]};
-    const win=[...list].sort((a,b)=>(b.universe?1:0)-(a.universe?1:0)||K.get(b.id).size-K.get(a.id).size||a.id.localeCompare(b.id))[0];
+    const win=[...list].sort((a,b)=>K.get(b.id).size-K.get(a.id).size||(b.universe?1:0)-(a.universe?1:0)||a.id.localeCompare(b.id))[0];   // the bigger one
     const rest=list.filter(t=>t!==win);rest.forEach(t=>S.idAlias.set(t.id,win.id));
     return{...win,universe:list.some(t=>t.universe),subs:list.flatMap(t=>t.subs),mergedIds:rest.map(t=>t.id),extraUni:rest.filter(t=>t.universe).map(t=>t.id)};});
   for(const c of live("custom"))merged.push({id:c.id,subs:[],name:c.name,author:c.author||"",custom:true,rec:c,mergedIds:[]});
@@ -886,7 +916,7 @@ function topsView(){
     let groups;
     if(t.custom)groups=(t.rec.groups||[]).map(g=>({name:g.name,books:g.books||[],pending:g.pending}));
     else if(t.universe){groups=[];
-      for(const uid of[t.id,...(t.extraUni||[])]){const u=S.records.get(uid);if(u&&!u.deleted&&u.groups)for(const g of u.groups)if(!groups.some(x=>norm(x.name)===norm(g.name)))groups.push({name:g.name,books:g.books});}
+      for(const uid of[t.id,...(t.extraUni||[])]){const u=S.records.get(uid);if(u&&!u.deleted&&u.groups&&sameAuthor(u.author,t.author))for(const g of u.groups)if(!groups.some(x=>norm(x.name)===norm(g.name)))groups.push({name:g.name,books:g.books});}
       for(const sb of t.subs){const g=groups.find(x=>norm(x.name)===norm(sb.name));if(!g)groups.push({name:sb.name,books:sb.books});else if(!g.books.length)g.books=sb.books;}}
     else{groups=[];for(const sb of t.subs){const g=groups.find(x=>norm(x.name)===norm(sb.name));if(!g)groups.push({name:sb.name,books:sb.books});else if((sb.books||[]).length>(g.books||[]).length)g.books=sb.books;}}
     const pr=mergedPrefs(t),hg=new Set(pr.hiddenGroups||[]),hb=new Set(pr.hiddenBooks||[]),ren=pr.renames||{};
@@ -894,8 +924,8 @@ function topsView(){
     for(const a of pr.added||[]){const g=groups.find(x=>norm(x.name)===norm(a.group))||groups[0];if(g)g.books.push({number:a.number,title:a.title,novella:!!a.novella,added:true});}
     groups=tidyGroups(groups);
     const used=new Set();
-    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const title=ren[norm(e.title)]||e.title;const o=owner(title,t.author)||(e.aka||[]).map(a=>owner(a,t.author)).find(Boolean);if(o)used.add(o.book);
-      return{number:e.number,title,orig:e.title,aka:e.aka||[],year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))||hb.has(norm(title))};})}));
+    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const title=ren[norm(e.title)]||e.title,au=e.author||t.author;const o=owner(title,au)||(e.aka||[]).map(a=>owner(a,au)).find(Boolean);if(o)used.add(o.book);
+      return{number:e.number,title,orig:e.title,author:e.author||"",aka:e.aka||[],year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))||hb.has(norm(title))};})}));
     for(const sb of t.subs)for(const b of sb.owned){if(used.has(b))continue;used.add(b);
       let g=G.find(x=>norm(x.name)===norm(sb.name));if(!g){g={name:sb.name,entries:[],hidden:hg.has(norm(sb.name))};G.push(g);}
       g.entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,hidden:hb.has(norm(b.title))});}
@@ -920,7 +950,7 @@ Rules:
 - If the series name is a special edition with its own volume numbering (for example "Berserk Deluxe Edition"), list that edition's own volumes with its own numbering. Otherwise list the standard books; an omnibus or box set is never an entry, list the books inside it instead.
 - "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle); otherwise null.
 - "complete" is false if more main books are planned.
-List only books you are confident exist. Never include books from other authors or other series.`;
+List only books you are confident exist. Never include books from other authors or other series${author?`: every book must be written or co-written by ${author}`:""}.`;
 }
 async function refreshSeries(sid,{quiet=false}={}){
   if(!canAsk()){if(!quiet)toast("Checking a series needs a connection to Claude.");return;}
@@ -935,7 +965,7 @@ async function refreshSeries(sid,{quiet=false}={}){
     const rec=clone(latest&&!latest.deleted?latest:{kind:"series",id:sid,name,author});
     const before=(rec.books||[]).length;
     rec.books=books;rec.catalogVersion=editionNamed(rec.name)?3:2;rec.akaChecked=true;if(typeof res.complete==="boolean")rec.complete=res.complete;
-    if(!rec.universe&&cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=stableUniverse(res.universe);
+    if(!rec.universe&&cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=stableUniverse(res.universe,rec.author);
     await save(rec);
     if(rec.universe)queueUniverse(rec.universe,rec.author);
     if(!quiet)toast(books.length>before&&before?`Found ${plural(books.length-before,"more book")} in ${name}.`:`${name} is up to date.`);
@@ -957,7 +987,7 @@ async function loadUniverse(name,author){
     const res=await Claude.json(`List every book in "${name}"${author?` by ${author}`:""}, grouped by its sub-series, with the sub-series in reading order.
 Reply with only JSON: {"name":"${name}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false,"alsoKnownAs":[]}]}]}
 Every book appears exactly once across all groups. If a book was published under more than one title, list it once under its most common title and put the other titles in "alsoKnownAs".
-Include novellas set in it with "novella": true, and announced books not out yet with "upcoming": true. Put standalone books in a group named "Standalone novels". An omnibus or box set is never an entry. List only books you are confident exist.`,{model:MODELS.smart,maxTokens:8000});
+Include novellas set in it with "novella": true, and announced books not out yet with "upcoming": true. Put standalone books in a group named "Standalone novels". An omnibus or box set is never an entry. List only books you are confident exist.${author?` Only include books written or co-written by ${author}; leave out tie-ins and spin-offs by other authors.`:""}`,{model:MODELS.smart,maxTokens:8000});
     const groups=(Array.isArray(res&&res.groups)?res.groups:[]).map(g=>({name:cleanStr(g&&g.name,150),books:cleanSeriesBooks(g&&g.books)})).filter(g=>g.name&&g.books.length);
     if(groups.length)await save({kind:"universe",id,name,author,groups,akaChecked:true});
   }catch(e){}
@@ -1202,7 +1232,7 @@ function colorDist(a,b){a=hex(a);b=hex(b);if(!a||!b)return 0;const x=parseInt(a.
   return Math.hypot((x>>16)-(y>>16),(x>>8&255)-(y>>8&255),(x&255)-(y&255));}
 function sameCopy(a,b){
   if(!titleMatch(a.title,b.title))return false;
-  if(a.author&&b.author&&lastName(a.author)!==lastName(b.author))return false;
+  if(!sameAuthor(a.author,b.author))return false;
   if(a.photoId&&b.photoId&&a.photoId===b.photoId&&norm(a.title)===norm(b.title)&&colorDist(a.color,b.color)<40)return true;  // the two halves of one photo
   if(a.photoId&&b.photoId&&a.photoId===b.photoId)return false;   // two copies side by side in one photo are real
   if(!a.photoId||!b.photoId)return false;                          // only books that came from two different photos
@@ -1219,7 +1249,7 @@ async function mergeDuplicates(){
     if(list.length<2||new Set(list.map(b=>norm(b.title))).size<2)continue;
     const keep=list.filter(b=>b.photoId).sort((x,y)=>(x.addedAt||0)-(y.addedAt||0))[0]||list.sort((x,y)=>(x.addedAt||0)-(y.addedAt||0))[0];
     let k=null;
-    for(const b of list){if(b===keep||b.photoId||norm(b.title)===norm(keep.title))continue;
+    for(const b of list){if(b===keep||b.photoId||norm(b.title)===norm(keep.title)||!sameAuthor(b.author,keep.author))continue;
       k=k||clone(keep);for(const[f,v]of Object.entries(b))if((k[f]==null||k[f]===""||(Array.isArray(k[f])&&!k[f].length))&&v!=null&&!["id","addedAt","updatedAt","_synced","title","photoId"].includes(f))k[f]=v;
       if(k.needsDetails&&!b.needsDetails)k.needsDetails=false;
       gone.add(b.id);out.push({kind:"book",id:b.id,deleted:true});}
@@ -1235,7 +1265,7 @@ async function mergeDuplicates(){
   if(out.length)await save(out);
   return gone.size;
 }
-function isOwned(c){return live("book").some(b=>titleMatch(b.title,c.title)&&(!c.author||!b.author||lastName(b.author)===lastName(c.author)));}
+function isOwned(c){return live("book").some(b=>titleMatch(b.title,c.title)&&sameAuthor(b.author,c.author));}
 // Photos are saved first, then read one after another while you keep using the app.
 // If the app is closed, whatever's left resumes the next time it opens online.
 let wake=null;
@@ -1254,7 +1284,7 @@ async function processQueue(){
       catch(e){if(stopsRun(e)){note=sampleMsg(e);break;}S.readFail.add(p.id);note=sampleMsg(e)||note;S.reading.done++;continue;}
       const seen=new Map();
       for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;const c={title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false};
-        const k=[...seen.keys()].find(x=>{const o=seen.get(x);return titleMatch(o.title,c.title)&&(!o.author||!c.author||lastName(o.author)===lastName(c.author))&&colorDist(o.color,c.color)<70;})||norm(c.title)+"|"+lastName(c.author);
+        const k=[...seen.keys()].find(x=>{const o=seen.get(x);return titleMatch(o.title,c.title)&&sameAuthor(o.author,c.author)&&colorDist(o.color,c.color)<70;})||norm(c.title)+"|"+lastName(c.author);
         const prev=seen.get(k);if(!prev||(!prev.sure&&c.sure))seen.set(k,c);}
       const cands=[...seen.values()].filter(c=>!isOwned(c));
       const checkAll=LS.get("study-check-all","0")==="1";
@@ -1366,6 +1396,8 @@ const ALL_STYLES=["gilt","hubs","label","paperback","twotone","penguin","deco","
 let _canon=null,_canonAt=-1;
 // "Berserk Deluxe Edition" and "Berserk" are one series: edition words are ignored when comparing series names.
 const seriesBase=n=>norm(n).replace(/\b(deluxe|omnibus|collectors?|collector s|illustrated|anniversary|hardcover|paperback|boxed|box|set|complete|edition|editions|special|definitive|vizbig|\d+ in 1|series)\b/g," ").replace(/\s+/g," ").trim();
+// The distinctive words of a series name, without words like "saga" or "cycle" that any series could use.
+const coreWords=n=>seriesBase(n).replace(/\b(saga|cycle|chronicles?|trilogy|quartet|quintet|duology|sequence|books?|novels?|universe|world|tales?|stories|legends?|of|the|and|a|an|in)\b/g," ").split(" ").filter(Boolean);
 function canonMaps(){
   if(_canon&&_canonAt===S.version)return _canon;
   const parent=new Map(),find=x=>{while(parent.get(x)!==x){parent.set(x,parent.get(parent.get(x)));x=parent.get(x);}return x;};
@@ -1373,23 +1405,31 @@ function canonMaps(){
   const recs=[...S.records.values()].filter(r=>r.kind==="series"&&!r.deleted);
   for(const r of recs)parent.set(r.id,r.id);
   for(const b of live("book"))if(b.seriesId&&!parent.has(b.seriesId))parent.set(b.seriesId,b.seriesId);
+  // Series fold together by a shared title or the same name, but only when the authors agree:
+  // another author's book with the same title, or another author's series with the same name, stays apart.
+  const bookAuthor=new Map();for(const b of live("book"))if(b.seriesId&&b.author&&!bookAuthor.has(b.seriesId))bookAuthor.set(b.seriesId,b.author);
+  const authorOf=id=>{const r=S.records.get(id);return(r&&!r.deleted&&r.author)||bookAuthor.get(id)||"";};
+  const join=(map,k,id)=>{if(!k)return;const list=map.get(k)||[];const hit=list.find(x=>sameAuthor(authorOf(x),authorOf(id)));if(hit)union(hit,id);else{list.push(id);map.set(k,list);}};
   const byTitle=new Map();
-  for(const r of recs)for(const e of r.books||[]){const k=norm(e.title);if(!k)continue;if(byTitle.has(k))union(byTitle.get(k),r.id);else byTitle.set(k,r.id);}
-  const byBase=new Map();for(const r of recs){const k=seriesBase(r.name);if(!k)continue;if(byBase.has(k))union(byBase.get(k),r.id);else byBase.set(k,r.id);}
-  const bySeries=new Map();for(const b of live("book"))if(b.seriesId){const k=seriesBase(b.seriesName||"");if(k){if(bySeries.has(k))union(bySeries.get(k),b.seriesId);else bySeries.set(k,b.seriesId);}}
+  for(const r of recs)for(const e of r.books||[])join(byTitle,norm(e.title),r.id);
+  const byBase=new Map();for(const r of recs)join(byBase,seriesBase(r.name),r.id);
+  const bySeries=new Map();for(const b of live("book"))if(b.seriesId)join(bySeries,seriesBase(b.seriesName||""),b.seriesId);
   const ap=new Map(),af=x=>{if(!ap.has(x))ap.set(x,x);while(ap.get(x)!==x){ap.set(x,ap.get(ap.get(x)));x=ap.get(x);}return x;};
   const aun=(a,b)=>{if(!a||!b)return;a=af(a);b=af(b);if(a!==b)ap.set(b,a);};
   const linkAka=(t,aka)=>{for(const a of aka||[])aun(norm(t),norm(a));};
-  for(const r of recs)for(const e of r.books||[]){linkAka(e.title,e.aka);for(const a of e.aka||[]){const k=norm(a);if(k&&!byTitle.has(k))byTitle.set(k,r.id);}}
+  for(const r of recs)for(const e of r.books||[]){linkAka(e.title,e.aka);for(const a of e.aka||[])join(byTitle,norm(a),r.id);}
   for(const u of[...S.records.values()].filter(r=>!r.deleted&&(r.kind==="universe"||r.kind==="custom")))for(const g of u.groups||[])for(const e of g.books||[])linkAka(e.title,e.aka);
   for(const b of live("book"))linkAka(b.title,b.aka);
   const members=new Map();for(const r of recs){const k=find(r.id);if(!members.has(k))members.set(k,[]);members.get(k).push(r);}
-  _canon={find,byTitle,members,aliasOf:t=>af(norm(t))};_canonAt=S.version;return _canon;
+  _canon={find,byTitle,members,authorOf,aliasOf:t=>af(norm(t))};_canonAt=S.version;return _canon;
 }
+// A book only ever sits in a series by its own author. If the series it was filed under is someone else's
+// (a misread, or an older library), it's matched again by title among its own author's series, or left standalone.
 function seriesKeyOf(b){
   const c=canonMaps();
-  if(b.seriesId)return c.find(b.seriesId);
-  const hit=c.byTitle.get(norm(b.title))||(b.contains||[]).map(t=>c.byTitle.get(norm(t))).find(Boolean);
+  if(b.seriesId){const r=S.records.get(b.seriesId);if(!r||r.deleted||sameAuthor(r.author,b.author))return c.find(b.seriesId);}
+  const pick=t=>(c.byTitle.get(norm(t))||[]).find(id=>sameAuthor(c.authorOf(id),b.author));
+  const hit=pick(b.title)||(b.contains||[]).map(pick).find(Boolean);
   return hit?c.find(hit):null;
 }
 // When several editions fold into one series, show the list for the edition you actually own.
@@ -1735,7 +1775,7 @@ async function importFromClaude(text){
   const seriesMap=new Map(),out=[];let added=0,updated=0,skipped=0,listed=0;
   for(const d of books){
     if(!d||!cleanStr(d.title))continue;
-    const existing=live("book").find(b=>titleMatch(b.title,d.title)&&(!d.author||!b.author||lastName(b.author)===lastName(d.author)));
+    const existing=live("book").find(b=>titleMatch(b.title,d.title)&&sameAuthor(b.author,d.author));
     if(existing){
       if(existing.needsDetails||!existing.blurb){const c=clone(existing);applyDetails(c,d,seriesMap);out.push(c);updated++;}else skipped++;
       continue;
@@ -2218,7 +2258,7 @@ function seriesPhotos(t){
 async function addSeriesBook(t,g,e,extra={}){
   const sb=(t.subs||[]).find(x=>norm(x.name)===norm(g.name))||(t.subs||[])[0];
   const mate=live("book").find(b=>nodeOf(b)==="s:"+t.id)||(sb&&sb.owned[0]);
-  const b=newBook({title:e.title,author:t.author||(mate&&mate.author),...extra});b.fromSeries=true;
+  const b=newBook({title:e.title,author:e.author||t.author||(mate&&mate.author),...extra});b.fromSeries=true;
   if(sb){b.seriesId=sb.sid;b.seriesName=sb.name;}b.seriesNumber=e.novella?null:e.number;if(mate){b.genre=mate.genre;b.format=b.format||mate.format;}
   return b;
 }
