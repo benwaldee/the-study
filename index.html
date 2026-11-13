@@ -242,6 +242,8 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+.btn.pick{flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
+.pk-t{font-size:17px}.pk-s{font-weight:400;font-size:14px;color:var(--text-2);font-style:italic}
 /* series extras */
 .tag.novtag{font-size:12px;font-weight:500;color:var(--text-2);border:1px solid var(--line);vertical-align:2px;padding:0 6px}
 .entry.nov .et{font-size:16px}
@@ -253,6 +255,15 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .uni-group small{font-weight:400;color:var(--text-2);font-style:italic;margin-left:6px}
 .uni-group.here{color:var(--brass-hi)}
 #group[hidden]{display:none}
+.btn.editbtn{background:linear-gradient(var(--leather-2),var(--leather));color:var(--brass-hi);border-color:var(--brass);gap:7px}
+.edit-note{margin:4px 14px 10px;padding:12px 14px;border:1px dashed var(--brass);border-radius:3px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.edit-note p{margin:0;flex:1 1 220px;color:var(--text-2);font-style:italic;font-size:15px}
+.grp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:16px 0 2px;font-family:var(--display);font-size:19px;color:var(--brass-hi)}
+.grp-head small{font-family:var(--serif);font-size:14px;color:var(--text-2);font-style:italic;margin-left:6px}
+.gone{opacity:.42}
+.gone .et{text-decoration:line-through}
+.ledger.dim{opacity:.6}
+.tag.kindmark{font-family:var(--serif);font-size:12px;font-weight:500;color:var(--brass);border:1px solid var(--brass-lo);vertical-align:4px}
 /* drawn book art */
 .spine.drawn{padding:0;background:none;color:inherit;box-shadow:1px 0 0 rgba(0,0,0,.55)}
 .art{position:absolute;inset:0;overflow:hidden;display:block;border-radius:inherit}
@@ -347,7 +358,7 @@ const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><d
 const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
-  persist:true,persisted:false,savedPhotos:0,translating:false,imgs:new Map(),sq:"",openUniverse:new Set(),
+  persist:true,persisted:false,savedPhotos:0,translating:false,imgs:new Map(),sq:"",editSeries:false,uniTried:new Set(),
   queue:new Set(),jobRunning:false,jobDone:0,jobTotal:0,suggesting:false,busySeries:new Set(),confirmDel:null,loaded:false,photoCtl:null};
 
 /* ---------- helpers ---------- */
@@ -565,6 +576,55 @@ function ownerOf(title,books){
   const d=books.find(b=>titleMatch(b.title,title));if(d)return{book:d,via:null};
   const o=books.find(b=>(b.contains||[]).some(t=>titleMatch(t,title)));return o?{book:o,via:o.title}:null;
 }
+// Fast "do I own this title?" lookups across the whole library (direct, or inside an omnibus).
+function ownerIndex(books){
+  const direct=new Map(),inside=new Map();
+  for(const b of books){direct.set(norm(b.title),b);for(const t of b.contains||[])inside.set(norm(t),b);}
+  return title=>{const n=norm(title);if(direct.has(n))return{book:direct.get(n),via:null};if(inside.has(n))return{book:inside.get(n),via:inside.get(n).title};
+    if(n.length>5)for(const b of books){const x=norm(b.title);if(x.length>5&&(x.startsWith(n+" ")||n.startsWith(x+" ")))return{book:b,via:null};}
+    return null;};
+}
+const topIdOf=sid=>{const r=S.records.get(sid);return r&&!r.deleted&&r.universe?"u_"+slug(r.universe):sid;};
+const prefsOf=id=>{const p=S.records.get("p_"+id);return p&&!p.deleted?p:{hiddenGroups:[],hiddenBooks:[],hidden:false};};
+async function setPrefs(id,fn){const p=clone(prefsOf(id));p.kind="seriesprefs";p.id="p_"+id;p.hiddenGroups=p.hiddenGroups||[];p.hiddenBooks=p.hiddenBooks||[];fn(p);await save(p);}
+const byNumber=(a,b)=>(a.number??999)-(b.number??999)||(a.year||0)-(b.year||0);
+function topsView(){
+  const books=live("book");const owner=ownerIndex(books);const tops=new Map();
+  const ensure=(id,base)=>{if(!tops.has(id))tops.set(id,{id,subs:[],...base});return tops.get(id);};
+  for(const sid of new Set(books.map(b=>b.seriesId).filter(Boolean))){
+    const rec=S.records.get(sid),ok=rec&&!rec.deleted,owned=books.filter(b=>b.seriesId===sid);
+    const name=(ok&&rec.name)||owned[0].seriesName||"Untitled series",author=(ok&&rec.author)||owned[0].author||"";
+    const sub={sid,name,books:ok&&Array.isArray(rec.books)?rec.books:[],owned,complete:ok?rec.complete:null};
+    if(ok&&rec.universe)ensure("u_"+slug(rec.universe),{name:rec.universe,author,universe:true}).subs.push(sub);
+    else ensure(sid,{name,author}).subs.push(sub);
+  }
+  for(const c of live("custom"))ensure(c.id,{name:c.name,author:c.author||"",custom:true,rec:c});
+  const out=[];
+  for(const t of tops.values()){
+    let groups;
+    if(t.custom)groups=(t.rec.groups||[]).map(g=>({name:g.name,books:g.books||[],pending:g.pending}));
+    else if(t.universe){const u=S.records.get(t.id);
+      groups=u&&!u.deleted&&u.groups?u.groups.map(g=>({name:g.name,books:g.books})):[];
+      for(const sb of t.subs){const g=groups.find(x=>norm(x.name)===norm(sb.name));if(!g)groups.push({name:sb.name,books:sb.books});else if(!g.books.length)g.books=sb.books;}}
+    else groups=[{name:t.subs[0].name,books:t.subs[0].books}];
+    const pr=prefsOf(t.id),hg=new Set(pr.hiddenGroups||[]),hb=new Set(pr.hiddenBooks||[]);
+    const used=new Set();
+    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const o=owner(e.title);if(o)used.add(o.book);
+      return{number:e.number,title:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))};})}));
+    for(const sb of t.subs)for(const b of sb.owned){if(used.has(b))continue;used.add(b);
+      let g=G.find(x=>norm(x.name)===norm(sb.name));if(!g){g={name:sb.name,entries:[],hidden:hg.has(norm(sb.name))};G.push(g);}
+      g.entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,hidden:hb.has(norm(b.title))});}
+    G.forEach(g=>g.entries.sort(byNumber));
+    const vis=G.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden));
+    const main=vis.filter(e=>!e.novella),nov=vis.filter(e=>e.novella);
+    out.push({...t,groups:G,hiddenTop:!!pr.hidden,main,nov,ownedMain:main.filter(e=>e.book).length,ownedNov:nov.filter(e=>e.book).length,
+      missing:vis.filter(e=>!e.book&&!e.upcoming),catalogued:G.some(g=>g.entries.length&&!g.pending),
+      writing:t.subs.some(sb=>sb.complete===false),
+      hiddenCount:G.filter(g=>g.hidden).length+G.flatMap(g=>g.entries).filter(e=>e.hidden).length});
+  }
+  out.sort((a,b)=>(b.missing.length>0)-(a.missing.length>0)||a.name.localeCompare(b.name));
+  return out;
+}
 function seriesView(){
   const owned=new Map();
   for(const b of live("book")){if(!b.seriesId)continue;if(!owned.has(b.seriesId))owned.set(b.seriesId,[]);owned.get(b.seriesId).push(b);}
@@ -605,8 +665,8 @@ List only books you are confident exist. Never include books from other authors 
 }
 async function refreshSeries(sid,{quiet=false}={}){
   if(!canAsk()){if(!quiet)toast("Checking a series needs a connection to Claude.");return;}
-  const sv=seriesView().find(s=>s.sid===sid);const cur=S.records.get(sid);
-  const name=(sv&&sv.name)||(cur&&cur.name);if(!name)return;const author=(sv&&sv.author)||(cur&&cur.author)||"";
+  const cur=S.records.get(sid);const ob=live("book").find(b=>b.seriesId===sid);
+  const name=(cur&&!cur.deleted&&cur.name)||(ob&&ob.seriesName);if(!name)return;const author=(cur&&cur.author)||(ob&&ob.author)||"";
   S.busySeries.add(sid);scheduleRender();
   try{
     const res=await AI.json(catalogPrompt(name,author),{model:MODELS.smart});   // series facts always use the careful model
@@ -618,6 +678,7 @@ async function refreshSeries(sid,{quiet=false}={}){
     rec.books=books;rec.catalogVersion=2;if(typeof res.complete==="boolean")rec.complete=res.complete;
     if(cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=cleanStr(res.universe,150);else if(res.universe===null)rec.universe=rec.universe||null;
     await save(rec);
+    if(rec.universe)queueUniverse(rec.universe,rec.author);
     if(!quiet)toast(books.length>before&&before?`Found ${plural(books.length-before,"more book")} in ${name}.`:`${name} is up to date.`);
   }catch(e){if(!quiet){const m=sampleMsg(e);if(m)toast(m);}}
   finally{S.busySeries.delete(sid);scheduleRender();}
@@ -628,21 +689,74 @@ function queueSeriesRefresh(ids){
   if(seriesRunning||!canAsk())return;
   seriesRunning=true;(async()=>{try{while(seriesQueue.size&&canAsk()){const id=[...seriesQueue][0];seriesQueue.delete(id);await refreshSeries(id,{quiet:true});}}finally{seriesRunning=false;}})();
 }
-// The wider series a sub-series belongs to (the whole Riftwar Cycle, the whole Cosmere...).
-async function loadUniverse(sid){
-  const rec=S.records.get(sid);if(!rec||!rec.universe)return;
-  if(!canAsk()){toast("Loading the whole series needs a connection to Claude.");return;}
-  S.busySeries.add("u:"+sid);scheduleRender();
+// The wider series a sub-series belongs to (the whole Riftwar Cycle, the whole Cosmere...), loaded on its own.
+async function loadUniverse(name,author){
+  const id="u_"+slug(name);S.uniTried.add(id);
+  if(!canAsk())return;
+  S.busySeries.add(id);scheduleRender();
   try{
-    const res=await AI.json(`List every book in "${rec.universe}"${rec.author?` by ${rec.author}`:""}, grouped by its sub-series, with the sub-series in reading order.
-Reply with only JSON: {"name":"${rec.universe}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false}]}]}
+    const res=await AI.json(`List every book in "${name}"${author?` by ${author}`:""}, grouped by its sub-series, with the sub-series in reading order.
+Reply with only JSON: {"name":"${name}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false}]}]}
 Include novellas set in it with "novella": true, and announced books not out yet with "upcoming": true. Put standalone books in a group named "Standalone novels". An omnibus or box set is never an entry. List only books you are confident exist.`,{model:MODELS.smart,maxTokens:8000});
     const groups=(Array.isArray(res&&res.groups)?res.groups:[]).map(g=>({name:cleanStr(g&&g.name,150),books:cleanSeriesBooks(g&&g.books)})).filter(g=>g.name&&g.books.length);
-    if(!groups.length)throw{code:"invalid_json"};
-    await save({kind:"universe",id:"u_"+slug(rec.universe),name:rec.universe,author:rec.author,groups});
-    S.openUniverse.add(sid);
-  }catch(e){const m=sampleMsg(e);if(m)toast(m);}
-  finally{S.busySeries.delete("u:"+sid);scheduleRender();}
+    if(groups.length)await save({kind:"universe",id,name,author,groups});
+  }catch(e){}
+  finally{S.busySeries.delete(id);scheduleRender();}
+}
+const uniQueue=[];let uniRunning=false;
+function queueUniverse(name,author){
+  const id="u_"+slug(name);const u=S.records.get(id);if((u&&!u.deleted)||uniQueue.some(x=>x.id===id))return;
+  uniQueue.push({id,name,author});
+  if(uniRunning)return;uniRunning=true;
+  (async()=>{try{while(uniQueue.length&&canAsk()){const x=uniQueue.shift();await loadUniverse(x.name,x.author);}}finally{uniRunning=false;}})();
+}
+// Your own series: pasted text, every novel by an author, or a list turned into a series.
+async function catalogFor(name,author){
+  try{const res=await AI.json(catalogPrompt(name,author),{model:MODELS.smart});return cleanSeriesBooks(res&&res.books);}catch(e){return null;}
+}
+async function authorWorks(author){
+  const res=await AI.json(`List every novel by ${author}, in order of publication.
+Reply with only JSON: {"books":[{"number":1,"title":"...","year":1965}]}
+Novels only (no story collections, plays, poetry or non-fiction). List only books you are confident exist.`,{model:MODELS.smart,maxTokens:4000});
+  return cleanSeriesBooks(res&&res.books);
+}
+function groupsFromItems(items,fallbackName){
+  const groups=[];const bookGroup=name=>{let g=groups.find(x=>x.name===name&&!x.pending);if(!g){g={name,books:[]};groups.push(g);}return g;};
+  for(const it of items){
+    const title=cleanStr(it&&it.title,200);if(!title)continue;
+    if(it.kind==="series")groups.push({name:title,books:[],pending:{name:title,author:cleanStr(it.author,120)}});
+    else{const g=bookGroup(cleanStr(it.section,150)||fallbackName);g.books.push({number:g.books.length+1,title,year:null,author:cleanStr(it.author,120)||null});}
+  }
+  return groups;
+}
+async function fillCustomGroups(id){
+  for(;;){
+    const rec=S.records.get(id);if(!rec||rec.deleted||!canAsk())return;
+    const gi=(rec.groups||[]).findIndex(g=>g.pending);if(gi<0)return;
+    const g=rec.groups[gi];S.busySeries.add(id);scheduleRender();
+    const books=await catalogFor(g.pending.name,g.pending.author);
+    const cur=clone(S.records.get(id));if(!cur||cur.deleted)return;
+    const cg=cur.groups.find(x=>x.pending&&x.name===g.name);
+    if(cg){if(books&&books.length){cg.books=books;delete cg.pending;}else{delete cg.pending;}}
+    await save(cur);S.busySeries.delete(id);scheduleRender();
+  }
+}
+async function createCustomSeries({name,text,author,items}){
+  let groups=[];
+  if(items)groups=groupsFromItems(items,name);
+  if(text&&text.trim()){const r=await parseListText(text);groups=groups.concat(groupsFromItems(r.items,name));}
+  if(author){const works=canAsk()?await authorWorks(author).catch(()=>[]):[];
+    groups.push(works&&works.length?{name:`Novels by ${author}`,books:works}:{name:`Novels by ${author}`,books:[],pending:{name:`every novel by ${author}`,author}});}
+  const rec={kind:"custom",id:"c_"+uid("x").slice(2),name,author:author||"",groups,createdAt:Date.now()};
+  await save(rec);fillCustomGroups(rec.id);return rec;
+}
+async function addToCustom(id,text){
+  const r=await parseListText(text);const cur=clone(S.records.get(id));if(!cur)return 0;
+  const add=groupsFromItems(r.items,cur.name);let n=0;
+  for(const g of add){if(g.pending){cur.groups.push(g);n++;continue;}
+    let tg=cur.groups.find(x=>x.name===g.name&&!x.pending);if(!tg){tg={name:g.name,books:[]};cur.groups.push(tg);}
+    for(const bk of g.books)if(!tg.books.some(x=>norm(x.title)===norm(bk.title))){tg.books.push({...bk,number:tg.books.length+1});n++;}}
+  await save(cur);fillCustomGroups(id);return n;
 }
 // One-time cleanup: split box sets, mark omnibus volumes, fix series membership, then rebuild every series list.
 function seriesCheckPrompt(items){
@@ -678,6 +792,8 @@ async function rebuildSeries(onStep){
   if(newIds.length)fillDetails(newIds);
   const ids=[...new Set(live("book").map(b=>b.seriesId).filter(Boolean))];
   for(let k=0;k<ids.length;k++){onStep(`Rebuilding series lists: ${k+1} of ${ids.length}`);await refreshSeries(ids[k],{quiet:true});}
+  const unis=[...new Map(ids.map(i=>S.records.get(i)).filter(r=>r&&r.universe).map(r=>[r.universe,r])).values()];
+  for(let k=0;k<unis.length;k++){onStep(`Loading wider series: ${k+1} of ${unis.length}`);const r=unis[k];const u=S.records.get("u_"+slug(r.universe));if(!u||u.deleted)await loadUniverse(r.universe,r.author);}
   return{split,series:ids.length};
 }
 
@@ -1104,24 +1220,32 @@ function translationPrompt(items){
 Books: ${JSON.stringify(items)}
 Reply with only a JSON array, one object per book, using the same "key" values:
 [{"key":"k0","originalLanguage":null,"translator":null,"translatorLikely":true}]
-"originalLanguage" is null for books first written in English. For translated books: if a translator is given in the input, repeat it with "translatorLikely": false. Otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, with "translatorLikely": true, and use null when you can't tell. Don't guess between several well-known translations without an edition clue.`;
+"originalLanguage" is null for books first written in English. For translated books: if a translator is given in the input, repeat it with "translatorLikely": false. Otherwise use the publisher and edition to work out the translation: most publishers' classics lines use one translation for a given work (for example a Penguin Classics edition of a work usually uses that series' current translation). Give that translator with "translatorLikely": true. Use null only when nothing points to a particular translation.`;
 }
 function rescanPrompt(parts,titles){
   return `${parts>1?"These images are overlapping sections of ONE photo of a bookshelf.":"This is a photo of a bookshelf."}
 Find these books on the shelf: ${JSON.stringify(titles)}
-For each one, read the translator's name if it is printed on the spine or cover, and the publisher imprint if visible. Do not guess: use null for anything you cannot read.
-Reply with only a JSON array: [{"title":"as given","translator":null,"publisher":null}]`;
+For each one, report what you can see: the translator's name if it is printed, the publisher imprint or logo, the edition line if visible (for example "Penguin Classics Deluxe Edition" or "Everyman's Library"), and a short description of the spine design (colours, artwork, typography).
+Reply with only a JSON array: [{"title":"as given","translator":null,"publisher":null,"edition":null,"design":""}]
+Use null for anything you cannot see. Never guess a translator's name that isn't printed.`;
+}
+// Work out which translation an edition is, from its publisher, edition line and design.
+function inferPrompt(items){
+  return `These translated books are in someone's home library. For each, work out which English translation this particular edition is, from the publisher, edition line and spine design.
+Books: ${JSON.stringify(items)}
+Reply with only a JSON array: [{"key":"k0","translator":null,"confidence":"high"}]
+Use what you know about publishers' editions (for example, which translation a given Penguin Classics, Penguin Classics Deluxe, Vintage Classics, Everyman's Library, Oxford World's Classics or Modern Library edition of that work uses). "confidence" is "high" when that edition is only issued in one translation, "medium" when one translation is the likely one, "low" otherwise. Use null when you can't narrow it down.`;
 }
 const isTranslated=b=>!!b.originalLanguage;
 const translatorKnown=b=>b.translator&&["spine","photo","you"].includes(b.translatorSource);
 async function findTranslators(onStep){
   if(!canAsk())throw{code:AI.key()?"offline":"no_key"};
-  let books=live("book").filter(b=>!b.translationChecked);
-  const res={checked:0,translated:0,fromPhotos:0};
+  let books=live("book").filter(b=>!b.translationChecked||(isTranslated(b)&&!b.translator));
+  const res={checked:0,translated:0,fromPhotos:0,inferred:0};
   // 1. which books are translations, plus edition-based guesses
   for(let i=0;i<books.length;i+=40){
     const batch=books.slice(i,i+40);onStep(`Checking which books are translations: ${Math.min(i+40,books.length)} of ${books.length}`);
-    const arr=await AI.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.translator)o.translator=b.translator;return o;})));
+    const arr=await AI.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
     const out=[];
     for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;
       const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;const c=clone(cur);applyTranslation(c,d);out.push(c);}
@@ -1136,19 +1260,53 @@ async function findTranslators(onStep){
       n++;onStep(`Looking at your saved photos again: ${n} of ${byPhoto.size}`);
       const p=photos.get(pid);if(!p||!p.blob)continue;
       const imgs=await prepImages(p.blob);
-      const arr=await AI.json(rescanPrompt(imgs.length,list.map(b=>b.title)),{images:imgs});
+      const arr=await AI.json(rescanPrompt(imgs.length,list.map(b=>b.title)),{images:imgs,model:MODELS.smart});
       const out=[];
       for(const d of Array.isArray(arr)?arr:[]){const b=list.find(x=>titleMatch(x.title,d&&d.title));if(!b)continue;
         const c=clone(S.records.get(b.id));const t=cleanStr(d.translator,160);
         if(t){c.translator=t;c.translatorSource="spine";res.fromPhotos++;}
-        if(!c.publisher&&cleanStr(d.publisher))c.publisher=cleanStr(d.publisher,80);
+        if(cleanStr(d.publisher))c.publisher=cleanStr(d.publisher,80);
+        if(cleanStr(d.edition))c.edition=cleanStr(d.edition,120);
+        if(cleanStr(d.design))c.design=cleanStr(d.design,200);
         out.push(c);}
       if(out.length)await save(out);
     }
   }
+  // 3. for anything still unconfirmed, reason from the edition clues
+  const left=live("book").filter(b=>isTranslated(b)&&!translatorKnown(b));
+  for(let i=0;i<left.length;i+=25){
+    const batch=left.slice(i,i+25);onStep(`Working out editions: ${Math.min(i+25,left.length)} of ${left.length}`);
+    const arr=await AI.json(inferPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||"",originalLanguage:b.originalLanguage};
+      for(const f of["publisher","edition","design","year"])if(b[f])o[f]=b[f];if(b.translator)o.currentGuess=b.translator;return o;})),{model:MODELS.smart});
+    const out=[];
+    for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;
+      const t=cleanStr(d&&d.translator,160);if(!t||d.confidence==="low")continue;
+      const c=clone(S.records.get(b.id));c.translator=t;c.translatorSource="likely";c.translatorConfidence=d.confidence;out.push(c);res.inferred++;}
+    if(out.length)await save(out);
+  }
   res.translated=live("book").filter(isTranslated).length;
   res.unknown=live("book").filter(b=>isTranslated(b)&&!translatorKnown(b)).length;
   return res;
+}
+async function translationsOf(b){
+  const res=await AI.json(`List the English translations of "${b.title}" by ${b.author||"its author"} that are in print or commonly found, most common first.
+Reply with only JSON: {"translations":[{"translator":"","publisher":"","year":2003,"note":"what the edition looks like or is known for"}]}
+List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:1500});
+  return(Array.isArray(res&&res.translations)?res.translations:[]).map(x=>({translator:cleanStr(x&&x.translator,160),publisher:cleanStr(x&&x.publisher,80),year:num(x&&x.year),note:cleanStr(x&&x.note,200)})).filter(x=>x.translator).slice(0,12);
+}
+async function openPickTranslation(id){
+  const b=S.records.get(id);if(!b)return;
+  if(!canAsk()){toast("Listing translations needs a connection to Claude.");return;}
+  openSheet(`<h2 class="sheet-title">Which translation is yours?</h2><p class="progress-line">Looking up the translations of ${esc(b.title)}…</p>`);
+  let list=[];try{list=await translationsOf(b);}catch(e){}
+  const body=$("#sheet .sheet-body");if(!body)return;
+  body.innerHTML=`<h2 class="sheet-title">Which translation is yours?</h2>
+    <p class="muted" style="margin-top:-6px">Check the title page or the back cover if you’re not sure.</p>
+    <div class="list-pick">${list.map((x,i)=>`<button class="btn wide pick" data-i="${i}"><span class="pk-t">${esc(x.translator)}</span><span class="pk-s">${esc([x.publisher,x.year].filter(Boolean).join(", "))}${x.note?` · ${esc(x.note)}`:""}</span></button>`).join("")||`<p class="muted">No translations found. Use Edit to type it in.</p>`}</div>
+    <button class="btn quiet wide" id="pkBack" style="margin-top:8px">Back</button>`;
+  body.querySelectorAll(".pick").forEach(btn=>btn.onclick=async()=>{const x=list[+btn.dataset.i];const c=clone(S.records.get(id));
+    c.translator=x.translator;c.translatorSource="you";if(x.publisher&&!c.publisher)c.publisher=x.publisher;await save(c);openBook(id);toast(`Translator: ${x.translator}.`);});
+  $("#pkBack",body).onclick=()=>openBook(id);
 }
 async function readTitlePage(id,file){
   const b=S.records.get(id);if(!b)return;
@@ -1271,18 +1429,20 @@ function openBook(id){
         <p class="b-author">${esc(b.author||"Author unknown")}</p>
         <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}${b.publisher?`<span class="tag soft">${esc(b.publisher)}</span>`:""}</p></div>
     </div>
-    ${isTranslated(b)?`<p class="translation">Translated from ${esc(b.originalLanguage)}${b.translator?` by ${esc(b.translator)}`:", translator unknown"}${b.translator&&b.translatorSource==="likely"?` <span class="tag soft">probably</span>`:""}</p>`:""}
+    ${isTranslated(b)?`<p class="translation">Translated from ${esc(b.originalLanguage)}${b.translator?` by ${esc(b.translator)}`:", translator unknown"}${b.translator&&b.translatorSource==="likely"?` <span class="tag soft">probably</span>`:""}${b.edition?`<br><span class="muted" style="font-size:15px">${esc(b.edition)}</span>`:""}</p>`:""}
     ${b.seriesName?`<button class="series-link" id="toSeries">${b.seriesNumber!=null?`Book ${esc(b.seriesNumber)} of `:"Part of "}${esc(b.seriesName)}</button>`:""}
     ${b.blurb?`<p class="blurb parch">${esc(b.blurb)}</p>`:`<p class="muted" style="margin-top:14px">${b.needsDetails?(canAsk()?"Details are on their way, or tap Look up details.":"Details get looked up once you’re online."):"No description for this one."}</p>`}
     <div class="actions">
       ${canAsk()?`<button class="btn" id="refresh">${b.needsDetails?"Look up details":"Refresh details"}</button>`:""}
+      ${canAsk()&&isTranslated(b)&&!translatorKnown(b)?`<button class="btn" id="pickTr">Pick the translation</button>`:""}
       <button class="btn" id="edit">Edit</button>
       <button class="btn quiet danger-text" id="remove">Remove</button>
     </div>`,body=>{
-      const ts=$("#toSeries",body);if(ts)ts.onclick=()=>{closeSheet();S.tab="series";S.openSeries.add(b.seriesId);render();
-        const el=document.getElementById("ser-"+b.seriesId);if(el)el.scrollIntoView({block:"start"});};
+      const ts=$("#toSeries",body);if(ts)ts.onclick=()=>{closeSheet();S.tab="series";const tid=topIdOf(b.seriesId);S.openSeries.add(tid);render();
+        const el=document.getElementById("ser-"+tid);if(el)el.scrollIntoView({block:"start"});};
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
+      const pt=$("#pickTr",body);if(pt)pt.onclick=()=>openPickTranslation(b.id);
       mountTurner($("#stage",body),$("#b3d",body));
       const rm=$("#remove",body);
       rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);return;}
@@ -1343,7 +1503,7 @@ function openNewList(){listSheet({title:"New list",needName:true});}
 function openMenu(){
   const sp=spend();const key=AI.key();
   openSheet(`<h2 class="sheet-title">Settings</h2>
-    <p>${plural(live("book").length,"book")}, ${plural(seriesView().length,"series","series")} and ${plural(live("list").length,"list")}.</p>
+    <p>${plural(live("book").length,"book")}, ${plural(topsView().length,"series","series")} and ${plural(live("list").length,"list")}.</p>
     <h3 class="sub">Anthropic API key</h3>
     <p class="muted" style="margin-top:0">Optional. Only needed if you want the app to read photos itself instead of pasting from a Claude chat. It stays on this phone and is only ever sent to Anthropic.</p>
     <div class="keyrow"><input id="apiKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(key)}"><button class="btn brass" id="saveKey">Save</button></div>
@@ -1372,7 +1532,7 @@ function openMenu(){
       const ft=$("#findTr",body);if(ft)ft.onclick=async()=>{
         ft.disabled=true;
         try{const r=await findTranslators(m=>{ft.textContent=m;});
-          closeSheet();toast(`${plural(r.translated,"translated book")}. ${r.fromPhotos?`${plural(r.fromPhotos,"translator")} read from your photos. `:""}${r.unknown?`${r.unknown} still unconfirmed: open one and tap Snap the title page.`:"All translators found."}`);}
+          closeSheet();toast(`${plural(r.translated,"translated book")}. ${r.fromPhotos?`${plural(r.fromPhotos,"translator")} read from your photos. `:""}${r.inferred?`${r.inferred} worked out from the edition. `:""}${r.unknown?`${r.unknown} still unconfirmed: open one and tap Pick the translation.`:"All translators found."}`);}
         catch(e){ft.disabled=false;ft.textContent="Find translators";toast(sampleMsg(e)||"That didn’t finish. Try again.");}};
       const dp=$("#delPhotos",body);if(dp)dp.onclick=async()=>{if(!dp.dataset.armed){dp.dataset.armed="1";dp.textContent="Tap again to delete";return;}
         const ids=(await store.all("photos")).filter(p=>p.read).map(p=>p.id);await store.del(ids,"photos");S.savedPhotos=0;
@@ -1457,61 +1617,94 @@ function renderShelves(){
   return`<p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p>`+
     groups.map(([label,list])=>bookcase(label,list.length,list.map(spine).join(""))).join("");
 }
-function seriesEntryHTML(s,e,listed){
-  const num=e.number!=null&&!e.novella?e.number:"";const nov=e.novella?` <span class="tag novtag">novella</span>`:"";
-  if(e.book)return`<div class="entry${e.novella?" nov":""}"><span class="num">${num}</span><button class="link" data-book="${e.book.id}"><div class="et">${esc(e.via?e.title:e.book.title)}${nov}</div>${e.via?`<div class="ey">in ${esc(e.via)}</div>`:e.year?`<div class="ey">${esc(e.year)}</div>`:""}</button><span class="owned">on your shelf</span></div>`;
-  if(e.upcoming)return`<div class="entry missing${e.novella?" nov":""}"><span class="num">${num}</span><div><div class="et">${esc(e.title)}${nov}</div></div><span class="owned" style="color:var(--text-2)">not out yet</span></div>`;
-  const idx=s.missing.indexOf(e);const on=listed.get(norm(e.title));
-  return`<div class="entry missing${e.novella?" nov":""}"><span class="num">${num}</span><div><div class="et">${esc(e.title)}${nov}</div>${e.year?`<div class="ey">${esc(e.year)}</div>`:""}</div>
-    ${on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small" data-want="${s.sid}|${idx}">Add to ${WISHLIST}</button>`}</div>`;
+const PEN=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>`;
+function entryHTML(t,gi,ei,e,listed){
+  const ed=S.editSeries,num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
+  const key=`${t.id}|${gi}|${ei}`;
+  let right;
+  if(ed)right=`<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button>`;
+  else if(e.book)right=`<span class="owned">on your shelf</span>`;
+  else if(e.upcoming)right=`<span class="owned" style="color:var(--text-2)">not out yet</span>`;
+  else{const on=listed.get(norm(e.title));right=on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small" data-want="${key}">Add to ${WISHLIST}</button>`;}
+  const sub=e.via?`<div class="ey">in ${esc(e.via)}</div>`:e.year?`<div class="ey">${esc(e.year)}</div>`:"";
+  const title=`<div class="et">${esc(e.book&&!e.via?e.book.title:e.title)}${nov}</div>${sub}`;
+  return`<div class="entry${e.book?"":" missing"}${e.novella?" nov":""}${e.hidden?" gone":""}"><span class="num">${num}</span>${e.book&&!ed?`<button class="link" data-book="${e.book.id}">${title}</button>`:`<div>${title}</div>`}${right}</div>`;
 }
-function universeHTML(s){
-  const u=S.records.get("u_"+slug(s.universe));if(!u||u.deleted||!S.openUniverse.has(s.sid))return"";
-  const books=live("book");let html=`<div class="universe"><p class="uni-title">Every book in ${esc(u.name)}</p>`;
-  for(const g of u.groups){
-    const own=g.books.filter(x=>ownerOf(x.title,books)).length;
-    html+=`<p class="uni-group${norm(g.name)===norm(s.name)?" here":""}">${esc(g.name)} <small>${own} of ${g.books.length}</small></p>`;
-    for(const x of g.books){const o=ownerOf(x.title,books);
-      html+=`<div class="entry${o?"":" missing"}${x.novella?" nov":""}"><span class="num">${x.novella?"":x.number??""}</span><div><div class="et">${esc(x.title)}${x.novella?` <span class="tag novtag">novella</span>`:""}</div>${o&&o.via?`<div class="ey">in ${esc(o.via)}</div>`:x.year?`<div class="ey">${esc(x.year)}</div>`:""}</div><span class="owned"${o?"":` style="color:var(--text-2)"`}>${o?"on your shelf":x.upcoming?"not out yet":""}</span></div>`;}
-  }
-  return html+`</div>`;
+function topCardHTML(t,listed){
+  const open=S.openSeries.has(t.id),ed=S.editSeries;
+  const counts=t.catalogued?[`you own ${t.ownedMain} of ${plural(t.main.length,"book")}`,t.nov.length?`${t.ownedNov} of ${plural(t.nov.length,"novella")}`:""].filter(Boolean).join(", "):"";
+  const visGroups=t.groups.filter(g=>!g.hidden);
+  const sub=[t.author,visGroups.length>1?plural(visGroups.length,"series","series"):"",counts,t.writing?"still being written":""].filter(Boolean).join(", ");
+  const busy=S.busySeries.has(t.id)||t.groups.some(g=>g.pending);
+  const tag=t.hiddenTop?`<span class="tag soft">Hidden</span>`:!t.catalogued?`<span class="tag soft">${busy?"Loading…":"List not loaded"}</span>`:t.missing.length?`<span class="tag gap">${t.missing.length} missing</span>`:`<span class="tag full">${t.writing?"Caught up":"Complete set"}</span>`;
+  const multi=t.groups.length>1;
+  let body="";
+  t.groups.forEach((g,gi)=>{
+    if(g.hidden&&!ed)return;
+    const ents=g.entries.map((e,ei)=>({e,ei})).filter(x=>ed||!x.e.hidden);
+    if(multi||ed){const own=g.entries.filter(e=>e.book&&!e.hidden).length,tot=g.entries.filter(e=>!e.hidden).length;
+      body+=`<div class="grp-head${g.hidden?" gone":""}"><span>${esc(g.name)} <small>${g.pending?"loading…":`${own} of ${tot}`}</small></span>${ed?`<button class="btn small quiet ${g.hidden?"":"danger-text"}" data-hide-group="${t.id}|${gi}">${g.hidden?"Put back":"Remove series"}</button>`:""}</div>`;}
+    if(!g.hidden)body+=ents.map(({e,ei})=>entryHTML(t,gi,ei,e,listed)).join("");
+  });
+  const foot=ed?`${t.custom?`<button class="btn small" data-add-custom="${t.id}">Add to this series</button><button class="btn small quiet danger-text" data-del-custom="${t.id}">${S.confirmDel===t.id?"Tap again to delete":"Delete series"}</button>`
+      :`<button class="btn small quiet" data-hide-top="${t.id}">${t.hiddenTop?"Show this series again":"Hide this whole series"}</button>`}${t.hiddenCount?`<button class="btn small quiet" data-reset-top="${t.id}">Put everything back</button>`:""}`
+    :t.custom?"":`<button class="btn small" data-refresh-top="${t.id}" ${busy?"disabled":""}>${busy?"Checking…":t.catalogued?"Check for newer books":"Load the full series"}</button>`;
+  return`<div class="ledger leather${t.hiddenTop?" dim":""}" id="ser-${t.id}">
+    <button class="card-head" data-toggle-series="${t.id}" aria-expanded="${open}">
+      <p class="card-title">${esc(t.name)}${t.custom?` <span class="tag kindmark">yours</span>`:""}</p>
+      <p class="card-sub">${esc(sub)}</p>
+      <div class="progress-row"><div class="pips" aria-hidden="true">${t.groups.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden)).slice(0,80).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?"":" miss"}${e.upcoming?" up":""}"${e.book?` style="background:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
+    </button>
+    ${open||ed?`<div class="card-body">${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
+  </div>`;
 }
 function renderSeries(){
-  let all=seriesView();
-  if(!all.length)return`<p class="empty-note">Series show up here once you add books that belong to one. Claude spots them while looking up details.</p>`;
-  const gaps=all.reduce((n,s)=>n+s.missing.length,0);
+  let all=topsView();const ed=S.editSeries;
+  if(canAsk())for(const t of all)if(t.universe&&!S.records.get(t.id)&&!S.uniTried.has(t.id))queueUniverse(t.name,t.author);
+  const head=`<div class="section-head"><p>${all.length?plural(all.filter(t=>!t.hiddenTop).length,"series","series"):"No series yet."}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${ed?"":`<button class="chip" data-act="gapsOnly" aria-pressed="${S.gapsOnly}">Only with gaps</button>`}
+      <button class="btn small ${ed?"brass":"editbtn"}" data-act="editSeries">${ed?"Done":`${PEN} Edit series`}</button></div></div>
+    ${ed?`<div class="edit-note"><p>Remove books or whole sub-series you don’t plan to read, and the series counts as complete without them. Nothing is deleted from your shelves.</p><button class="btn small brass" data-act="newSeries">New series</button></div>`:""}`;
+  if(!all.length)return head+`<p class="empty-note">Series show up here once you add books that belong to one. You can also make your own with Edit series, then New series.</p>`;
   const q=norm(S.sq);
-  if(q)all=all.filter(s=>norm([s.name,s.author,s.universe,...s.entries.map(e=>e.title)].join(" ")).includes(q));
-  const shown=S.gapsOnly?all.filter(s=>s.missing.length):all;
+  if(q)all=all.filter(t=>norm([t.name,t.author,...t.groups.map(g=>g.name),...t.groups.flatMap(g=>g.entries.map(e=>e.title))].join(" ")).includes(q));
+  if(!ed)all=all.filter(t=>!t.hiddenTop);
+  const shown=S.gapsOnly&&!ed?all.filter(t=>t.missing.length):all;
   const listed=listItemsIndex();
-  return`<div class="section-head"><p>${q?`${plural(all.length,"series","series")} match “${esc(S.sq)}”`:`${plural(seriesView().length,"series","series")}, ${gaps?`${plural(gaps,"book")} missing`:"no gaps"}`}</p>
-    <button class="chip" data-act="gapsOnly" aria-pressed="${S.gapsOnly}">Only series with gaps</button></div>`+
-  (shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+
-  shown.map(s=>{
-    const open=S.openSeries.has(s.sid);
-    const counts=s.catalogued?[`you own ${s.ownedMain} of ${plural(s.main.length,"book")}`,s.nov.length?`${s.ownedNov} of ${plural(s.nov.length,"novella")}`:""].filter(Boolean).join(", "):"";
-    const sub=[s.author,counts,s.complete===false?"still being written":""].filter(Boolean).join(", ");
-    const tag=!s.catalogued?`<span class="tag soft">List not loaded</span>`:s.missing.length?`<span class="tag gap">${s.missing.length} missing</span>`:`<span class="tag full">${s.complete===false?"Caught up":"Complete set"}</span>`;
-    const ubusy=S.busySeries.has("u:"+s.sid),uloaded=s.universe&&S.records.get("u_"+slug(s.universe));
-    return`<div class="ledger leather" id="ser-${s.sid}">
-      <button class="card-head" data-toggle-series="${s.sid}" aria-expanded="${open}">
-        <p class="card-title">${esc(s.name)}</p>
-        ${s.universe?`<p class="card-sub">Part of ${esc(s.universe)}</p>`:""}
-        <p class="card-sub">${esc(sub)}</p>
-        <div class="progress-row"><div class="pips" aria-hidden="true">${s.entries.slice(0,60).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?"":" miss"}${e.upcoming?" up":""}"${e.book?` style="background:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
-      </button>
-      ${open?`<div class="card-body">${s.entries.map(e=>seriesEntryHTML(s,e,listed)).join("")}
-        <div class="card-foot"><button class="btn small" data-refresh-series="${s.sid}" ${S.busySeries.has(s.sid)?"disabled":""}>${S.busySeries.has(s.sid)?"Checking…":s.catalogued?"Check for newer books":"Load the full series"}</button>
-        ${s.universe?`<button class="btn small" data-universe="${s.sid}" ${ubusy?"disabled":""}>${ubusy?"Loading…":S.openUniverse.has(s.sid)&&uloaded?`Hide the rest of ${esc(s.universe)}`:`Show the entire ${esc(s.universe)}`}</button>`:""}</div>
-        ${universeHTML(s)}
-      </div>`:""}
-    </div>`;}).join("");
+  return head+(shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+shown.map(t=>topCardHTML(t,listed)).join("");
+}
+function openNewSeries(){
+  openSheet(`<h2 class="sheet-title">New series</h2>
+    <div class="field"><label for="nsN">Name</label><input id="nsN" placeholder="Cormac McCarthy’s novels" autocomplete="off"></div>
+    <div class="field"><label for="nsA">Every novel by an author <span class="opt">(optional)</span></label><input id="nsA" placeholder="Cormac McCarthy" autocomplete="off"></div>
+    <div class="field"><label for="nsT">And or paste anything <span class="opt">(books, whole series, headings)</span></label><textarea id="nsT" placeholder="Blood Meridian&#10;The Road&#10;The Border Trilogy"></textarea></div>
+    ${live("list").length?`<div class="field"><label for="nsL">Or start from one of your lists</label><select id="nsL" style="width:100%"><option value="">None</option>${live("list").map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></div>`:""}
+    <p class="muted" style="margin-top:-2px">${canAsk()?"Whole series you name get their full book lists filled in.":"Whole series get their book lists once you’re online."}</p>
+    <button class="btn brass wide" id="nsGo">Create series</button>`,body=>{
+      $("#nsGo",body).onclick=async()=>{
+        const name=cleanStr($("#nsN",body).value,120);const author=cleanStr($("#nsA",body).value,120);const text=$("#nsT",body).value;const lid=$("#nsL",body)?$("#nsL",body).value:"";
+        if(!name){$("#nsN",body).focus();return;}
+        if(!author&&!text.trim()&&!lid){toast("Add an author, some books, or pick a list.");return;}
+        const btn=$("#nsGo",body);btn.disabled=true;btn.textContent="Building your series…";
+        const l=lid?S.records.get(lid):null;
+        const rec=await createCustomSeries({name,author,text,items:l?l.items:null});
+        closeSheet();S.openSeries.add(rec.id);S.tab="series";render();toast(`Created ${name}.`);
+      };
+    });
+}
+async function listToSeries(listId){
+  const l=S.records.get(listId);if(!l)return;
+  const rec=await createCustomSeries({name:l.name,items:l.items||[]});
+  S.openSeries.add(rec.id);S.tab="series";render();toast(`${l.name} is now a series. The list is still here too.`);
 }
 function listItemHTML(l,it){
   const kind=it.kind||"book";let status="";
   if(kind==="book"&&live("book").some(b=>titleMatch(b.title,it.title)))status=`<span class="tag ownedtag">On your shelves</span>`;
-  if(kind==="series"){const sv=seriesView().find(x=>titleMatch(x.name,it.title)||norm(x.name).includes(norm(it.title)));
-    if(sv)status=`<span class="tag ownedtag">You own ${sv.entries.filter(e=>e.book).length}${sv.catalogued?` of ${sv.entries.length}`:""}</span>`;}
+  if(kind==="series"){const tv=topsView();let hit=null;
+    for(const t of tv){if(titleMatch(t.name,it.title)){hit={own:t.ownedMain,tot:t.main.length};break;}
+      const g=t.groups.find(g=>titleMatch(g.name,it.title));if(g){hit={own:g.entries.filter(e=>e.book).length,tot:g.entries.length};break;}}
+    if(hit)status=`<span class="tag ownedtag">You own ${hit.own}${hit.tot?` of ${hit.tot}`:""}</span>`;}
   return`<div class="item">
     <div class="it">${esc(it.title||it.text||"")}${kind==="series"?` <span class="tag kindtag">series</span>`:""}</div>
     ${it.author?`<div class="ia">${esc(it.author)}</div>`:""}
@@ -1533,7 +1726,7 @@ function renderLists(){
     return`<div class="index-card"><button class="card-head" data-toggle-list="${l.id}" aria-expanded="${open}">
       <p class="card-title">${esc(l.name)}</p><p class="card-sub">${plural(items.length,"item")}${series?`, ${plural(series,"series","series")}`:""}</p></button>
       ${open?`<div class="card-body">${items.length?body:`<p style="color:var(--parch-ink-2);font-style:italic">This list is empty.</p>`}
-        <div class="card-foot"><button class="btn small" data-add-item="${l.id}">Add to this list</button>
+        <div class="card-foot"><button class="btn small" data-add-item="${l.id}">Add to this list</button><button class="btn small" data-list-series="${l.id}">Make this a series</button>
         <button class="btn small quiet danger-text" data-del-list="${l.id}">${S.confirmDel===l.id?"Tap again to delete":"Delete list"}</button></div></div>`:""}
     </div>`;}).join("");
 }
@@ -1547,7 +1740,7 @@ function render(){
   $("#offline").hidden=navigator.onLine!==false;
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
-  const miss=seriesView().reduce((n,s)=>n+s.missing.length,0);
+  const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
   const bd=$("#seriesBadge");bd.textContent=miss>99?"99+":String(miss);bd.hidden=!miss;
 }
 
@@ -1557,13 +1750,25 @@ $("#main").addEventListener("click",e=>{
   if(d.book)return openBook(d.book);
   if(d.toggleSeries){S.openSeries.has(d.toggleSeries)?S.openSeries.delete(d.toggleSeries):S.openSeries.add(d.toggleSeries);return render();}
   if(d.toggleList){S.openLists.has(d.toggleList)?S.openLists.delete(d.toggleList):S.openLists.add(d.toggleList);return render();}
-  if(d.want){const[sid,idx]=d.want.split("|");const s=seriesView().find(x=>x.sid===sid);const m=s&&s.missing[+idx];
-    if(m)addToList(WISHLIST,{title:m.title,author:s.author,note:`${s.name}${m.number!=null?`, book ${m.number}`:""}`});return;}
-  if(d.refreshSeries)return refreshSeries(d.refreshSeries);
-  if(d.universe){const sid=d.universe,r=S.records.get(sid);const u=r&&r.universe&&S.records.get("u_"+slug(r.universe));
-    if(S.openUniverse.has(sid)&&u){S.openUniverse.delete(sid);return render();}
-    if(u&&!u.deleted){S.openUniverse.add(sid);return render();}
-    return loadUniverse(sid);}
+  if(d.want){const[tid,gi,ei]=d.want.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[+gi];const m=g&&g.entries[+ei];
+    if(m)addToList(WISHLIST,{title:m.title,author:t.author,note:`${g.name}${m.number!=null&&!m.novella?`, book ${m.number}`:""}`});return;}
+  if(d.refreshTop){const tid=d.refreshTop;const t=topsView().find(x=>x.id===tid);if(!t)return;
+    if(!canAsk()){toast("Checking a series needs a connection to Claude.");return;}
+    (async()=>{S.busySeries.add(tid);render();for(const sb of t.subs||[])await refreshSeries(sb.sid,{quiet:true});
+      if(t.universe){const u=S.records.get(t.id);if(u)await save({kind:"universe",id:t.id,deleted:true});S.uniTried.delete(t.id);await loadUniverse(t.name,t.author);}
+      S.busySeries.delete(tid);render();toast(`${t.name} is up to date.`);})();return;}
+  if(d.hideBook){const[tid,gi,ei]=d.hideBook.split("|");const t=topsView().find(x=>x.id===tid);const e=t&&t.groups[+gi]&&t.groups[+gi].entries[+ei];if(!e)return;
+    const k=norm(e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
+  if(d.hideGroup){const[tid,gi]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[+gi];if(!g)return;
+    const k=norm(g.name);return setPrefs(tid,p=>{p.hiddenGroups=p.hiddenGroups.includes(k)?p.hiddenGroups.filter(x=>x!==k):[...p.hiddenGroups,k];});}
+  if(d.hideTop)return setPrefs(d.hideTop,p=>{p.hidden=!p.hidden;});
+  if(d.resetTop)return setPrefs(d.resetTop,p=>{p.hiddenGroups=[];p.hiddenBooks=[];p.hidden=false;});
+  if(d.addCustom){const id=d.addCustom;const r=S.records.get(id);if(!r)return;
+    openSheet(`<h2 class="sheet-title">Add to ${esc(r.name)}</h2><div class="field"><label for="acT">Paste or type anything</label><textarea id="acT" placeholder="Child of God&#10;The Border Trilogy"></textarea></div><button class="btn brass wide" id="acGo">Add</button>`,body=>{
+      $("#acGo",body).onclick=async()=>{const v=$("#acT",body).value;if(!v.trim())return;$("#acGo",body).disabled=true;const n=await addToCustom(id,v);closeSheet();toast(`Added ${plural(n,"item")}.`);};});return;}
+  if(d.delCustom){const id=d.delCustom;if(S.confirmDel!==id){S.confirmDel=id;render();setTimeout(()=>{if(S.confirmDel===id){S.confirmDel=null;scheduleRender();}},4000);return;}
+    S.confirmDel=null;const r=S.records.get(id);return save({kind:"custom",id,deleted:true,name:r&&r.name,groups:[]}).then(()=>toast("Series deleted."));}
+  if(d.listSeries)return listToSeries(d.listSeries);
   if(d.addItem)return openItemSheet(d.addItem);
   if(d.gotit)return gotIt(d.gotit);
   if(d.removeItem)return removeItem(d.removeItem);
@@ -1575,6 +1780,8 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="readQueue")return startReading(S.queued.map(p=>({blob:p.blob,qid:p.id})));
   if(d.act==="typeQueue")return openTypeFromPhoto(0);
   if(d.act==="gapsOnly"){S.gapsOnly=!S.gapsOnly;return render();}
+  if(d.act==="editSeries"){S.editSeries=!S.editSeries;return render();}
+  if(d.act==="newSeries")return openNewSeries();
 });
 document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render();window.scrollTo(0,0);});
 $("#addBtn").onclick=openAdd;
