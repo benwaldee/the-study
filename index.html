@@ -246,18 +246,36 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
-/* collapsing bookcases */
+.rate-row{display:flex;align-items:center;gap:10px;margin:10px 0 0;flex-wrap:wrap}
+.stars{position:relative;width:140px;height:28px;cursor:pointer;touch-action:none;flex:none}
+.stars .st{position:absolute;left:0;top:0;height:28px;display:flex;overflow:hidden;white-space:nowrap}
+.stars .st svg{flex:none}
+.stars .base svg{fill:none;stroke:var(--brass-lo);stroke-width:1.4}
+.stars .fill{width:0}
+.stars .fill svg{fill:var(--brass-hi);stroke:var(--brass);stroke-width:1}
+.st-val{font-family:var(--display);font-size:18px;color:var(--brass-hi);min-width:3ch}
+.st-clear{padding:2px 6px}
+.status-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.status-row .chip{font-size:14px;padding:5px 11px}
+.series-rate{margin:4px 0 2px}
+.series-rate .rate-row{margin-top:8px}
+#seriesSort{font-size:15px;padding:5px 8px;border-radius:999px}
+.spine .ribbon{position:absolute;top:-2px;left:50%;width:7px;height:20px;margin-left:-3.5px;background:#B2322A;box-shadow:0 1px 2px rgba(0,0,0,.5);
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);z-index:2}
+/* bookcases: open, half open, closed */
 button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;gap:0;font:inherit;font-family:var(--display);font-size:18px}
-.plate .caret{margin-left:8px;align-self:center;transition:transform .4s cubic-bezier(.4,0,.2,1);opacity:.75}
-.case.closed .plate .caret{transform:rotate(-90deg)}
-.shelf-wrap,.doors-wrap{display:grid;transition:grid-template-rows .5s cubic-bezier(.4,0,.2,1)}
-.shelf-wrap{grid-template-rows:1fr}.case.closed .shelf-wrap{grid-template-rows:0fr}
-.doors-wrap{grid-template-rows:0fr}.case.closed .doors-wrap{grid-template-rows:1fr}
-.shelf-inner,.doors{min-height:0;overflow:hidden}
-.shelf-inner .shelf{transition:opacity .35s ease,transform .5s cubic-bezier(.4,0,.2,1);transform-origin:top center}
-.case.closed .shelf-inner .shelf{opacity:0;transform:scaleY(.92)}
+.plate .caret{margin-left:8px;align-self:center;opacity:.75}
+.shelf-wrap{overflow:hidden;contain:paint}
+.shelf-inner .shelf{will-change:transform,opacity;transition:opacity .38s ease,transform .48s cubic-bezier(.22,.9,.25,1)}
+.case.st-peek .shelf-wrap{height:332px}
+.case.st-peek .shelf-inner{height:332px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  -webkit-mask-image:linear-gradient(#000 calc(100% - 26px),transparent);mask-image:linear-gradient(#000 calc(100% - 26px),transparent)}
+.case.st-closed .shelf-wrap{height:0}
+.case.st-closed .shelf-inner .shelf{opacity:0;transform:translateY(-24px)}
+.doors-wrap{height:0;overflow:hidden}
+.case.st-closed .doors-wrap{height:74px}
 .doors-in{display:grid;grid-template-columns:1fr 1fr;gap:3px;height:74px;padding:2px 0 10px;perspective:600px}
-.door{position:relative;display:block;border-radius:2px;transition:transform .55s cubic-bezier(.3,.7,.2,1) .05s,opacity .3s ease .05s;
+.door{position:relative;display:block;border-radius:2px;will-change:transform;transition:transform .5s cubic-bezier(.22,.9,.25,1) .04s,opacity .28s ease .04s;
   background:var(--grain-v),linear-gradient(90deg,var(--walnut-dark),var(--walnut-mid) 50%,var(--walnut-dark));
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.6),inset 0 0 0 3px var(--walnut-edge),inset 0 0 0 5px var(--walnut-dark),0 2px 4px rgba(0,0,0,.5)}
 .door::before{content:"";position:absolute;inset:11px 12px;border-radius:2px;
@@ -266,11 +284,15 @@ button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;ga
 .door::after{content:"";position:absolute;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;
   background:radial-gradient(circle at 35% 35%,var(--brass-hi),var(--brass) 45%,var(--brass-lo));box-shadow:0 1px 2px rgba(0,0,0,.7)}
 .door.l::after{right:4px}.door.r::after{left:4px}
-.door.l{transform-origin:left center;transform:rotateY(-70deg);opacity:0}
-.door.r{transform-origin:right center;transform:rotateY(70deg);opacity:0}
-.case.closed .door{transform:none;opacity:1}
-@media (prefers-reduced-motion: reduce){.shelf-wrap,.doors-wrap,.door,.shelf-inner .shelf,.plate .caret{transition:none}}
-.count-row{display:flex;align-items:center;justify-content:space-between;margin:12px 16px 0}
+.door.l{transform-origin:left center;transform:rotateY(-75deg);opacity:0}
+.door.r{transform-origin:right center;transform:rotateY(75deg);opacity:0}
+.case.st-closed .door{transform:none;opacity:1}
+@media (prefers-reduced-motion: reduce){.door,.shelf-inner .shelf{transition:none}}
+.count-row{display:flex;align-items:center;justify-content:space-between;margin:0;padding:10px 16px 8px;position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--head-h,120px));z-index:8;
+  background:linear-gradient(var(--wall) 0,var(--wall) 70%,rgba(0,0,0,0))}
+.entry-acts{display:flex;gap:4px;align-items:center;justify-content:flex-end}
+.entry-acts.col{flex-direction:column;align-items:stretch}
+.entry-acts .btn{white-space:nowrap}
 .count-row .count{margin:0}
 .spine.picked{outline:3px solid var(--brass-hi);outline-offset:1px;transform:translateY(-8px);box-shadow:0 8px 10px rgba(0,0,0,.5)}
 .spine{transition:transform .15s ease}
@@ -377,6 +399,8 @@ button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;ga
         <option value="genre">By genre</option>
         <option value="author">By author</option>
         <option value="recent">Newest</option>
+        <option value="rating">By rating</option>
+        <option value="status">By reading status</option>
       </select>
     </div>
   </div>
@@ -412,7 +436,7 @@ const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><d
 const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
-  persist:true,persisted:false,revealed:new Set(),editing:new Set(),showHidden:false,selecting:false,selected:new Set(),savedPhotos:0,translating:false,imgs:new Map(),sq:"",editSeries:false,uniTried:new Set(),
+  persist:true,persisted:false,seriesSort:"gaps",revealed:new Set(),editing:new Set(),showHidden:false,selecting:false,selected:new Set(),savedPhotos:0,translating:false,imgs:new Map(),sq:"",editSeries:false,uniTried:new Set(),
   queue:new Set(),jobRunning:false,jobDone:0,jobTotal:0,suggesting:false,busySeries:new Set(),confirmDel:null,loaded:false,photoCtl:null};
 
 /* ---------- helpers ---------- */
@@ -420,7 +444,7 @@ const $=(s,el=document)=>el.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
-const norm=s=>String(s||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim().replace(/^(the|a|an) /,"");
+const norm=s=>String(s||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim().replace(/^(the|a|an) /,"").replace(/\b(vol|v)\b(?= \d)/g,"volume");
 const slug=s=>(norm(s).replace(/ /g,"-").slice(0,80))||"x";
 const cleanStr=(s,max=300)=>typeof s==="string"?s.trim().slice(0,max):"";
 const hex=c=>typeof c==="string"&&/^#[0-9a-fA-F]{6}$/.test(c.trim())?c.trim():null;
@@ -539,7 +563,7 @@ Reply with only a JSON array, one object per book, using the same "key" values:
 "translations" is only for books first written in another language: the English translations in print or commonly found, most common first, as [{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]; otherwise [].
 "wordCount" is the approximate number of words in the text. "pages" and "format" (one of "mass market paperback", "trade paperback", "hardcover") describe the edition the publisher suggests if one is given, otherwise the most common current edition.
 "originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
-"color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
+"color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "name" is the series' plain name without edition words (no "Deluxe Edition", "Omnibus", "Collector's Edition"); "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
 }
 
 /* ---------- books ---------- */
@@ -711,8 +735,9 @@ function ownerOf(title,books){
 // Fast "do I own this title?" lookups across the whole library (direct, or inside an omnibus).
 function ownerIndex(books){
   const direct=new Map(),inside=new Map();
-  for(const b of books){direct.set(norm(b.title),b);for(const t of b.contains||[])inside.set(norm(t),b);}
-  return title=>{const n=norm(title);if(direct.has(n))return{book:direct.get(n),via:null};if(inside.has(n))return{book:inside.get(n),via:inside.get(n).title};
+  const bare=x=>x.replace(/\bvolume /g,"");   // "Berserk 3" and "Berserk, Vol. 3" are the same book
+  for(const b of books){const n=norm(b.title);direct.set(n,b);direct.set(bare(n),direct.get(bare(n))||b);for(const t of b.contains||[]){const m=norm(t);inside.set(m,b);inside.set(bare(m),b);}}
+  return title=>{const n=norm(title);for(const k of[n,bare(n)]){if(direct.has(k))return{book:direct.get(k),via:null};if(inside.has(k))return{book:inside.get(k),via:inside.get(k).title};}
     if(n.length>5)for(const b of books){const x=norm(b.title);if(x.length>5&&(x.startsWith(n+" ")||n.startsWith(x+" ")))return{book:b,via:null};}
     return null;};
 }
@@ -720,6 +745,20 @@ const topIdOf=sid=>{const r=S.records.get(sid);return r&&!r.deleted&&r.universe?
 const prefsOf=id=>{const p=S.records.get("p_"+id);return p&&!p.deleted?p:{hiddenGroups:[],hiddenBooks:[],hidden:false};};
 async function setPrefs(id,fn){const p=clone(prefsOf(id));p.kind="seriesprefs";p.id="p_"+id;p.hiddenGroups=p.hiddenGroups||[];p.hiddenBooks=p.hiddenBooks||[];fn(p);await save(p);}
 const byNumber=(a,b)=>(a.number??999)-(b.number??999)||(a.year||0)-(b.year||0);
+// No book twice: drop repeats inside a sub-series, drop a sub-series whose books all appear elsewhere,
+// and when a book sits in two sub-series keep it in the smaller one.
+function tidyGroups(groups){
+  let gs=groups.map(g=>{if(g.pending)return g;const seen=new Set();return{...g,books:(g.books||[]).filter(e=>{const k=norm(e.title);if(seen.has(k))return false;seen.add(k);return true;})};});
+  const keys=g=>new Set((g.books||[]).map(e=>norm(e.title)));
+  for(const g of [...gs].sort((a,b)=>(b.books||[]).length-(a.books||[]).length)){
+    if(g.pending||!(g.books||[]).length)continue;
+    const others=new Set();for(const o of gs)if(o!==g&&!o.pending)for(const k of keys(o))others.add(k);
+    if([...keys(g)].every(k=>others.has(k)))gs=gs.filter(x=>x!==g);
+  }
+  const home=new Map();
+  for(const g of [...gs].sort((a,b)=>(a.books||[]).length-(b.books||[]).length))for(const k of keys(g))if(!home.has(k))home.set(k,g);
+  return gs.map(g=>g.pending?g:{...g,books:g.books.filter(e=>home.get(norm(e.title))===g)}).filter(g=>g.pending||g.books.length||groups.length===1);
+}
 function topsView(){
   const books=live("book");const owner=ownerIndex(books);const tops=new Map();
   const ensure=(id,base)=>{if(!tops.has(id))tops.set(id,{id,subs:[],...base});return tops.get(id);};
@@ -740,17 +779,20 @@ function topsView(){
       groups=u&&!u.deleted&&u.groups?u.groups.map(g=>({name:g.name,books:g.books})):[];
       for(const sb of t.subs){const g=groups.find(x=>norm(x.name)===norm(sb.name));if(!g)groups.push({name:sb.name,books:sb.books});else if(!g.books.length)g.books=sb.books;}}
     else groups=[{name:t.subs[0].name,books:t.subs[0].books}];
-    const pr=prefsOf(t.id),hg=new Set(pr.hiddenGroups||[]),hb=new Set(pr.hiddenBooks||[]);
+    const pr=prefsOf(t.id),hg=new Set(pr.hiddenGroups||[]),hb=new Set(pr.hiddenBooks||[]),ren=pr.renames||{};
+    groups=groups.map(g=>({...g,books:[...(g.books||[])]}));
+    for(const a of pr.added||[]){const g=groups.find(x=>norm(x.name)===norm(a.group))||groups[0];if(g)g.books.push({number:a.number,title:a.title,novella:!!a.novella,added:true});}
+    groups=tidyGroups(groups);
     const used=new Set();
-    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const o=owner(e.title);if(o)used.add(o.book);
-      return{number:e.number,title:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))};})}));
+    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const title=ren[norm(e.title)]||e.title;const o=owner(title);if(o)used.add(o.book);
+      return{number:e.number,title,orig:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))};})}));
     for(const sb of t.subs)for(const b of sb.owned){if(used.has(b))continue;used.add(b);
       let g=G.find(x=>norm(x.name)===norm(sb.name));if(!g){g={name:sb.name,entries:[],hidden:hg.has(norm(sb.name))};G.push(g);}
       g.entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,hidden:hb.has(norm(b.title))});}
     G.forEach(g=>g.entries.sort(byNumber));
     const vis=G.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden));
     const main=vis.filter(e=>!e.novella),nov=vis.filter(e=>e.novella);
-    out.push({...t,groups:G,hiddenTop:!!pr.hidden,main,nov,ownedMain:main.filter(e=>e.book).length,ownedNov:nov.filter(e=>e.book).length,
+    out.push({...t,groups:G,hiddenTop:!!pr.hidden,rating:pr.rating||null,main,nov,ownedMain:main.filter(e=>e.book).length,ownedNov:nov.filter(e=>e.book).length,
       missing:vis.filter(e=>!e.book&&!e.upcoming),catalogued:G.some(g=>g.entries.length&&!g.pending),
       writing:t.subs.some(sb=>sb.complete===false),
       hiddenCount:G.filter(g=>g.hidden).length+G.flatMap(g=>g.entries).filter(e=>e.hidden).length});
@@ -791,7 +833,7 @@ Reply with only JSON: {"name":"Series name","universe":null,"complete":true,"boo
 Rules:
 - Main books in reading order with their series number. Include announced main books that are not out yet with "upcoming": true and "year": null.
 - Include novellas and short novels set in this series with "novella": true and a number that places them in reading order (for example 2.5 between books 2 and 3). Leave out single short stories and anthologies.
-- An omnibus or box set is never an entry; list the books inside it instead.
+- An omnibus, box set or special edition (deluxe, collector's, omnibus volumes) is never an entry and never a separate series; list the standard books inside it instead, using the standard numbering.
 - "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle); otherwise null.
 - "complete" is false if more main books are planned.
 List only books you are confident exist. Never include books from other authors or other series.`;
@@ -1318,6 +1360,8 @@ const ALL_STYLES=["gilt","hubs","label","paperback","twotone","penguin","deco","
 // Series that are really the same set (different names for it, or a book whose series wasn't recorded)
 // are folded together by the titles their lists share, so every book in a set gets one design.
 let _canon=null,_canonAt=-1;
+// "Berserk Deluxe Edition" and "Berserk" are one series: edition words are ignored when comparing series names.
+const seriesBase=n=>norm(n).replace(/\b(deluxe|omnibus|collectors?|collector s|illustrated|anniversary|hardcover|paperback|boxed|box|set|complete|edition|editions|special|definitive|vizbig|\d+ in 1|series)\b/g," ").replace(/\s+/g," ").trim();
 function canonMaps(){
   if(_canon&&_canonAt===S.version)return _canon;
   const parent=new Map(),find=x=>{while(parent.get(x)!==x){parent.set(x,parent.get(parent.get(x)));x=parent.get(x);}return x;};
@@ -1327,7 +1371,8 @@ function canonMaps(){
   for(const b of live("book"))if(b.seriesId&&!parent.has(b.seriesId))parent.set(b.seriesId,b.seriesId);
   const byTitle=new Map();
   for(const r of recs)for(const e of r.books||[]){const k=norm(e.title);if(!k)continue;if(byTitle.has(k))union(byTitle.get(k),r.id);else byTitle.set(k,r.id);}
-  const bySeries=new Map();for(const b of live("book"))if(b.seriesId){const k=norm(b.seriesName||"");if(k){if(bySeries.has(k))union(bySeries.get(k),b.seriesId);else bySeries.set(k,b.seriesId);}}
+  const byBase=new Map();for(const r of recs){const k=seriesBase(r.name);if(!k)continue;if(byBase.has(k))union(byBase.get(k),r.id);else byBase.set(k,r.id);}
+  const bySeries=new Map();for(const b of live("book"))if(b.seriesId){const k=seriesBase(b.seriesName||"");if(k){if(bySeries.has(k))union(bySeries.get(k),b.seriesId);else bySeries.set(k,b.seriesId);}}
   _canon={find,byTitle};_canonAt=S.version;return _canon;
 }
 function seriesKeyOf(b){
@@ -1336,13 +1381,13 @@ function seriesKeyOf(b){
   const hit=c.byTitle.get(norm(b.title))||(b.contains||[]).map(t=>c.byTitle.get(norm(t))).find(Boolean);
   return hit?c.find(hit):null;
 }
-const nodeOf=b=>{const k=seriesKeyOf(b);return k?"s:"+k:"b:"+b.id;};
+const nodeOf=b=>{const k=seriesKeyOf(b);if(!k)return"b:"+b.id;const r=S.records.get(k);return"s:"+(r&&!r.deleted&&r.universe?"u_"+slug(r.universe):k);};
 function setForGenre(g){g=g||"";return STYLE_SETS[/Western/.test(g)?"western":/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
   /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other"];}
 // A sub-series takes its genre from its first book, so every book in it lands in the same style family.
 function nodeGenre(b){
-  const key=seriesKeyOf(b);if(!key)return b.genre;
-  const mates=live("book").filter(x=>seriesKeyOf(x)===key).sort((x,y)=>(x.seriesNumber??999)-(y.seriesNumber??999)||String(x.id).localeCompare(String(y.id)));
+  const node=nodeOf(b);if(node.startsWith("b:"))return b.genre;
+  const mates=live("book").filter(x=>nodeOf(x)===node).sort((x,y)=>(x.seriesNumber??999)-(y.seriesNumber??999)||String(x.id).localeCompare(String(y.id)));
   return(mates[0]||b).genre;
 }
 function preferredStyle(node,b){const set=setForGenre(nodeGenre(b));return set[hash(node)%set.length];}
@@ -1773,12 +1818,43 @@ function isLaterInSeries(b){
   const key=seriesKeyOf(b);if(!key)return false;const r=S.records.get(key);
   const e=r&&(r.books||[]).find(x=>titleMatch(x.title,b.title));return!!(e&&e.number!=null&&Number(e.number)>1);
 }
+const STAR=`<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 2.6l2.9 6 6.5.8-4.8 4.5 1.2 6.5L12 17.2l-5.8 3.2 1.2-6.5-4.8-4.5 6.5-.8z"/></svg>`;
+const fmtRating=v=>v?(Number.isInteger(v)?String(v):v.toFixed(2).replace(/0$/,"")):"";
+function starsHTML(key,v,label){
+  v=v||0;
+  return`<div class="rate-row"><div class="stars" data-rate="${key}" role="slider" tabindex="0" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="5" aria-valuenow="${v}" aria-valuetext="${v?fmtRating(v)+" stars":"Not rated"}">
+    <div class="st base">${STAR.repeat(5)}</div><div class="st fill" style="width:${v/5*100}%">${STAR.repeat(5)}</div></div>
+    <span class="st-val">${v?fmtRating(v):"Not rated"}</span>${v?`<button class="btn small quiet st-clear" data-rate-clear="${key}">Clear</button>`:""}</div>`;
+}
+// Drag or tap across the stars; values snap to quarters.
+function mountStars(root,onSet){
+  root.querySelectorAll(".stars").forEach(el=>{
+    const key=el.dataset.rate;let v=+el.getAttribute("aria-valuenow")||0,down=false;
+    const show=x=>{el.querySelector(".fill").style.width=x/5*100+"%";const lab=el.parentNode.querySelector(".st-val");if(lab)lab.textContent=x?fmtRating(x):"Not rated";};
+    const at=e=>{const r=el.getBoundingClientRect();return Math.max(0,Math.min(5,Math.round((e.clientX-r.left)/r.width*20)/4));};
+    el.addEventListener("pointerdown",e=>{down=true;try{el.setPointerCapture(e.pointerId);}catch(_){}v=at(e);show(v);e.preventDefault();});
+    el.addEventListener("pointermove",e=>{if(!down)return;v=at(e);show(v);});
+    const up=()=>{if(!down)return;down=false;if(v<.25)v=.25;show(v);onSet(key,v);};
+    el.addEventListener("pointerup",up);el.addEventListener("pointercancel",up);
+    el.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowUp"){v=Math.min(5,v+.25);}else if(e.key==="ArrowLeft"||e.key==="ArrowDown"){v=Math.max(0,v-.25);}else return;
+      e.preventDefault();show(v);onSet(key,v);});
+  });
+  root.querySelectorAll("[data-rate-clear]").forEach(b=>b.onclick=e=>{e.stopPropagation();onSet(b.dataset.rateClear,0);});
+}
+async function setRating(key,v){
+  const[kind,id]=key.split(":");
+  if(kind==="book"){const b=S.records.get(id);if(!b)return;const c=clone(b);c.rating=v||null;await save(c);}
+  else await setPrefs(id,p=>{p.rating=v||null;});
+}
+const STATUS={want:"Want to read",reading:"Currently reading",read:"Read"};
 function openBook(id){
   const b=S.records.get(id);if(!b||b.deleted)return;
   const{c,t}=colors(b);
   openSheet(`${book3dHTML(b)}<div class="bookhead">
       <div><h2 class="b-title">${esc(b.title)}</h2>
         <p class="b-author">${esc(b.author||"Author unknown")}</p>
+        ${starsHTML("book:"+b.id,b.rating,"Your rating")}
+        <div class="status-row" role="group" aria-label="Reading status">${Object.entries(STATUS).map(([k,l])=>`<button class="chip st-${k}" data-status="${k}" aria-pressed="${b.status===k}">${l}</button>`).join("")}</div>
         <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}${b.publisher?`<span class="tag soft">${esc(b.publisher)}</span>`:""}</p>
         ${b.wordCount||b.pages||b.format?`<p class="b-meta">${b.format?`<span class="tag soft">${esc(b.format[0].toUpperCase()+b.format.slice(1))}</span>`:""}${b.pages?`<span class="tag soft">${b.pages.toLocaleString()} pages</span>`:""}${b.wordCount?`<span class="tag soft">about ${(Math.round(b.wordCount/1000)*1000).toLocaleString()} words</span>`:""}</p>`:""}</div>
     </div>
@@ -1797,6 +1873,11 @@ function openBook(id){
         const el=document.getElementById("ser-"+tid);if(el)el.scrollIntoView({block:"start"});};
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
+      const onRate=async(key,v)=>{await setRating(key,v);const row=body.querySelector(".rate-row");if(row){row.outerHTML=starsHTML(key,v,"Your rating");mountStars(body,onRate);}};
+      mountStars(body,onRate);
+      body.querySelectorAll("[data-status]").forEach(btn=>btn.onclick=async()=>{const cur=S.records.get(b.id);const k=btn.dataset.status;const c=clone(cur);
+        c.status=cur.status===k?null:k;if(c.status==="read"&&!c.finishedAt)c.finishedAt=Date.now();if(c.status==="reading"&&!c.startedAt)c.startedAt=Date.now();await save(c);
+        body.querySelectorAll("[data-status]").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.status===c.status)));});
       const sb=$("#spoilBtn",body);if(sb)sb.onclick=()=>{S.revealed.add(b.id);$("#spoiler",body).classList.add("revealed");};
       const pt=$("#pickTr",body);if(pt)pt.onclick=()=>openPickTranslation(b.id);
       mountTurner($("#stage",body),$("#b3d",body));
@@ -1946,26 +2027,44 @@ let rq=false;
 function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=false;render();});}
 function spine(b){
   const{W,H}=spineDims(b);
-  return`<div class="slot"><button class="spine drawn${b.needsDetails?" pending":""}${S.selecting&&S.selected.has(b.id)?" picked":""}" style="--h:${H}px;--w:${W}px" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}">${spineArt(b,W,H)}</button></div>`;
+  return`<div class="slot"><button class="spine drawn${b.needsDetails?" pending":""}${S.selecting&&S.selected.has(b.id)?" picked":""}" style="--h:${H}px;--w:${W}px" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}${b.status==="reading"?", currently reading":""}">${spineArt(b,W,H)}${b.status==="reading"?`<i class="ribbon" aria-hidden="true"></i>`:""}</button></div>`;
 }
-// Tapping a nameplate closes that bookcase: the shelves fold away and two panelled doors close over it.
-const collapsedSet=()=>{try{return new Set(JSON.parse(LS.get("study-collapsed","[]")));}catch(e){return new Set();}};
-const CARET=`<svg class="caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5L5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// A bookcase is open, half open (two shelves tall, scroll inside it) or closed behind its doors.
+// Tapping the nameplate steps open → half open → closed → open.
+const PEEK_H=332;   // two shelves
+function shelfStates(){try{const o=JSON.parse(LS.get("study-shelfstate","null"));if(o)return o;}catch(e){}
+  const old=(()=>{try{return JSON.parse(LS.get("study-collapsed","[]"));}catch(e){return[];}})();const o={};old.forEach(l=>o[l]="closed");return o;}
+const stateOf=label=>shelfStates()[label]||"open";
+const ICONS={open:`<path d="M1.5 3.5L5 7l3.5-3.5"/>`,peek:`<path d="M1.5 2.5h7M1.5 5h7M1.5 7.5h4"/>`,closed:`<path d="M3.5 1.5L7 5 3.5 8.5"/>`};
+const stateIcon=st=>`<svg class="caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[st]}</svg>`;
+const STATE_WORD={open:"open",peek:"half open",closed:"closed"};
 function bookcase(label,count,inner,opts={}){
-  const can=!opts.blank,closed=can&&collapsedSet().has(label);
-  const plate=can?`<button class="plate" data-shelf="${esc(label)}" aria-expanded="${!closed}" aria-label="${esc(label)}, ${count} books. Tap to ${closed?"open":"close"} this shelf">${esc(label)}${count!=null?`<small>${count}</small>`:""}${CARET}</button>`
+  const can=!opts.blank,st=can?stateOf(label):"open";
+  const plate=can?`<button class="plate" data-shelf="${esc(label)}" aria-label="${esc(label)}, ${count} books, ${STATE_WORD[st]}. Tap to change.">${esc(label)}${count!=null?`<small>${count}</small>`:""}${stateIcon(st)}</button>`
     :`<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>`;
-  return`<section class="case${closed?" closed":""}">${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
+  return`<section class="case st-${st}">${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
     <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div></div>
-    ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div></div>`:""}
+    ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div>`:""}
     <div class="plinth" aria-hidden="true"></div>${opts.extra||""}</section>`;
 }
+const EASE="cubic-bezier(.22,.9,.25,1)";
 function toggleShelf(btn){
-  const label=btn.dataset.shelf,set=collapsedSet(),caseEl=btn.closest(".case");
-  const closing=!set.has(label);closing?set.add(label):set.delete(label);
-  LS.set("study-collapsed",JSON.stringify([...set]));
-  caseEl.classList.toggle("closed",closing);   // animate in place, no redraw
-  btn.setAttribute("aria-expanded",String(!closing));
+  const label=btn.dataset.shelf,caseEl=btn.closest(".case"),wrap=caseEl.querySelector(".shelf-wrap"),inner=caseEl.querySelector(".shelf-inner"),doors=caseEl.querySelector(".doors-wrap");
+  const cur=stateOf(label),full=inner.querySelector(".shelf").offsetHeight;
+  let next=cur==="open"?"peek":cur==="peek"?"closed":"open";
+  if(next==="peek"&&full<=PEEK_H+8)next="closed";      // short shelves skip the half-open step
+  const o=shelfStates();o[label]=next;LS.set("study-shelfstate",JSON.stringify(o));
+  const from=wrap.getBoundingClientRect().height,to=next==="open"?full:next==="peek"?PEEK_H:0;
+  const doorFrom=doors.getBoundingClientRect().height,doorTo=next==="closed"?74:0;
+  caseEl.classList.remove("st-open","st-peek","st-closed");caseEl.classList.add("st-"+next,"moving");
+  btn.querySelector(".caret").outerHTML=stateIcon(next);
+  btn.setAttribute("aria-label",`${label}, ${STATE_WORD[next]}. Tap to change.`);
+  if(next!=="peek")inner.scrollTop=0;
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches,dur=reduce?0:480;
+  // Only the wrapper's height changes; the books ride on their own layer, so the motion stays smooth.
+  const a=wrap.animate([{height:from+"px"},{height:to+"px"}],{duration:dur,easing:EASE});
+  doors.animate([{height:doorFrom+"px"},{height:doorTo+"px"}],{duration:dur,easing:EASE});
+  a.onfinish=()=>caseEl.classList.remove("moving");
 }
 function banners(){
   if(S.tab!=="shelves")return"";
@@ -2006,6 +2105,14 @@ function shelfLayout(){
   const sortKey=b=>[lastName(b.author),norm(b.seriesName||""),String(b.seriesNumber??0).padStart(6,"0"),norm(b.title)].join("|");
   let groups;
   if(S.group==="recent"){groups=[["Newest arrivals",[...books].sort((a,b)=>(b.addedAt||0)-(a.addedAt||0))]];}
+  else if(S.group==="rating"){
+    const band=r=>!r?"Not rated yet":r>=5?"Five stars":r>=4?"Four stars and up":r>=3?"Three stars and up":"Below three stars";
+    const order=["Five stars","Four stars and up","Three stars and up","Below three stars","Not rated yet"];const m=new Map();
+    for(const b of books){const k=band(b.rating);if(!m.has(k))m.set(k,[]);m.get(k).push(b);}
+    groups=order.filter(k=>m.has(k)).map(k=>[k,m.get(k).sort((a,b)=>(b.rating||0)-(a.rating||0)||sortKey(a).localeCompare(sortKey(b)))]);}
+  else if(S.group==="status"){
+    const order=[["reading","Currently reading"],["want","Want to read"],["read","Read"],[null,"No status yet"]];
+    groups=order.map(([k,l])=>[l,books.filter(b=>(b.status||null)===k).sort((a,b)=>sortKey(a).localeCompare(sortKey(b)))]).filter(g=>g[1].length);}
   else{
     const m=new Map();
     for(const b of books){const k=S.group==="genre"?(b.genre||"Not yet catalogued"):((lastName(b.author)[0]||"#").toUpperCase());if(!m.has(k))m.set(k,[]);m.get(k).push(b);}
@@ -2021,10 +2128,10 @@ function entryHTML(t,gi,ei,e,listed){
   const ed=S.editing.has(t.id),num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
   const key=`${t.id}|${gi}|${ei}`;
   let right;
-  if(ed)right=`<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button>`;
+  if(ed)right=`<span class="entry-acts">${e.hidden?"":`<button class="btn small quiet" data-rename="${key}" aria-label="Rename ${esc(e.title)}">${PEN}</button>`}<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button></span>`;
   else if(e.book)right=`<span class="owned">on your shelf</span>`;
   else if(e.upcoming)right=`<span class="owned" style="color:var(--text-2)">not out yet</span>`;
-  else{const on=listed.get(norm(e.title));right=on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small" data-want="${key}">Add to ${WISHLIST}</button>`;}
+  else{const on=listed.get(norm(e.title));right=`<span class="entry-acts col"><button class="btn small" data-have="${key}">I have this book</button>${on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small quiet" data-want="${key}">Add to ${WISHLIST}</button>`}</span>`;}
   const sub=e.via?`<div class="ey">in ${esc(e.via)}</div>`:e.year?`<div class="ey">${esc(e.year)}</div>`:"";
   const title=`<div class="et">${esc(e.book&&!e.via?e.book.title:e.title)}${nov}</div>${sub}`;
   return`<div class="entry${e.book?"":" missing"}${e.novella?" nov":""}${e.hidden?" gone":""}"><span class="num">${num}</span>${e.book&&!ed?`<button class="link" data-book="${e.book.id}">${title}</button>`:`<div>${title}</div>`}${right}</div>`;
@@ -2033,7 +2140,7 @@ function topCardHTML(t,listed){
   const open=S.openSeries.has(t.id),ed=S.editing.has(t.id);
   const counts=t.catalogued?[`you own ${t.ownedMain} of ${plural(t.main.length,"book")}`,t.nov.length?`${t.ownedNov} of ${plural(t.nov.length,"novella")}`:""].filter(Boolean).join(", "):"";
   const visGroups=t.groups.filter(g=>!g.hidden);
-  const sub=[t.author,visGroups.length>1?plural(visGroups.length,"series","series"):"",counts,t.writing?"still being written":""].filter(Boolean).join(", ");
+  const sub=[t.author,visGroups.length>1?plural(visGroups.length,"series","series"):"",counts,t.writing?"still being written":""].filter(Boolean).join(", ")+(t.rating?` · ★ ${fmtRating(t.rating)}`:"");
   const busy=S.busySeries.has(t.id)||t.groups.some(g=>g.pending);
   const tag=t.hiddenTop?`<span class="tag soft">Hidden</span>`:!t.catalogued?`<span class="tag soft">${busy?"Loading…":"List not loaded"}</span>`:t.missing.length?`<span class="tag gap">${t.missing.length} missing</span>`:`<span class="tag full">${t.writing?"Caught up":"Complete set"}</span>`;
   const multi=t.groups.length>1;
@@ -2045,7 +2152,7 @@ function topCardHTML(t,listed){
       body+=`<div class="grp-head${g.hidden?" gone":""}"><span>${esc(g.name)} <small>${g.pending?"loading…":`${own} of ${tot}`}</small></span>${ed?`<button class="btn small quiet ${g.hidden?"":"danger-text"}" data-hide-group="${t.id}|${gi}">${g.hidden?"Put back":"Remove series"}</button>`:""}</div>`;}
     if(!g.hidden)body+=ents.map(({e,ei})=>entryHTML(t,gi,ei,e,listed)).join("");
   });
-  const foot=ed?`${t.custom?`<button class="btn small" data-add-custom="${t.id}">Add to this series</button><button class="btn small quiet danger-text" data-del-custom="${t.id}">${S.confirmDel===t.id?"Tap again to delete":"Delete series"}</button>`
+  const foot=ed?`${t.custom?"":`<button class="btn small" data-add-entry="${t.id}">Add a book or novella</button>`}${t.custom?`<button class="btn small" data-add-custom="${t.id}">Add to this series</button><button class="btn small quiet danger-text" data-del-custom="${t.id}">${S.confirmDel===t.id?"Tap again to delete":"Delete series"}</button>`
       :`<button class="btn small quiet" data-hide-top="${t.id}">${t.hiddenTop?"Show this series again":"Hide this whole series"}</button>`}${t.hiddenCount?`<button class="btn small quiet" data-reset-top="${t.id}">Put everything back</button>`:""}`
     :t.custom?"":`<button class="btn small" data-refresh-top="${t.id}" ${busy?"disabled":""}>${busy?"Checking…":t.catalogued?"Check for newer books":"Load the full series"}</button>`;
   return`<div class="ledger leather${t.hiddenTop?" dim":""}${ed?" editing":""}" id="ser-${t.id}">
@@ -2055,7 +2162,7 @@ function topCardHTML(t,listed){
       <p class="card-sub">${esc(sub)}</p>
       <div class="progress-row"><div class="pips" aria-hidden="true">${t.groups.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden)).slice(0,80).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?"":" miss"}${e.upcoming?" up":""}"${e.book?` style="background:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
     </button>
-    ${open||ed?`<div class="card-body">${ed?`<p class="edit-hint">Remove books or sub-series you don’t plan to read; the series then counts as complete without them. Nothing leaves your shelves.</p>`:""}${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
+    ${open||ed?`<div class="card-body"><div class="series-rate">${starsHTML("series:"+t.id,t.rating,"Your rating for "+t.name)}</div>${ed?`<p class="edit-hint">Remove books or sub-series you don’t plan to read; the series then counts as complete without them. Nothing leaves your shelves.</p>`:""}${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
   </div>`;
 }
 function renderSeries(){
@@ -2064,15 +2171,52 @@ function renderSeries(){
   const hiddenN=all.filter(t=>t.hiddenTop).length;
   const head=`<div class="section-head"><p>${all.length?plural(all.length-hiddenN,"series","series"):"No series yet."}${hiddenN?` <button class="linkish" data-act="showHidden">${S.showHidden?"hide":"show"} ${hiddenN} hidden</button>`:""}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="seriesSort" aria-label="Sort series"><option value="gaps"${S.seriesSort==="gaps"?" selected":""}>Gaps first</option><option value="rating"${S.seriesSort==="rating"?" selected":""}>Highest rated</option><option value="az"${S.seriesSort==="az"?" selected":""}>A to Z</option></select>
       <button class="chip" data-act="gapsOnly" aria-pressed="${S.gapsOnly}">Only with gaps</button>
       <button class="btn small editbtn" data-act="newSeries">New series</button></div></div>`;
   if(!all.length)return head+`<p class="empty-note">Series show up here once you add books that belong to one. You can also make your own with New series.</p>`;
   const q=norm(S.sq);
   if(q)all=all.filter(t=>norm([t.name,t.author,...t.groups.map(g=>g.name),...t.groups.flatMap(g=>g.entries.map(e=>e.title))].join(" ")).includes(q));
   all=all.filter(t=>!t.hiddenTop||S.showHidden||S.editing.has(t.id));
-  const shown=S.gapsOnly?all.filter(t=>t.missing.length||S.editing.has(t.id)):all;
+  let shown=S.gapsOnly?all.filter(t=>t.missing.length||S.editing.has(t.id)):all;
+  if(S.seriesSort==="rating")shown=[...shown].sort((a,b)=>(b.rating||0)-(a.rating||0)||a.name.localeCompare(b.name));
+  else if(S.seriesSort==="az")shown=[...shown].sort((a,b)=>a.name.localeCompare(b.name));
   const listed=listItemsIndex();
   return head+(shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+shown.map(t=>topCardHTML(t,listed)).join("");
+}
+async function haveBook(tid,gi,ei){
+  const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[gi];const e=g&&g.entries[ei];if(!e||e.book)return;
+  const sb=(t.subs||[]).find(x=>norm(x.name)===norm(g.name))||(t.subs||[])[0];
+  const mate=live("book").find(b=>nodeOf(b)==="s:"+tid)||(sb&&sb.owned[0]);
+  const b=newBook({title:e.title,author:t.author||(mate&&mate.author)});
+  if(sb){b.seriesId=sb.sid;b.seriesName=sb.name;}b.seriesNumber=e.novella?null:e.number;if(mate){b.genre=mate.genre;b.format=mate.format;}
+  await save(b);fillDetails([b.id]);toast(`Added ${e.title} to your shelves.`);
+}
+function openRename(tid,gi,ei){
+  const t=topsView().find(x=>x.id===tid);const e=t&&t.groups[gi]&&t.groups[gi].entries[ei];if(!e)return;
+  openSheet(`<h2 class="sheet-title">Fix this title</h2>
+    <div class="field"><label for="rnT">Title</label><input id="rnT" value="${esc(e.title)}" autocomplete="off"></div>
+    <p class="muted" style="margin-top:-2px">If it matches a book on your shelves, it’ll count as owned.</p>
+    <div class="actions"><button class="btn brass" id="rnGo">Save</button>${e.orig&&e.orig!==e.title?`<button class="btn quiet" id="rnReset">Back to “${esc(e.orig)}”</button>`:""}</div>`,body=>{
+      const done=async v=>{await setPrefs(tid,p=>{p.renames=p.renames||{};if(v&&v!==e.orig)p.renames[norm(e.orig)]=v;else delete p.renames[norm(e.orig)];});closeSheet();};
+      $("#rnGo",body).onclick=()=>done(cleanStr($("#rnT",body).value,200));
+      const rs=$("#rnReset",body);if(rs)rs.onclick=()=>done(null);
+    });
+}
+function openAddEntry(tid){
+  const t=topsView().find(x=>x.id===tid);if(!t)return;
+  openSheet(`<h2 class="sheet-title">Add to ${esc(t.name)}</h2>
+    <div class="field"><label for="aeT">Title</label><input id="aeT" autocomplete="off"></div>
+    <div class="field" style="display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:end">
+      <div><label for="aeN">Number <span class="opt">(optional)</span></label><input id="aeN" inputmode="decimal" placeholder="4.5"></div>
+      <label class="switch" style="margin-bottom:8px"><input type="checkbox" id="aeV"> It’s a novella</label></div>
+    ${t.groups.length>1?`<div class="field"><label for="aeG">Sub-series</label><select id="aeG" style="width:100%">${t.groups.map(g=>`<option>${esc(g.name)}</option>`).join("")}</select></div>`:""}
+    <button class="btn brass wide" id="aeGo">Add</button>`,body=>{
+      $("#aeGo",body).onclick=async()=>{const title=cleanStr($("#aeT",body).value,200);if(!title){$("#aeT",body).focus();return;}
+        const group=$("#aeG",body)?$("#aeG",body).value:(t.groups[0]&&t.groups[0].name);
+        await setPrefs(tid,p=>{p.added=p.added||[];p.added.push({group,title,number:num($("#aeN",body).value),novella:$("#aeV",body).checked});});
+        closeSheet();toast(`Added ${title} to ${t.name}.`);};
+    });
 }
 function openNewSeries(){
   openSheet(`<h2 class="sheet-title">New series</h2>
@@ -2151,6 +2295,8 @@ function openMoveTo(){
         closeSheet();S.selected.clear();S.selecting=false;render();toast(`Moved ${plural(ids.length,"book")} to ${g}.`);});
     });
 }
+function syncHeadHeight(){const t=$(".top");if(t)document.documentElement.style.setProperty("--head-h",t.offsetHeight+"px");}
+window.addEventListener("resize",syncHeadHeight);
 function render(){
   if(!S.loaded)return;
   document.querySelectorAll(".nav [data-tab]").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab?"page":"false"));
@@ -2162,13 +2308,15 @@ function render(){
   assignStyles(shelfLayout().groups.map(g=>g[1]));
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
-  selectBar();
+  selectBar();syncHeadHeight();
+  if(S.tab==="series"){mountStars($("#main"),(k,v)=>setRating(k,v));const ss=$("#seriesSort");if(ss)ss.onchange=e=>{S.seriesSort=e.target.value;LS.set("study-series-sort",S.seriesSort);render();};}
   const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
   const bd=$("#seriesBadge");bd.textContent=miss>99?"99+":String(miss);bd.hidden=!miss;
 }
 
 /* ---------- events ---------- */
 $("#main").addEventListener("click",e=>{
+  if(e.target.closest(".stars"))return;
   const t=e.target.closest("button,[data-book]");if(!t)return;const d=t.dataset;
   if(d.shelf!==undefined)return toggleShelf(t);
   if(d.book){if(S.selecting&&S.tab==="shelves"){S.selected.has(d.book)?S.selected.delete(d.book):S.selected.add(d.book);return render();}return openBook(d.book);}
@@ -2182,6 +2330,9 @@ $("#main").addEventListener("click",e=>{
     (async()=>{S.busySeries.add(tid);render();for(const sb of t.subs||[])await refreshSeries(sb.sid,{quiet:true});
       if(t.universe){const u=S.records.get(t.id);if(u)await save({kind:"universe",id:t.id,deleted:true});S.uniTried.delete(t.id);await loadUniverse(t.name,t.author);}
       S.busySeries.delete(tid);render();toast(`${t.name} is up to date.`);})();return;}
+  if(d.have){const[tid,gi,ei]=d.have.split("|");return haveBook(tid,+gi,+ei);}
+  if(d.rename){const[tid,gi,ei]=d.rename.split("|");return openRename(tid,+gi,+ei);}
+  if(d.addEntry)return openAddEntry(d.addEntry);
   if(d.hideBook){const[tid,gi,ei]=d.hideBook.split("|");const t=topsView().find(x=>x.id===tid);const e=t&&t.groups[+gi]&&t.groups[+gi].entries[+ei];if(!e)return;
     const k=norm(e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
   if(d.hideGroup){const[tid,gi]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[+gi];if(!g)return;
@@ -2206,6 +2357,7 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="typeQueue")return openTypeFromPhoto(0);
   if(d.act==="gapsOnly"){S.gapsOnly=!S.gapsOnly;return render();}
   if(d.editTop){const id=d.editTop;if(S.editing.has(id))S.editing.delete(id);else{S.editing.add(id);S.openSeries.add(id);}return render();}
+  if(d.act==="noop"){}
   if(d.act==="showHidden"){S.showHidden=!S.showHidden;return render();}
   if(d.act==="newSeries")return openNewSeries();
 });
@@ -2219,7 +2371,8 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 window.addEventListener("offline",scheduleRender);
 
 (async function init(){
-  try{const g=localStorage.getItem("shelves-group");if(g&&["genre","author","recent"].includes(g)){S.group=g;$("#group").value=g;}}catch(_){}
+  S.seriesSort=LS.get("study-series-sort","gaps");
+  try{const g=localStorage.getItem("shelves-group");if(g&&["genre","author","recent","rating","status"].includes(g)){S.group=g;$("#group").value=g;}}catch(_){}
   await store.open();
   for(const r of await store.all())S.records.set(r.id,r);
   const photos=(await store.all("photos")).filter(p=>p&&p.blob);
