@@ -1136,22 +1136,45 @@ function wrapFit(text,f,maxW,maxH,maxFs,minFs){
 }
 const surname=a=>{const p=String(a||"").trim().split(/\s+/);return p.length?p[p.length-1]:"";};
 function palette(b){const h=hash(b.id);const base=hex(b.color)||PALETTE[h%PALETTE.length];
-  return{c:base,dark:shade(base,-.45),deep:shade(base,-.7),light:shade(base,.35),acc:ACCENTS[(h>>3)%ACCENTS.length],ink:inkOn(base)};}
+  return{c:base,dark:shade(base,-.45),deep:shade(base,-.7),light:shade(base,.35),acc:ACCENTS[(hash(nodeOf(b))>>>3)%ACCENTS.length],ink:inkOn(base)};}
 const STYLE_SETS={classic:["gilt","hubs","label","minimal","penguin","deco"],fantasy:["gilt","gradient","deco","hubs","twotone","monogram","label"],
   scifi:["pulp","minimal","gradient","twotone","stripes","deco"],dark:["pulp","twotone","stripes","deco","gradient","monogram"],
   young:["paperback","stripes","pulp","twotone","monogram"],other:["paperback","twotone","minimal","stripes","label","penguin","monogram","gradient"]};
-function styleOf(b){
-  const g=b.genre||"";const set=/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
-    /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other";
-  const list=STYLE_SETS[set];return list[hash(b.seriesId||b.id)%list.length];   // a series shares one design, like real editions
+const ALL_STYLES=["gilt","hubs","label","paperback","twotone","penguin","deco","pulp","minimal","gradient","stripes","monogram"];
+// A "node" is a whole sub-series (all its books share one design) or a single standalone book.
+const nodeOf=b=>b.seriesId?"s:"+b.seriesId:"b:"+b.id;
+function setForGenre(g){g=g||"";return STYLE_SETS[/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
+  /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other"];}
+// A sub-series takes its genre from its first book, so every book in it lands in the same style family.
+function nodeGenre(b){
+  if(!b.seriesId)return b.genre;
+  const mates=live("book").filter(x=>x.seriesId===b.seriesId).sort((x,y)=>(x.seriesNumber??999)-(y.seriesNumber??999)||String(x.id).localeCompare(String(y.id)));
+  return(mates[0]||b).genre;
 }
+function preferredStyle(node,b){const set=setForGenre(nodeGenre(b));return set[hash(node)%set.length];}
+// Walk the shelves in order and give each node its preferred style, unless a neighbour from another series already has it.
+function assignStyles(rows){
+  const adj=new Map(),first=new Map(),order=[];
+  const link=(a,c)=>{if(a===c)return;if(!adj.has(a))adj.set(a,new Set());if(!adj.has(c))adj.set(c,new Set());adj.get(a).add(c);adj.get(c).add(a);};
+  for(const row of rows)row.forEach((b,i)=>{const n=nodeOf(b);if(!first.has(n)){first.set(n,b);order.push(n);}if(i)link(nodeOf(row[i-1]),n);});
+  const out=new Map();
+  for(const n of order){
+    const b=first.get(n),set=setForGenre(nodeGenre(b)),pref=set[hash(n)%set.length];
+    const banned=new Set([...(adj.get(n)||[])].map(m=>out.get(m)).filter(Boolean));
+    if(!banned.has(pref)){out.set(n,pref);continue;}
+    const start=set.indexOf(pref);const tries=[...set.slice(start+1),...set.slice(0,start),...ALL_STYLES];
+    out.set(n,tries.find(x=>!banned.has(x))||pref);
+  }
+  S.styleMap=out;
+}
+function styleOf(b){const n=nodeOf(b);return(S.styleMap&&S.styleMap.get(n))||preferredStyle(n,b);}
 const PX_PER_CM=5.8;   // a 24 cm hardcover stands 139 px tall on the shelf
 function spineDims(b){
   const ph=physical(b);
   // Heights are true to scale. Thickness keeps true proportions, nudged up a little so short titles stay readable.
   if(ph)return{H:Math.min(148,Math.round(ph.h*PX_PER_CM)),W:Math.max(13,Math.min(72,Math.round(ph.t*PX_PER_CM*1.3)))};
   const h=hash(b.id+b.title);const H=118+(h%30);const len=(b.title||"").length;
-  return{H,W:Math.min(54,24+((h>>5)%12)+(len>16?6:0)+(len>28?8:0))};
+  return{H,W:Math.min(54,24+((h>>>5)%12)+(len>16?6:0)+(len>28?8:0))};
 }
 const vt=(text,top,L,f,W,maxFs,thick=.74)=>{if(!text||L<12)return"";const str=f.up?text.toUpperCase():text;const r=fitVertical(str,f,L*.94,W*thick,maxFs);
   if(maxFs<=9&&r.fs<5.5)return"";   // an author name that can't be read at this size is left off
@@ -1666,9 +1689,14 @@ function renderShelves(){
       <p>${canRead()?"Photograph a shelf and Claude will read the spines.":(AI.key()?"Type a few books in, or save shelf photos for Claude to read once you’re online.":"Send your shelf photos to Claude in chat and paste what it gives you, or type a few books in.")}</p>
       <button class="btn brass" data-act="add">Add books</button></div>`});
   }
-  const q=norm(S.q);
-  const books=q?all.filter(b=>norm([b.title,b.author,b.seriesName,b.genre,b.translator,b.publisher,b.originalLanguage].join(" ")).includes(q)):all;
+  const{books,groups}=shelfLayout();const q=norm(S.q);
   if(!books.length)return`<p class="empty-note">Nothing on your shelves matches “${esc(S.q)}”.</p>`;
+  return`<p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p>`+
+    groups.map(([label,list])=>bookcase(label,list.length,list.map(spine).join(""))).join("");
+}
+function shelfLayout(){
+  const all=live("book"),q=norm(S.q);
+  const books=q?all.filter(b=>norm([b.title,b.author,b.seriesName,b.genre,b.translator,b.publisher,b.originalLanguage].join(" ")).includes(q)):all;
   const sortKey=b=>[lastName(b.author),norm(b.seriesName||""),String(b.seriesNumber??0).padStart(6,"0"),norm(b.title)].join("|");
   let groups;
   if(S.group==="recent"){groups=[["Newest arrivals",[...books].sort((a,b)=>(b.addedAt||0)-(a.addedAt||0))]];}
@@ -1680,8 +1708,7 @@ function renderShelves(){
     else groups.sort((a,b)=>a[0].localeCompare(b[0]));
     groups.forEach(g=>g[1].sort((a,b)=>sortKey(a).localeCompare(sortKey(b))));
   }
-  return`<p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p>`+
-    groups.map(([label,list])=>bookcase(label,list.length,list.map(spine).join(""))).join("");
+  return{books,groups};
 }
 const PEN=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>`;
 function entryHTML(t,gi,ei,e,listed){
@@ -1804,6 +1831,7 @@ function render(){
   const qi=$("#q"),want=S.tab==="series"?S.sq:S.q;if(qi.value!==want)qi.value=want;
   qi.placeholder=S.tab==="series"?"Search series or authors":"Search titles, authors, translators";
   $("#offline").hidden=navigator.onLine!==false;
+  assignStyles(shelfLayout().groups.map(g=>g[1]));
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
   const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
