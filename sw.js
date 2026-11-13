@@ -1,7 +1,7 @@
 // The Study: keeps the app on the phone so it opens with no signal.
 // Online: always fetches the newest version first (so updates show on the next open).
 // Offline or slow signal: opens instantly from the copy saved on the phone.
-const VERSION = "study-v19";
+const VERSION = "study-v21";
 const COVERS = "study-covers"; // cover pictures from Open Library / Google Books, kept across updates
 const COVER_URL = /^https:\/\/(covers\.openlibrary\.org\/b\/|books\.google\.com\/books\/content|books\.googleusercontent\.com\/)/;
 const FILES = [

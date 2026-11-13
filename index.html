@@ -159,8 +159,17 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .card-sub{color:var(--text-2);font-size:15px;margin:2px 0 0;font-style:italic}
 .progress-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:10px}
 .pips{display:flex;gap:2px;align-items:flex-end;flex-wrap:wrap}
-.pip{width:9px;height:26px;border-radius:1px;box-shadow:inset 1px 0 0 rgba(255,255,255,.15),inset -1px 0 0 rgba(0,0,0,.35)}
-.pip.miss{border:1.5px dashed var(--brass);opacity:.65;box-shadow:none}
+.pips{gap:3px!important}
+.pip{box-sizing:border-box;width:10px;height:26px;border-radius:1.5px;flex:none}
+.pip.own{background:linear-gradient(90deg,rgba(0,0,0,.28),rgba(255,235,200,.14) 40%,rgba(0,0,0,.3)),var(--pc,#6b4a2b);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.45),inset 0 3px 0 -1px rgba(217,184,100,.55),inset 0 -3px 0 -1px rgba(217,184,100,.55)}
+.pip.miss{border:1px solid rgba(217,184,100,.8);background:repeating-linear-gradient(135deg,rgba(217,184,100,.22) 0 1px,transparent 1px 4px),rgba(0,0,0,.28);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.pip.nv{width:8px;height:15px;border-radius:1px}
+.pip.nv.own{background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(255,255,255,.18) 45%,rgba(0,0,0,.22)),#6FA59A;box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+.pip.nv.miss{border-color:#7DB8AC;background:repeating-linear-gradient(135deg,rgba(125,184,172,.28) 0 1px,transparent 1px 4px),rgba(0,0,0,.28)}
+.pip.up{opacity:.4;background:rgba(0,0,0,.2)}
+.toast-undo{margin-left:10px;border:1px solid var(--parch-ink-2);background:transparent;color:var(--parch-ink);font:inherit;font-weight:600;padding:2px 10px;border-radius:3px;cursor:pointer}
 .tag{display:inline-block;font-size:14px;font-weight:600;padding:1px 10px;border-radius:2px;white-space:nowrap}
 .tag.gap{background:linear-gradient(var(--brass-hi),var(--brass));color:var(--brass-ink)}
 .tag.full{color:var(--ok);border:1px solid currentColor}
@@ -317,8 +326,6 @@ button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;ga
 /* series extras */
 .tag.novtag{font-size:12px;font-weight:500;color:var(--text-2);border:1px solid var(--line);vertical-align:2px;padding:0 6px}
 .entry.nov .et{font-size:16px}
-.pip.nv{height:16px;width:7px}
-.pip.up{opacity:.35}
 .universe{margin-top:16px;border-top:1px solid rgba(196,154,69,.35);padding-top:8px}
 .uni-title{font-family:var(--display);font-size:20px;color:var(--brass-hi);margin:6px 0 4px}
 .uni-group{margin:14px 0 2px;font-weight:600;color:var(--text)}
@@ -460,6 +467,8 @@ function ratio(a,b){const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min
 function colors(b){const h=hash(b.id);const c=hex(b.color)||PALETTE[h%PALETTE.length];let t=hex(b.textColor);if(!t||ratio(c,t)<3)t=lum(c)>.3?"#1E1A14":"#F1E8D2";return{c,t};}
 function genreOf(g){if(!g)return null;const n=norm(g);return GENRES.find(x=>norm(x)===n)||null;}
 function num(v){const n=parseFloat(v);return Number.isFinite(n)?n:null;}
+// Loose author check: "Robert Jordan and Brandon Sanderson" still matches "Robert Jordan".
+function sameAuthor(a,b){if(!a||!b)return true;const x=norm(a),y=norm(b),la=lastName(a),lb=lastName(b);return!!(la&&y.includes(la))||!!(lb&&x.includes(lb));}
 function titleMatch(a,b){const x=norm(a),y=norm(b);return !!x&&(x===y||(x.length>5&&y.length>5&&(x.startsWith(y+" ")||y.startsWith(x+" "))));}
 const live=kind=>[...S.records.values()].filter(r=>r.kind===kind&&!r.deleted);
 const plural=(n,w,p)=>`${n} ${n===1?w:(p||w+"s")}`;
@@ -468,7 +477,12 @@ function parseLines(text){
     const m=l.match(/^(.+)\s(?:by|—|–|-)\s(.+)$/i);return m?{title:m[1].trim(),author:m[2].trim()}:{title:l,author:""};});
 }
 let toastTimer;
-function toast(msg){if(!msg)return;const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,3800);}
+function toast(msg,opts={}){if(!msg)return;const t=$("#toast");t.textContent=msg;
+  if(opts.undo){const b=document.createElement("button");b.className="toast-undo";b.textContent="Undo";
+    b.onclick=async()=>{clearTimeout(toastTimer);t.hidden=true;try{await opts.undo();}catch(e){}};t.append(" ",b);}
+  t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,opts.undo?7000:3800);}
+// Put back exactly what was there before (used by Undo).
+async function undoAdd(ids,label){await save(ids.map(id=>({kind:"book",id,deleted:true})));toast(label||"Undone.");}
 const toDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b);});
 
 /* ---------- on-device storage (IndexedDB) ---------- */
@@ -562,8 +576,9 @@ function enrichPrompt(items){
   return `Give catalogue details for each book below, for a home-library app.
 Books: ${JSON.stringify(items)}
 Reply with only a JSON array, one object per book, using the same "key" values:
-[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[],"translations":[],"wordCount":90000,"pages":320,"format":"trade paperback"}]
+[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[],"alsoKnownAs":[],"translations":[],"wordCount":90000,"pages":320,"format":"trade paperback"}]
 "translations" is only for books first written in another language: the English translations in print or commonly found, most common first, as [{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]; otherwise [].
+"alsoKnownAs" lists other titles this same book has been published under (UK or US titles, retitled reissues); otherwise [].
 "wordCount" is the approximate number of words in the text. "pages" and "format" (one of "mass market paperback", "trade paperback", "hardcover") describe the edition the publisher suggests if one is given, otherwise the most common current edition.
 "originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
 "color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "name" is the series name; when this book belongs to a special edition with its own volume numbering (for example Berserk Deluxe Edition), use that edition's name; "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
@@ -585,7 +600,8 @@ async function addBooks(items,opts={}){
 }
 function cleanSeriesBooks(list){
   if(!Array.isArray(list))return[];
-  return list.map(e=>({number:num(e&&e.number),title:cleanStr(e&&e.title,200),year:num(e&&e.year),novella:!!(e&&e.novella),upcoming:!!(e&&e.upcoming)})).filter(e=>e.title).slice(0,150);
+  const akaOf=e=>{const a=e&&(e.alsoKnownAs||e.aka);return Array.isArray(a)?a.map(x=>cleanStr(x,200)).filter(Boolean).slice(0,6):[];};
+  return list.map(e=>({number:num(e&&e.number),title:cleanStr(e&&e.title,200),year:num(e&&e.year),novella:!!(e&&e.novella),upcoming:!!(e&&e.upcoming),aka:akaOf(e)})).filter(e=>e.title).slice(0,150);
 }
 const FORMATS={"mass market paperback":{h:17.5,w:10.8,paper:.0075,boards:.1},"trade paperback":{h:21,w:13.8,paper:.0068,boards:.1},"hardcover":{h:24,w:16,paper:.0062,boards:.5}};
 function applySize(book,d){
@@ -645,6 +661,7 @@ function applyDetails(book,d,seriesMap){
   if(!hex(book.color))book.color=hex(d.color);
   applyTranslation(book,d);
   applySize(book,d);
+  if(Array.isArray(d.alsoKnownAs))book.aka=d.alsoKnownAs.map(x=>cleanStr(x,200)).filter(Boolean).slice(0,6);
   book.needsDetails=false;
   if(Array.isArray(d.contains))book.contains=d.contains.map(x=>cleanStr(typeof x==="string"?x:x&&x.title,200)).filter(Boolean).slice(0,30);
   applySeries(book,d.series,seriesMap);
@@ -712,6 +729,7 @@ function stockGaps(){
     languages:books.filter(b=>!b.translationChecked&&!b.needsDetails).length,
     translations:books.filter(b=>isTranslated(b)&&!(b.translations&&b.translations.length)&&!b.translationsChecked).length,
     series:[...new Set(books.map(b=>b.seriesId).filter(Boolean))].filter(id=>needsCatalog(S.records.get(id))).length,
+    aliases:aliasTargets().length,
     wider:[...new Set(books.map(b=>b.seriesId).filter(Boolean).map(id=>S.records.get(id)).filter(r=>r&&r.universe).map(r=>"u_"+slug(r.universe)))].filter(id=>!S.records.get(id)).length,
     details:books.filter(b=>b.needsDetails).length};
 }
@@ -737,10 +755,39 @@ List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:6
         const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=clone(S.records.get(b.id));
           c.translations=cleanTranslations(d.translations);c.translationsChecked=true;out.push(c);}
         if(out.length)await save(out);}catch(e){break;}}
+    // books listed twice under different titles
+    if(await checkAliases()){const m=await mergeDuplicates();if(m)toast(`Merged ${plural(m,"book")} that you had under two titles.`);}
     // full series lists and the wider series they belong to
     queueSeriesRefresh([...new Set(live("book").map(b=>b.seriesId).filter(Boolean))]);
     for(const r of new Map(live("book").map(b=>S.records.get(b.seriesId)).filter(r=>r&&r.universe).map(r=>[r.universe,r])).values())queueUniverse(r.universe,r.author);
   }finally{S.stocking=false;scheduleRender();}
+}
+const aliasTargets=()=>[...S.records.values()].filter(r=>!r.deleted&&!r.akaChecked&&((r.kind==="series"&&(r.books||[]).length>1)||((r.kind==="universe"||r.kind==="custom")&&(r.groups||[]).some(g=>(g.books||[]).length))));
+async function checkAliases(){
+  const todo=aliasTargets();if(!todo.length||!canAsk())return 0;let marked=0;
+  const titlesOf=r=>r.kind==="series"?(r.books||[]).map(e=>e.title):[...new Set((r.groups||[]).flatMap(g=>(g.books||[]).map(e=>e.title)))];
+  for(let i=0;i<todo.length&&canAsk();){
+    const batch=[];let n=0;while(i<todo.length&&(batch.length<6)&&(n<320||!batch.length)){const t=titlesOf(todo[i]);batch.push({r:todo[i],t});n+=t.length;i++;}
+    let arr;
+    try{arr=await Claude.json(`These are reading lists for book series. In each list, find entries that are the same book published under different titles (for example a UK and a US title, or a retitled reissue).
+Never group different books, sequels, prequels, or an omnibus with the books inside it.
+Lists: ${JSON.stringify(batch.map((x,k)=>({key:"k"+k,titles:x.t})))}
+Reply with only JSON: [{"key":"k0","same":[["Title exactly as listed","Other title exactly as listed"]]}]
+Use "same": [] for a list with none.`,{model:MODELS.smart,maxTokens:3000});}catch(e){break;}
+    const out=[];
+    for(const d of Array.isArray(arr)?arr:[]){
+      const x=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!x)continue;
+      const r=clone(S.records.get(x.r.id));if(!r||r.deleted)continue;
+      const sets=(Array.isArray(d.same)?d.same:[]).map(s=>(Array.isArray(s)?s:[]).map(t=>cleanStr(t,200)).filter(t=>t&&x.t.some(y=>norm(y)===norm(t)))).filter(s=>s.length>1);
+      const tag=e=>{const set=sets.find(s=>s.some(t=>norm(t)===norm(e.title)));if(!set)return;
+        e.aka=[...new Set([...(e.aka||[]),...set.filter(t=>norm(t)!==norm(e.title))])];marked++;};
+      if(r.kind==="series")(r.books||[]).forEach(tag);else(r.groups||[]).forEach(g=>(g.books||[]).forEach(tag));
+      r.akaChecked=true;out.push(r);
+    }
+    for(const x of batch)if(!out.some(r=>r.id===x.r.id)){const r=clone(S.records.get(x.r.id));if(r){r.akaChecked=true;out.push(r);}}
+    if(out.length)await save(out);
+  }
+  return marked;
 }
 async function measureBooks(){
   if(S.measuring||!canAsk())return;const todo=live("book").filter(b=>!b.sizeChecked&&!b.needsDetails);if(!todo.length)return;
@@ -762,24 +809,38 @@ Reply with only a JSON array: [{"key":"k0","wordCount":90000,"pages":320,"format
 
 /* ---------- series ---------- */
 // A book owns a series entry directly, or through an omnibus volume that contains it.
-// Fast "do I own this title?" lookups across the whole library (direct, or inside an omnibus).
+// Fast "do I own this title?" lookups across the whole library (direct, inside an omnibus, or under another title).
+const aliasOf=t=>canonMaps().aliasOf(t);
 function ownerIndex(books){
-  const direct=new Map(),inside=new Map();
+  const direct=new Map(),inside=new Map(),alias=new Map();
+  for(const b of books){const k=aliasOf(b.title);if(!alias.has(k))alias.set(k,b);}
   const bare=x=>x.replace(/\bvolume /g,"");   // "Berserk 3" and "Berserk, Vol. 3" are the same book
   for(const b of books){const n=norm(b.title);direct.set(n,b);direct.set(bare(n),direct.get(bare(n))||b);for(const t of b.contains||[]){const m=norm(t);inside.set(m,b);inside.set(bare(m),b);}}
-  return title=>{const n=norm(title);for(const k of[n,bare(n)]){if(direct.has(k))return{book:direct.get(k),via:null};if(inside.has(k))return{book:inside.get(k),via:inside.get(k).title};}
-    if(n.length>5)for(const b of books){const x=norm(b.title);if(x.length>5&&(x.startsWith(n+" ")||n.startsWith(x+" ")))return{book:b,via:null};}
+  // A partial title ("The Castle" vs "The Castle of Dreaming Books") only counts when the author matches too.
+  return(title,author)=>{const n=norm(title);for(const k of[n,bare(n)]){if(direct.has(k))return{book:direct.get(k),via:null};if(inside.has(k))return{book:inside.get(k),via:inside.get(k).title};}
+    const ak=aliasOf(title);if(alias.has(ak))return{book:alias.get(ak),via:null};
+    if(n.length>5)for(const b of books){const x=norm(b.title);if(x.length>5&&(x.startsWith(n+" ")||n.startsWith(x+" "))&&author&&b.author&&sameAuthor(author,b.author))return{book:b,via:null};}
     return null;};
 }
 const topIdOf=sid=>{const r=S.records.get(sid);return r&&!r.deleted&&r.universe?"u_"+slug(r.universe):sid;};
+// A merged card reads the edits you made on any of the cards it absorbed.
+function mergedPrefs(t){const ps=[t.id,...(t.mergedIds||[])].map(prefsOf);const p=ps[0];
+  return{...p,hiddenGroups:[...new Set(ps.flatMap(x=>x.hiddenGroups||[]))],hiddenBooks:[...new Set(ps.flatMap(x=>x.hiddenBooks||[]))],
+    renames:Object.assign({},...ps.slice().reverse().map(x=>x.renames||{})),added:ps.flatMap(x=>x.added||[]),hidden:ps.some(x=>x.hidden),rating:p.rating||ps.map(x=>x.rating).find(Boolean)||null};}
+async function setPrefsAll(t,fn){for(const id of[t.id,...(t.mergedIds||[])])await setPrefs(id,fn);}
 const prefsOf=id=>{const p=S.records.get("p_"+id);return p&&!p.deleted?p:{hiddenGroups:[],hiddenBooks:[],hidden:false};};
 async function setPrefs(id,fn){const p=clone(prefsOf(id));p.kind="seriesprefs";p.id="p_"+id;p.hiddenGroups=p.hiddenGroups||[];p.hiddenBooks=p.hiddenBooks||[];fn(p);await save(p);}
 const byNumber=(a,b)=>(a.number??999)-(b.number??999)||(a.year||0)-(b.year||0);
 // No book twice: drop repeats inside a sub-series, drop a sub-series whose books all appear elsewhere,
 // and when a book sits in two sub-series keep it in the smaller one.
 function tidyGroups(groups){
-  let gs=groups.map(g=>{if(g.pending)return g;const seen=new Set();return{...g,books:(g.books||[]).filter(e=>{const k=norm(e.title);if(seen.has(k))return false;seen.add(k);return true;})};});
-  const keys=g=>new Set((g.books||[]).map(e=>norm(e.title)));
+  const K=e=>aliasOf(e.title);
+  let gs=groups.map(g=>{if(g.pending)return g;const seen=new Map();const books=[];
+    for(const e0 of g.books||[]){const e={...e0,aka:[...(e0.aka||[])]};const k=K(e);const kept=seen.get(k);
+      if(kept){for(const t of[e.title,...e.aka])if(norm(t)!==norm(kept.title)&&!kept.aka.some(x=>norm(x)===norm(t)))kept.aka.push(t);continue;}
+      seen.set(k,e);books.push(e);}
+    return{...g,books};});
+  const keys=g=>new Set((g.books||[]).map(K));
   for(const g of [...gs].sort((a,b)=>(b.books||[]).length-(a.books||[]).length)){
     if(g.pending||!(g.books||[]).length)continue;
     const others=new Set();for(const o of gs)if(o!==g&&!o.pending)for(const k of keys(o))others.add(k);
@@ -787,7 +848,7 @@ function tidyGroups(groups){
   }
   const home=new Map();
   for(const g of [...gs].sort((a,b)=>(a.books||[]).length-(b.books||[]).length))for(const k of keys(g))if(!home.has(k))home.set(k,g);
-  return gs.map(g=>g.pending?g:{...g,books:g.books.filter(e=>home.get(norm(e.title))===g)}).filter(g=>g.pending||g.books.length||groups.length===1);
+  return gs.map(g=>g.pending?g:{...g,books:g.books.filter(e=>home.get(K(e))===g)}).filter(g=>g.pending||g.books.length||groups.length===1);
 }
 function topsView(){
   const books=live("book");const owner=ownerIndex(books);const tops=new Map();
@@ -800,22 +861,41 @@ function topsView(){
     if(ok&&rec.universe)ensure("u_"+slug(rec.universe),{name:rec.universe,author,universe:true}).subs.push(sub);
     else ensure(sid,{name,author}).subs.push(sub);
   }
-  for(const c of live("custom"))ensure(c.id,{name:c.name,author:c.author||"",custom:true,rec:c});
+  // Cards that share most of their books, or whose names match a sub-series of the other, are one series
+  // (for example a "Shannara" card that was filed without its wider "Shannara Cycle").
+  const raw=[...tops.values()];const keySet=t=>{const ks=new Set();const add=x=>{const k=aliasOf(x);if(k)ks.add(k);};
+    const u=t.universe&&S.records.get(t.id);if(u&&!u.deleted)for(const g of u.groups||[])for(const e of g.books||[])add(e.title);
+    for(const sb of t.subs){for(const e of sb.books||[])add(e.title);for(const b of sb.owned)add(b.title);}return ks;};
+  const names=t=>{const ns=new Set([seriesBase(t.name),...t.subs.map(sb=>seriesBase(sb.name))]);const u=t.universe&&S.records.get(t.id);
+    if(u&&!u.deleted)for(const g of u.groups||[])ns.add(seriesBase(g.name));ns.delete("");return ns;};
+  const K=new Map(raw.map(t=>[t.id,keySet(t)])),N=new Map(raw.map(t=>[t.id,names(t)]));
+  const par=new Map(raw.map(t=>[t.id,t.id])),fp=x=>{while(par.get(x)!==x){par.set(x,par.get(par.get(x)));x=par.get(x);}return x;};
+  for(let i=0;i<raw.length;i++)for(let j=i+1;j<raw.length;j++){const a=raw[i],b=raw[j];
+    const ka=K.get(a.id),kb=K.get(b.id);let shared=0;for(const k of ka)if(kb.has(k))shared++;
+    const small=Math.min(ka.size,kb.size),nameHit=[...N.get(a.id)].some(n=>N.get(b.id).has(n));
+    if((small&&shared>=Math.max(1,Math.ceil(small*.5)))||(nameHit&&shared>0)||(nameHit&&(a.universe||b.universe)&&sameAuthor(a.author,b.author)))par.set(fp(b.id),fp(a.id));}
+  const clusters=new Map();for(const t of raw){const r=fp(t.id);if(!clusters.has(r))clusters.set(r,[]);clusters.get(r).push(t);}
+  S.idAlias=new Map();
+  const merged=[...clusters.values()].map(list=>{if(list.length===1)return{...list[0],mergedIds:[]};
+    const win=[...list].sort((a,b)=>(b.universe?1:0)-(a.universe?1:0)||K.get(b.id).size-K.get(a.id).size||a.id.localeCompare(b.id))[0];
+    const rest=list.filter(t=>t!==win);rest.forEach(t=>S.idAlias.set(t.id,win.id));
+    return{...win,universe:list.some(t=>t.universe),subs:list.flatMap(t=>t.subs),mergedIds:rest.map(t=>t.id),extraUni:rest.filter(t=>t.universe).map(t=>t.id)};});
+  for(const c of live("custom"))merged.push({id:c.id,subs:[],name:c.name,author:c.author||"",custom:true,rec:c,mergedIds:[]});
   const out=[];
-  for(const t of tops.values()){
+  for(const t of merged){
     let groups;
     if(t.custom)groups=(t.rec.groups||[]).map(g=>({name:g.name,books:g.books||[],pending:g.pending}));
-    else if(t.universe){const u=S.records.get(t.id);
-      groups=u&&!u.deleted&&u.groups?u.groups.map(g=>({name:g.name,books:g.books})):[];
+    else if(t.universe){groups=[];
+      for(const uid of[t.id,...(t.extraUni||[])]){const u=S.records.get(uid);if(u&&!u.deleted&&u.groups)for(const g of u.groups)if(!groups.some(x=>norm(x.name)===norm(g.name)))groups.push({name:g.name,books:g.books});}
       for(const sb of t.subs){const g=groups.find(x=>norm(x.name)===norm(sb.name));if(!g)groups.push({name:sb.name,books:sb.books});else if(!g.books.length)g.books=sb.books;}}
-    else groups=[{name:t.subs[0].name,books:t.subs[0].books}];
-    const pr=prefsOf(t.id),hg=new Set(pr.hiddenGroups||[]),hb=new Set(pr.hiddenBooks||[]),ren=pr.renames||{};
+    else{groups=[];for(const sb of t.subs){const g=groups.find(x=>norm(x.name)===norm(sb.name));if(!g)groups.push({name:sb.name,books:sb.books});else if((sb.books||[]).length>(g.books||[]).length)g.books=sb.books;}}
+    const pr=mergedPrefs(t),hg=new Set(pr.hiddenGroups||[]),hb=new Set(pr.hiddenBooks||[]),ren=pr.renames||{};
     groups=groups.map(g=>({...g,books:[...(g.books||[])]}));
     for(const a of pr.added||[]){const g=groups.find(x=>norm(x.name)===norm(a.group))||groups[0];if(g)g.books.push({number:a.number,title:a.title,novella:!!a.novella,added:true});}
     groups=tidyGroups(groups);
     const used=new Set();
-    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const title=ren[norm(e.title)]||e.title;const o=owner(title);if(o)used.add(o.book);
-      return{number:e.number,title,orig:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))||hb.has(norm(title))};})}));
+    const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const title=ren[norm(e.title)]||e.title;const o=owner(title,t.author)||(e.aka||[]).map(a=>owner(a,t.author)).find(Boolean);if(o)used.add(o.book);
+      return{number:e.number,title,orig:e.title,aka:e.aka||[],year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))||hb.has(norm(title))};})}));
     for(const sb of t.subs)for(const b of sb.owned){if(used.has(b))continue;used.add(b);
       let g=G.find(x=>norm(x.name)===norm(sb.name));if(!g){g={name:sb.name,entries:[],hidden:hg.has(norm(sb.name))};G.push(g);}
       g.entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,hidden:hb.has(norm(b.title))});}
@@ -832,8 +912,9 @@ function topsView(){
 }
 function catalogPrompt(name,author){
   return `Give the complete reading list for the book series "${name}"${author?` by ${author}`:""}.
-Reply with only JSON: {"name":"Series name","universe":null,"complete":true,"books":[{"number":1,"title":"...","year":2001,"novella":false,"upcoming":false}]}
+Reply with only JSON: {"name":"Series name","universe":null,"complete":true,"books":[{"number":1,"title":"...","year":2001,"novella":false,"upcoming":false,"alsoKnownAs":[]}]}
 Rules:
+- Every book appears exactly once. If a book was published under more than one title (a UK and a US title, or a retitled reissue), list it once under its most common title and put the other titles in "alsoKnownAs".
 - Main books in reading order with their series number. Include announced main books that are not out yet with "upcoming": true and "year": null.
 - Include novellas and short novels set in this series with "novella": true and a number that places them in reading order (for example 2.5 between books 2 and 3). Leave out single short stories and anthologies.
 - If the series name is a special edition with its own volume numbering (for example "Berserk Deluxe Edition"), list that edition's own volumes with its own numbering. Otherwise list the standard books; an omnibus or box set is never an entry, list the books inside it instead.
@@ -853,7 +934,7 @@ async function refreshSeries(sid,{quiet=false}={}){
     const latest=S.records.get(sid);
     const rec=clone(latest&&!latest.deleted?latest:{kind:"series",id:sid,name,author});
     const before=(rec.books||[]).length;
-    rec.books=books;rec.catalogVersion=editionNamed(rec.name)?3:2;if(typeof res.complete==="boolean")rec.complete=res.complete;
+    rec.books=books;rec.catalogVersion=editionNamed(rec.name)?3:2;rec.akaChecked=true;if(typeof res.complete==="boolean")rec.complete=res.complete;
     if(!rec.universe&&cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=stableUniverse(res.universe);
     await save(rec);
     if(rec.universe)queueUniverse(rec.universe,rec.author);
@@ -874,10 +955,11 @@ async function loadUniverse(name,author){
   S.busySeries.add(id);scheduleRender();
   try{
     const res=await Claude.json(`List every book in "${name}"${author?` by ${author}`:""}, grouped by its sub-series, with the sub-series in reading order.
-Reply with only JSON: {"name":"${name}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false}]}]}
+Reply with only JSON: {"name":"${name}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false,"alsoKnownAs":[]}]}]}
+Every book appears exactly once across all groups. If a book was published under more than one title, list it once under its most common title and put the other titles in "alsoKnownAs".
 Include novellas set in it with "novella": true, and announced books not out yet with "upcoming": true. Put standalone books in a group named "Standalone novels". An omnibus or box set is never an entry. List only books you are confident exist.`,{model:MODELS.smart,maxTokens:8000});
     const groups=(Array.isArray(res&&res.groups)?res.groups:[]).map(g=>({name:cleanStr(g&&g.name,150),books:cleanSeriesBooks(g&&g.books)})).filter(g=>g.name&&g.books.length);
-    if(groups.length)await save({kind:"universe",id,name,author,groups});
+    if(groups.length)await save({kind:"universe",id,name,author,groups,akaChecked:true});
   }catch(e){}
   finally{S.busySeries.delete(id);scheduleRender();}
 }
@@ -1129,7 +1211,21 @@ function sameCopy(a,b){
   return true;
 }
 async function mergeDuplicates(){
-  const books=live("book").sort((x,y)=>(x.addedAt||0)-(y.addedAt||0));const gone=new Set(),out=[];
+  const gone=new Set(),out=[];
+  // Same book, different title: merge only when one copy came from a series button rather than a photo,
+  // so two genuinely different editions you photographed (a UK and a US copy) both stay.
+  const groupsA=new Map();for(const b of live("book")){const k=aliasOf(b.title)+"|"+lastName(b.author);if(!groupsA.has(k))groupsA.set(k,[]);groupsA.get(k).push(b);}
+  for(const list of groupsA.values()){
+    if(list.length<2||new Set(list.map(b=>norm(b.title))).size<2)continue;
+    const keep=list.filter(b=>b.photoId).sort((x,y)=>(x.addedAt||0)-(y.addedAt||0))[0]||list.sort((x,y)=>(x.addedAt||0)-(y.addedAt||0))[0];
+    let k=null;
+    for(const b of list){if(b===keep||b.photoId||norm(b.title)===norm(keep.title))continue;
+      k=k||clone(keep);for(const[f,v]of Object.entries(b))if((k[f]==null||k[f]===""||(Array.isArray(k[f])&&!k[f].length))&&v!=null&&!["id","addedAt","updatedAt","_synced","title","photoId"].includes(f))k[f]=v;
+      if(k.needsDetails&&!b.needsDetails)k.needsDetails=false;
+      gone.add(b.id);out.push({kind:"book",id:b.id,deleted:true});}
+    if(k)out.push(k);
+  }
+  const books=live("book").filter(b=>!gone.has(b.id)).sort((x,y)=>(x.addedAt||0)-(y.addedAt||0));
   for(let i=0;i<books.length;i++){if(gone.has(books[i].id))continue;let keep=null;
     for(let j=i+1;j<books.length;j++){const b=books[j];if(gone.has(b.id)||!sameCopy(books[i],b))continue;
       keep=keep||clone(books[i]);for(const[k,v]of Object.entries(b))if((keep[k]==null||keep[k]===""||(Array.isArray(keep[k])&&!keep[k].length))&&v!=null&&!["id","addedAt","updatedAt","_synced"].includes(k))keep[k]=v;
@@ -1281,8 +1377,14 @@ function canonMaps(){
   for(const r of recs)for(const e of r.books||[]){const k=norm(e.title);if(!k)continue;if(byTitle.has(k))union(byTitle.get(k),r.id);else byTitle.set(k,r.id);}
   const byBase=new Map();for(const r of recs){const k=seriesBase(r.name);if(!k)continue;if(byBase.has(k))union(byBase.get(k),r.id);else byBase.set(k,r.id);}
   const bySeries=new Map();for(const b of live("book"))if(b.seriesId){const k=seriesBase(b.seriesName||"");if(k){if(bySeries.has(k))union(bySeries.get(k),b.seriesId);else bySeries.set(k,b.seriesId);}}
+  const ap=new Map(),af=x=>{if(!ap.has(x))ap.set(x,x);while(ap.get(x)!==x){ap.set(x,ap.get(ap.get(x)));x=ap.get(x);}return x;};
+  const aun=(a,b)=>{if(!a||!b)return;a=af(a);b=af(b);if(a!==b)ap.set(b,a);};
+  const linkAka=(t,aka)=>{for(const a of aka||[])aun(norm(t),norm(a));};
+  for(const r of recs)for(const e of r.books||[]){linkAka(e.title,e.aka);for(const a of e.aka||[]){const k=norm(a);if(k&&!byTitle.has(k))byTitle.set(k,r.id);}}
+  for(const u of[...S.records.values()].filter(r=>!r.deleted&&(r.kind==="universe"||r.kind==="custom")))for(const g of u.groups||[])for(const e of g.books||[])linkAka(e.title,e.aka);
+  for(const b of live("book"))linkAka(b.title,b.aka);
   const members=new Map();for(const r of recs){const k=find(r.id);if(!members.has(k))members.set(k,[]);members.get(k).push(r);}
-  _canon={find,byTitle,members};_canonAt=S.version;return _canon;
+  _canon={find,byTitle,members,aliasOf:t=>af(norm(t))};_canonAt=S.version;return _canon;
 }
 function seriesKeyOf(b){
   const c=canonMaps();
@@ -1858,7 +1960,7 @@ function openMenu(){
     <label class="switch" style="margin-top:10px"><input type="checkbox" id="checkAll" ${LS.get("study-check-all","0")==="1"?"checked":""}> Let me check every book before it’s added</label>
     <p class="muted">Spent so far: $${(sp.cost||0).toFixed(2)} across ${plural(sp.calls||0,"request")}.</p>
     <h3 class="sub">Stored on this phone</h3>
-    <p class="muted" style="margin-top:0">${(()=>{const g=stockGaps();const left=[g.details&&plural(g.details,"book")+" waiting for details",g.sizes&&plural(g.sizes,"book size"),g.languages&&plural(g.languages,"language check"),g.translations&&plural(g.translations,"translation list"),g.series&&plural(g.series,"series list"),g.wider&&plural(g.wider,"wider series","wider series")].filter(Boolean);
+    <p class="muted" style="margin-top:0">${(()=>{const g=stockGaps();const left=[g.details&&plural(g.details,"book")+" waiting for details",g.sizes&&plural(g.sizes,"book size"),g.languages&&plural(g.languages,"language check"),g.translations&&plural(g.translations,"translation list"),g.series&&plural(g.series,"series list"),g.aliases&&plural(g.aliases,"series title check"),g.wider&&plural(g.wider,"wider series","wider series")].filter(Boolean);
       return left.length?`Still to download: ${left.join(", ")}. It happens on its own whenever you’re online.`:"Everything is stored: details, sizes, translations and full series lists all work offline. Only adding books, suggestions and checking for new releases need internet.";})()}</p>
     <h3 class="sub">Series</h3>
     <p class="muted" style="margin-top:0">Rechecks every book: splits box sets into their books, counts omnibus volumes as every book inside them, adds novellas and links sub-series to their wider series. Uses the more careful model, roughly 50 cents for a library your size.</p>
@@ -2029,19 +2131,21 @@ function shelfLayout(){
 }
 const PEN=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>`;
 function entryHTML(t,gi,ei,e,listed){
-  const ed=S.editing.has(t.id),num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
+  const ed=[t.id,...(t.mergedIds||[])].some(i=>S.editing.has(i)),num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
   const key=`${t.id}|${encodeURIComponent(t.groups[gi].name)}|${encodeURIComponent(e.orig||e.title)}`;
   let right;
-  if(ed)right=`<span class="entry-acts">${e.hidden?"":`<button class="btn small quiet" data-rename="${key}" aria-label="Rename ${esc(e.title)}">${PEN}</button>`}<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button></span>`;
+  const offable=e.book&&!e.via&&!e.book.photoId,offKey="off:"+(e.book?e.book.id:"");
+  if(ed)right=`<span class="entry-acts">${offable&&!e.hidden?`<button class="btn small quiet danger-text" data-off-shelf="${e.book.id}">${S.confirmDel===offKey?"Tap again":"Off my shelf"}</button>`:""}${e.hidden?"":`<button class="btn small quiet" data-rename="${key}" aria-label="Rename ${esc(e.title)}">${PEN}</button>`}<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button></span>`;
   else if(e.book)right=`<span class="owned">on your shelf</span>`;
   else if(e.upcoming)right=`<span class="owned" style="color:var(--text-2)">not out yet</span>`;
   else{const on=listed.get(norm(e.title));right=`<span class="entry-acts col"><button class="btn small" data-have="${key}">I have this book</button>${on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small quiet" data-want="${key}">Add to ${WISHLIST}</button>`}</span>`;}
-  const sub=e.via?`<div class="ey">in ${esc(e.via)}</div>`:e.year?`<div class="ey">${esc(e.year)}</div>`:"";
+  const shown=e.book&&!e.via?e.book.title:e.title;const other=[e.title,...(e.aka||[])].find(x=>norm(x)!==norm(shown));
+  const sub=e.via?`<div class="ey">in ${esc(e.via)}</div>`:(e.year||other)?`<div class="ey">${[e.year?esc(e.year):"",other?`also published as ${esc(other)}`:""].filter(Boolean).join(", ")}</div>`:"";
   const title=`<div class="et">${esc(e.book&&!e.via?e.book.title:e.title)}${nov}</div>${sub}`;
   return`<div class="entry${e.book?"":" missing"}${e.novella?" nov":""}${e.hidden?" gone":""}"><span class="num">${num}</span>${e.book&&!ed?`<button class="link" data-book="${e.book.id}">${title}</button>`:`<div>${title}</div>`}${right}</div>`;
 }
 function topCardHTML(t,listed){
-  const open=S.openSeries.has(t.id),ed=S.editing.has(t.id);
+  const ids=[t.id,...(t.mergedIds||[])],open=ids.some(i=>S.openSeries.has(i)),ed=ids.some(i=>S.editing.has(i));
   const counts=t.catalogued?[`you own ${t.ownedMain} of ${plural(t.main.length,"book")}`,t.nov.length?`${t.ownedNov} of ${plural(t.nov.length,"novella")}`:""].filter(Boolean).join(", "):"";
   const visGroups=t.groups.filter(g=>!g.hidden);
   const sub=[t.author,visGroups.length>1?plural(visGroups.length,"series","series"):"",counts,t.writing?"still being written":""].filter(Boolean).join(", ")+(t.rating?` · ★ ${fmtRating(t.rating)}`:"");
@@ -2066,7 +2170,7 @@ function topCardHTML(t,listed){
     <button class="card-head" data-toggle-series="${t.id}" aria-expanded="${open}">
       <p class="card-title">${esc(t.name)}${t.custom?` <span class="tag kindmark">yours</span>`:""}</p>
       <p class="card-sub">${esc(sub)}</p>
-      <div class="progress-row"><div class="pips" aria-hidden="true">${t.groups.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden)).slice(0,80).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?"":" miss"}${e.upcoming?" up":""}"${e.book?` style="background:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
+      <div class="progress-row"><div class="pips" aria-hidden="true">${t.groups.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden)).slice(0,80).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?" own":" miss"}${e.upcoming?" up":""}"${e.book&&!e.novella?` style="--pc:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
     </button>
     ${open||ed?`<div class="card-body"><div class="series-rate">${starsHTML("series:"+t.id,t.rating,"Your rating for "+t.name)}</div>${ed?`<p class="edit-hint">Remove books or sub-series you don’t plan to read; the series then counts as complete without them. Nothing leaves your shelves.</p>`:""}${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
   </div>`;
@@ -2084,9 +2188,16 @@ function renderSeries(){
   const q=norm(S.sq);
   if(q)all=all.filter(t=>norm([t.name,t.author,...t.groups.map(g=>g.name),...t.groups.flatMap(g=>g.entries.map(e=>e.title))].join(" ")).includes(q));
   all=all.filter(t=>!t.hiddenTop||S.showHidden||S.editing.has(t.id));
-  let shown=S.gapsOnly?all.filter(t=>t.missing.length||S.editing.has(t.id)):all;
+  // The order is set when you arrive or change the sort, search or filter, then held while you edit or rate,
+  // so cards don't move under you. It re-sorts the next time you open the tab.
+  const okey=[S.seriesSort,S.sq,S.gapsOnly,S.showHidden].join("|"),frozen=S.orderKey===okey&&S.seriesOrder;
+  const inFrozen=new Set(frozen?S.seriesOrder:[]);
+  let shown=S.gapsOnly?all.filter(t=>t.missing.length||S.editing.has(t.id)||[t.id,...(t.mergedIds||[])].some(i=>inFrozen.has(i))):all;
   if(S.seriesSort==="rating")shown=[...shown].sort((a,b)=>(b.rating||0)-(a.rating||0)||a.name.localeCompare(b.name));
   else if(S.seriesSort==="az")shown=[...shown].sort((a,b)=>a.name.localeCompare(b.name));
+  if(frozen){const pos=new Map(S.seriesOrder.map((id,i)=>[id,i]));const at=t=>Math.min(...[t.id,...(t.mergedIds||[])].map(i=>pos.has(i)?pos.get(i):1e9));
+    shown=[...shown].sort((a,b)=>at(a)-at(b));}
+  S.seriesOrder=shown.map(t=>t.id);S.orderKey=okey;
   const listed=listItemsIndex();
   return head+(shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+shown.map(t=>topCardHTML(t,listed)).join("");
 }
@@ -2107,14 +2218,15 @@ function seriesPhotos(t){
 async function addSeriesBook(t,g,e,extra={}){
   const sb=(t.subs||[]).find(x=>norm(x.name)===norm(g.name))||(t.subs||[])[0];
   const mate=live("book").find(b=>nodeOf(b)==="s:"+t.id)||(sb&&sb.owned[0]);
-  const b=newBook({title:e.title,author:t.author||(mate&&mate.author),...extra});
+  const b=newBook({title:e.title,author:t.author||(mate&&mate.author),...extra});b.fromSeries=true;
   if(sb){b.seriesId=sb.sid;b.seriesName=sb.name;}b.seriesNumber=e.novella?null:e.number;if(mate){b.genre=mate.genre;b.format=b.format||mate.format;}
   return b;
 }
 async function haveAll(tid){
   const t=topsView().find(x=>x.id===tid);if(!t)return;
   const add=[];for(const g of t.groups){if(g.hidden)continue;for(const e of g.entries)if(!e.book&&!e.hidden&&!e.upcoming)add.push(await addSeriesBook(t,g,e));}
-  if(!add.length)return;await save(add);fillDetails(add.map(b=>b.id));toast(`Added ${plural(add.length,"book")} from ${t.name}.`);
+  if(!add.length)return;await save(add);fillDetails(add.map(b=>b.id));
+  toast(`Added ${plural(add.length,"book")} from ${t.name}.`,{undo:()=>undoAdd(add.map(b=>b.id),`Took ${plural(add.length,"book")} back off your shelves.`)});
 }
 // A second, targeted look: tell Claude exactly which titles to search for in the photos that already show this series.
 async function relookSeries(tid){
@@ -2126,25 +2238,26 @@ async function relookSeries(tid){
   try{
     for(const pid of seriesPhotos(t)){
       const p=photos.get(pid);if(!p||!p.blob)continue;
-      const want=missing.filter(m=>!found.has(norm(m.e.title))).map(m=>m.e.title);if(!want.length)break;
+      const want=missing.filter(m=>!found.has(norm(m.e.title))).flatMap(m=>[m.e.title,...(m.e.aka||[])]);if(!want.length)break;
       const imgs=await prepImages(p.blob);
       const res=await Claude.json(`${imgs.length>1?"These images are overlapping sections of ONE photo of a bookshelf.":"This is a photo of a bookshelf."}
 Look carefully at every spine, including small, worn, faded or partly hidden ones, and books lying flat or facing out.
 Which of these books are in the photo? ${JSON.stringify(want)}
 Reply with only JSON: {"found":["title exactly as written in the list"]}
 Include a book only if you can actually see it.`,{images:imgs,model:MODELS.smart,maxTokens:2000});
-      for(const ttl of Array.isArray(res&&res.found)?res.found:[]){const m=missing.find(x=>titleMatch(x.e.title,ttl));if(m&&!found.has(norm(m.e.title)))found.set(norm(m.e.title),{...m,pid});}
+      for(const ttl of Array.isArray(res&&res.found)?res.found:[]){const m=missing.find(x=>[x.e.title,...(x.e.aka||[])].some(t=>titleMatch(t,ttl)));if(m&&!found.has(norm(m.e.title)))found.set(norm(m.e.title),{...m,pid});}
     }
     const add=[];for(const m of found.values())add.push(await addSeriesBook(t,m.g,m.e,{photoId:m.pid}));
     if(add.length){await save(add);fillDetails(add.map(b=>b.id));}
-    toast(add.length?`Found ${plural(add.length,"more book")} from ${t.name} in your photos.`:`No more ${t.name} books in those photos. If you own them, try I have all of these, or rescan that shelf closer.`);
+    if(add.length)toast(`Found ${plural(add.length,"more book")} from ${t.name} in your photos.`,{undo:()=>undoAdd(add.map(b=>b.id),`Took ${plural(add.length,"book")} back off your shelves.`)});
+    else toast(add.length?"":`No more ${t.name} books in those photos. If you own them, try I have all of these, or rescan that shelf closer.`);
   }catch(e){toast(sampleMsg(e)||"That didn’t finish. Try again.");}
   finally{S.relooking=null;scheduleRender();}
 }
 async function haveBook(key){
   const{t,g,e}=findEntry(key);if(!e||e.book)return;
   const b=await addSeriesBook(t,g,e);
-  await save(b);fillDetails([b.id]);toast(`Added ${e.title} to your shelves.`);
+  await save(b);fillDetails([b.id]);toast(`Added ${e.title} to your shelves.`,{undo:()=>undoAdd([b.id],`Took ${e.title} back off your shelves.`)});
 }
 function openRename(key){
   const{e,tid}=findEntry(key);if(!e)return;
@@ -2198,7 +2311,7 @@ async function listToSeries(listId){
 }
 function listItemHTML(l,it){
   const kind=it.kind||"book";let status="";
-  if(kind==="book"&&live("book").some(b=>titleMatch(b.title,it.title)))status=`<span class="tag ownedtag">On your shelves</span>`;
+  if(kind==="book"&&live("book").some(b=>titleMatch(b.title,it.title)&&(norm(b.title)===norm(it.title)||sameAuthor(b.author,it.author))))status=`<span class="tag ownedtag">On your shelves</span>`;
   if(kind==="series"){const tv=topsView();let hit=null;
     for(const t of tv){if(titleMatch(t.name,it.title)){hit={own:t.ownedMain,tot:t.main.length};break;}
       const g=t.groups.find(g=>titleMatch(g.name,it.title));if(g){hit={own:g.entries.filter(e=>e.book).length,tot:g.entries.length};break;}}
@@ -2269,6 +2382,7 @@ function renderInner(){
   const anchorEl=S.anchor&&document.getElementById(S.anchor),anchorTop=anchorEl?anchorEl.getBoundingClientRect().top:null;
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
+  if(anchorTop!=null&&S.anchor&&!document.getElementById(S.anchor)&&S.idAlias){const w=S.idAlias.get(S.anchor.replace(/^ser-/,""));if(w)S.anchor="ser-"+w;}
   if(anchorTop!=null){const el=document.getElementById(S.anchor);if(el){const d=el.getBoundingClientRect().top-anchorTop;if(Math.abs(d)>1)window.scrollBy(0,d);}}
   selectBar();syncHeadHeight();
   if(S.tab==="series"){mountStars($("#main"),(k,v)=>setRating(k,v));const ss=$("#seriesSort");if(ss)ss.onchange=e=>{S.seriesSort=e.target.value;LS.set("study-series-sort",S.seriesSort);render();};}
@@ -2284,7 +2398,8 @@ $("#main").addEventListener("click",e=>{
   if(d.shelf!==undefined)return toggleShelf(t);
   if(d.book){if(S.selecting&&S.tab==="shelves"){S.selected.has(d.book)?S.selected.delete(d.book):S.selected.add(d.book);return render();}return openBook(d.book);}
   if(d.act==="selectMode"){S.selecting=!S.selecting;S.selected.clear();return render();}
-  if(d.toggleSeries){S.openSeries.has(d.toggleSeries)?S.openSeries.delete(d.toggleSeries):S.openSeries.add(d.toggleSeries);return render();}
+  if(d.toggleSeries){const id=d.toggleSeries;const t=topsView().find(x=>x.id===id);const ids=[id,...((t&&t.mergedIds)||[])];
+    if(ids.some(i=>S.openSeries.has(i)))ids.forEach(i=>S.openSeries.delete(i));else S.openSeries.add(id);return render();}
   if(d.toggleList){S.openLists.has(d.toggleList)?S.openLists.delete(d.toggleList):S.openLists.add(d.toggleList);return render();}
   if(d.want){const{t,g,e:m}=findEntry(d.want);
     if(m)addToList(WISHLIST,{title:m.title,author:t.author,note:`${g.name}${m.number!=null&&!m.novella?`, book ${m.number}`:""}`});return;}
@@ -2293,6 +2408,9 @@ $("#main").addEventListener("click",e=>{
     (async()=>{S.busySeries.add(tid);render();for(const sb of t.subs||[])await refreshSeries(sb.sid,{quiet:true});
       if(t.universe){const u=S.records.get(t.id);if(u)await save({kind:"universe",id:t.id,deleted:true});S.uniTried.delete(t.id);await loadUniverse(t.name,t.author);}
       S.busySeries.delete(tid);render();toast(`${t.name} is up to date.`);})();return;}
+  if(d.offShelf){const id=d.offShelf,k="off:"+id;if(S.confirmDel!==k){S.confirmDel=k;render();setTimeout(()=>{if(S.confirmDel===k){S.confirmDel=null;scheduleRender();}},4000);return;}
+    S.confirmDel=null;const old=clone(S.records.get(id));if(!old)return;
+    return save({kind:"book",id,deleted:true}).then(()=>toast(`Took ${old.title} off your shelves.`,{undo:async()=>{old.deleted=false;await save(old);toast(`${old.title} is back.`);}}));}
   if(d.have)return haveBook(d.have);
   if(d.rename)return openRename(d.rename);
   if(d.addEntry)return openAddEntry(d.addEntry);
@@ -2303,8 +2421,8 @@ $("#main").addEventListener("click",e=>{
     const k=norm(e.orig||e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
   if(d.hideGroup){const[tid,gn]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups.find(x=>x.name===decodeURIComponent(gn));if(!g)return;
     const k=norm(g.name);return setPrefs(tid,p=>{p.hiddenGroups=p.hiddenGroups.includes(k)?p.hiddenGroups.filter(x=>x!==k):[...p.hiddenGroups,k];});}
-  if(d.hideTop)return setPrefs(d.hideTop,p=>{p.hidden=!p.hidden;});
-  if(d.resetTop)return setPrefs(d.resetTop,p=>{p.hiddenGroups=[];p.hiddenBooks=[];p.hidden=false;});
+  if(d.hideTop){const t=topsView().find(x=>x.id===d.hideTop);if(!t)return;const v=!t.hiddenTop;return setPrefsAll(t,p=>{p.hidden=v;});}
+  if(d.resetTop){const t=topsView().find(x=>x.id===d.resetTop);if(!t)return;return setPrefsAll(t,p=>{p.hiddenGroups=[];p.hiddenBooks=[];p.hidden=false;});}
   if(d.addCustom){const id=d.addCustom;const r=S.records.get(id);if(!r)return;
     openSheet(`<h2 class="sheet-title">Add to ${esc(r.name)}</h2><div class="field"><label for="acT">Paste or type anything</label><textarea id="acT" placeholder="Child of God&#10;The Border Trilogy"></textarea></div><button class="btn brass wide" id="acGo">Add</button>`,body=>{
       $("#acGo",body).onclick=async()=>{const v=$("#acT",body).value;if(!v.trim())return;$("#acGo",body).disabled=true;const n=await addToCustom(id,v);closeSheet();toast(`Added ${plural(n,"item")}.`);};});return;}
@@ -2322,12 +2440,13 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="checkPending")return openPending();
   if(d.act==="typeQueue")return openTypeFromPhoto(0);
   if(d.act==="gapsOnly"){S.gapsOnly=!S.gapsOnly;return render();}
-  if(d.editTop){const id=d.editTop;if(S.editing.has(id))S.editing.delete(id);else{S.editing.add(id);S.openSeries.add(id);}return render();}
+  if(d.editTop){const id=d.editTop;const t=topsView().find(x=>x.id===id);const ids=[id,...((t&&t.mergedIds)||[])];
+    if(ids.some(i=>S.editing.has(i)))ids.forEach(i=>S.editing.delete(i));else{S.editing.add(id);S.openSeries.add(id);}return render();}
   if(d.act==="noop"){}
   if(d.act==="showHidden"){S.showHidden=!S.showHidden;return render();}
   if(d.act==="newSeries")return openNewSeries();
 });
-document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;S.anchor=null;if(S.tab!=="shelves"){S.selecting=false;S.selected.clear();}render();window.scrollTo(0,0);});
+document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;S.anchor=null;S.seriesOrder=null;if(S.tab!=="shelves"){S.selecting=false;S.selected.clear();}render();window.scrollTo(0,0);});
 $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
