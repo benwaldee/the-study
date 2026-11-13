@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.anthropic.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Study</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -80,7 +82,7 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .icon-btn{width:40px;height:38px;border-radius:3px;border:1px solid var(--brass-lo);background:linear-gradient(var(--leather-2),var(--leather));color:var(--brass-hi);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .danger-text{color:var(--danger)}
 
-main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
+main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .muted{color:var(--text-2)}
 .count{margin:16px 18px 0;color:var(--text-2);font-style:italic;font-size:16px}
 
@@ -441,15 +443,16 @@ const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:f
 
 /* ---------- helpers ---------- */
 const $=(s,el=document)=>el.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const txt=v=>typeof v==="string"?v:typeof v==="number"&&Number.isFinite(v)?String(v):"";
+const esc=s=>txt(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
-const norm=s=>String(s||"").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim().replace(/^(the|a|an) /,"").replace(/\b(vol|v)\b(?= \d)/g,"volume");
+const norm=s=>txt(s).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim().replace(/^(the|a|an) /,"").replace(/\b(vol|v)\b(?= \d)/g,"volume");
 const slug=s=>(norm(s).replace(/ /g,"-").slice(0,80))||"x";
-const cleanStr=(s,max=300)=>typeof s==="string"?s.trim().slice(0,max):"";
+const cleanStr=(s,max=300)=>typeof s==="string"?s.trim().slice(0,max):"";   // (unchanged: only real strings pass)
 const hex=c=>typeof c==="string"&&/^#[0-9a-fA-F]{6}$/.test(c.trim())?c.trim():null;
 const lastName=a=>norm(a).split(" ").pop()||"";
-const canAsk=()=>!!AI.key()&&navigator.onLine!==false;
+const canAsk=()=>!!Claude.key()&&navigator.onLine!==false;
 const canRead=()=>canAsk();
 function hash(s){let h=2166136261;for(const ch of String(s)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
 function lum(h){const n=parseInt(h.slice(1),16);const ch=[n>>16&255,n>>8&255,n&255].map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return .2126*ch[0]+.7152*ch[1]+.0722*ch[2];}
@@ -505,7 +508,7 @@ function parseJSON(text){
   if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}
   throw{code:"invalid_json"};
 }
-const AI={
+const Claude={
   key(){return LS.get("study-api-key","");},
   model(){return LS.get("study-economy","0")==="1"?MODELS.cheap:MODELS.smart;},
   async json(prompt,opts={}){
@@ -563,7 +566,7 @@ Reply with only a JSON array, one object per book, using the same "key" values:
 "translations" is only for books first written in another language: the English translations in print or commonly found, most common first, as [{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]; otherwise [].
 "wordCount" is the approximate number of words in the text. "pages" and "format" (one of "mass market paperback", "trade paperback", "hardcover") describe the edition the publisher suggests if one is given, otherwise the most common current edition.
 "originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
-"color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "name" is the series' plain name without edition words (no "Deluxe Edition", "Omnibus", "Collector's Edition"); "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
+"color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "name" is the series name; when this book belongs to a special edition with its own volume numbering (for example Berserk Deluxe Edition), use that edition's name; "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
 }
 
 /* ---------- books ---------- */
@@ -599,6 +602,28 @@ function physical(b){
   const f=FORMATS[b.format]||FORMATS["trade paperback"];
   return{h:f.h,w:f.w,t:(pages||320)*f.paper+f.boards,pages};
 }
+const BACKUP_KINDS=["book","list","series","universe","custom","seriesprefs"];
+// Anything restored from a file is treated as untrusted: known text fields become plain strings, numbers become numbers,
+// lists must be lists, and unexpected nesting is dropped.
+const TEXT_FIELDS=new Set(["title","author","genre","blurb","publisher","translator","translatorSource","translatorConfidence","originalLanguage","seriesId","seriesName","color","textColor","edition","design","format","status","photoId","name","universe","note","section","complete"]);
+const NUM_FIELDS=new Set(["seriesNumber","year","pages","wordCount","rating","addedAt","updatedAt","createdAt","startedAt","finishedAt","catalogVersion"]);
+const BOOL_FIELDS=new Set(["needsDetails","sizeChecked","translationChecked","translationsChecked","genreLocked","coverChecked","deleted","hidden","novella","upcoming","added"]);
+function cleanValue(k,v,depth){
+  if(v==null)return null;
+  if(TEXT_FIELDS.has(k))return typeof v==="string"?v.slice(0,4000):typeof v==="number"&&Number.isFinite(v)?String(v):typeof v==="boolean"&&k==="complete"?v:undefined;
+  if(NUM_FIELDS.has(k)){const n=typeof v==="number"?v:typeof v==="string"?parseFloat(v):NaN;return Number.isFinite(n)?n:undefined;}
+  if(BOOL_FIELDS.has(k))return typeof v==="boolean"?v:undefined;
+  if(depth>4)return undefined;
+  if(Array.isArray(v))return v.slice(0,600).map(x=>typeof x==="string"?x.slice(0,4000):x&&typeof x==="object"&&!Array.isArray(x)?cleanObj(x,depth+1):typeof x==="number"&&Number.isFinite(x)?x:undefined).filter(x=>x!==undefined);
+  if(typeof v==="object")return k==="renames"?Object.fromEntries(Object.entries(v).filter(([a,b])=>typeof b==="string"&&a!=="__proto__").map(([a,b])=>[a.slice(0,400),b.slice(0,400)])):cleanObj(v,depth+1);
+  if(typeof v==="string")return v.slice(0,4000);
+  if(typeof v==="number"&&Number.isFinite(v))return v;
+  if(typeof v==="boolean")return v;
+  return undefined;
+}
+function cleanObj(o,depth){const out={};for(const[k,v]of Object.entries(o)){if(k==="__proto__"||k==="constructor"||k==="prototype")continue;const c=cleanValue(k,v,depth);if(c!==undefined)out[k]=c;}return out;}
+// Anything restored from a file is treated as untrusted: every field is forced to the type the app expects.
+function cleanRecord(r){const out=cleanObj(r,0);out.id=r.id;out.kind=r.kind;return out;}
 const cleanTranslations=list=>(Array.isArray(list)?list:[]).map(x=>({translator:cleanStr(x&&x.translator,160),publisher:cleanStr(x&&x.publisher,80),year:num(x&&x.year),note:cleanStr(x&&x.note,200)})).filter(x=>x.translator).slice(0,12);
 function applyTranslation(book,d){
   if(d&&Array.isArray(d.translations)&&d.translations.length)book.translations=cleanTranslations(d.translations);
@@ -624,6 +649,15 @@ function applyDetails(book,d,seriesMap){
   if(Array.isArray(d.contains))book.contains=d.contains.map(x=>cleanStr(typeof x==="string"?x:x&&x.title,200)).filter(Boolean).slice(0,30);
   applySeries(book,d.series,seriesMap);
 }
+// Claude can call the same wider series slightly different things on different days ("The Cosmere",
+// "Brandon Sanderson's Cosmere"). Reuse the name already in the library so the card never jumps or vanishes.
+function stableUniverse(name){
+  const n=cleanStr(name,150);if(!n)return null;const b=seriesBase(n);
+  const known=[...S.records.values()].filter(r=>!r.deleted&&(r.kind==="universe"||r.kind==="series")).map(r=>r.kind==="universe"?r.name:r.universe).filter(Boolean);
+  const words=x=>new Set(seriesBase(x).split(" ").filter(w=>w.length>2));
+  for(const k of known){const kb=seriesBase(k);if(kb===b)return k;const a=words(k),c=words(n);const shared=[...a].filter(w=>c.has(w)).length;if(shared&&shared>=Math.min(a.size,c.size))return k;}
+  return n;
+}
 function applySeries(book,s,seriesMap){
   if(!s||typeof s!=="object"||!cleanStr(s.name))return;
   const name=cleanStr(s.name,150),sid="s_"+slug(name);
@@ -633,7 +667,7 @@ function applySeries(book,s,seriesMap){
   if(rec.deleted)rec=fresh;
   const books=cleanSeriesBooks(s.books);   // only used if a full list came along (pasted from a chat)
   if(books.length&&rec.catalogVersion!==2&&books.length>=(rec.books||[]).length){rec.books=books;if(typeof s.complete==="boolean")rec.complete=s.complete;}
-  if(cleanStr(s.universe)&&norm(s.universe)!==norm(name))rec.universe=cleanStr(s.universe,150);
+  if(!rec.universe&&cleanStr(s.universe)&&norm(s.universe)!==norm(name))rec.universe=stableUniverse(s.universe);
   rec.name=rec.name||name;rec.author=rec.author||book.author;
   seriesMap.set(sid,rec);
 }
@@ -652,7 +686,7 @@ async function runJob(){
       const books=batch.map(i=>S.records.get(i)).filter(b=>b&&!b.deleted).map(clone);
       if(!books.length)continue;
       try{
-        const res=await AI.json(enrichPrompt(books.map((b,i)=>{const o={key:"k"+i,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.translator)o.translator=b.translator;return o;})));
+        const res=await Claude.json(enrichPrompt(books.map((b,i)=>{const o={key:"k"+i,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.translator)o.translator=b.translator;return o;})));
         const arr=Array.isArray(res)?res:(Array.isArray(res&&res.books)?res.books:[]);
         const seriesMap=new Map(),out=[];
         for(const d of arr){
@@ -677,7 +711,7 @@ function stockGaps(){
   return{sizes:books.filter(b=>!b.sizeChecked&&!b.needsDetails).length,
     languages:books.filter(b=>!b.translationChecked&&!b.needsDetails).length,
     translations:books.filter(b=>isTranslated(b)&&!(b.translations&&b.translations.length)&&!b.translationsChecked).length,
-    series:[...new Set(books.map(b=>b.seriesId).filter(Boolean))].filter(id=>{const r=S.records.get(id);return!r||r.catalogVersion!==2;}).length,
+    series:[...new Set(books.map(b=>b.seriesId).filter(Boolean))].filter(id=>needsCatalog(S.records.get(id))).length,
     wider:[...new Set(books.map(b=>b.seriesId).filter(Boolean).map(id=>S.records.get(id)).filter(r=>r&&r.universe).map(r=>"u_"+slug(r.universe)))].filter(id=>!S.records.get(id)).length,
     details:books.filter(b=>b.needsDetails).length};
 }
@@ -690,13 +724,13 @@ async function stockUp(){
     // which books are translations (and the likely translator)
     const langs=live("book").filter(b=>!b.translationChecked&&!b.needsDetails);
     for(let i=0;i<langs.length&&canAsk();i+=40){const batch=langs.slice(i,i+40);
-      try{const arr=await AI.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
+      try{const arr=await Claude.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
         const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=clone(S.records.get(b.id));applyTranslation(c,d);c.translationChecked=true;out.push(c);}
         if(out.length)await save(out);}catch(e){break;}}
     // every translation of every translated book, for picking yours offline
     const tr=live("book").filter(b=>isTranslated(b)&&!(b.translations&&b.translations.length)&&!b.translationsChecked);
     for(let i=0;i<tr.length&&canAsk();i+=10){const batch=tr.slice(i,i+10);
-      try{const arr=await AI.json(`For each book, list the English translations that are in print or commonly found, most common first.
+      try{const arr=await Claude.json(`For each book, list the English translations that are in print or commonly found, most common first.
 Books: ${JSON.stringify(batch.map((b,k)=>({key:"k"+k,title:b.title,author:b.author||""})))}
 Reply with only a JSON array: [{"key":"k0","translations":[{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]}]
 List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:6000});
@@ -714,7 +748,7 @@ async function measureBooks(){
   try{
     for(let i=0;i<todo.length;i+=40){
       const batch=todo.slice(i,i+40);
-      const arr=await AI.json(`For each book, give its approximate word count and the page count and format of its most common current edition (or the edition the publisher suggests, if given).
+      const arr=await Claude.json(`For each book, give its approximate word count and the page count and format of its most common current edition (or the edition the publisher suggests, if given).
 Books: ${JSON.stringify(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.contains&&b.contains.length)o.omnibusOf=b.contains;return o;}))}
 Reply with only a JSON array: [{"key":"k0","wordCount":90000,"pages":320,"format":"trade paperback"}]
 "format" is one of "mass market paperback", "trade paperback", "hardcover". An omnibus counts every book inside it.`,{model:MODELS.smart,maxTokens:4000});
@@ -728,10 +762,6 @@ Reply with only a JSON array: [{"key":"k0","wordCount":90000,"pages":320,"format
 
 /* ---------- series ---------- */
 // A book owns a series entry directly, or through an omnibus volume that contains it.
-function ownerOf(title,books){
-  const d=books.find(b=>titleMatch(b.title,title));if(d)return{book:d,via:null};
-  const o=books.find(b=>(b.contains||[]).some(t=>titleMatch(t,title)));return o?{book:o,via:o.title}:null;
-}
 // Fast "do I own this title?" lookups across the whole library (direct, or inside an omnibus).
 function ownerIndex(books){
   const direct=new Map(),inside=new Map();
@@ -763,8 +793,8 @@ function topsView(){
   const books=live("book");const owner=ownerIndex(books);const tops=new Map();
   const ensure=(id,base)=>{if(!tops.has(id))tops.set(id,{id,subs:[],...base});return tops.get(id);};
   const keyed=new Map();for(const b of books){const k=seriesKeyOf(b);if(k){if(!keyed.has(k))keyed.set(k,[]);keyed.get(k).push(b);}}
-  for(const[sid,owned]of keyed){
-    const rec=S.records.get(sid),ok=rec&&!rec.deleted;
+  for(const[key,owned]of keyed){
+    const rec=bestRecord(key,owned),ok=rec&&!rec.deleted,sid=ok?rec.id:key;
     const name=(ok&&rec.name)||owned[0].seriesName||"Untitled series",author=(ok&&rec.author)||owned[0].author||"";
     const sub={sid,name,books:ok&&Array.isArray(rec.books)?rec.books:[],owned,complete:ok?rec.complete:null};
     if(ok&&rec.universe)ensure("u_"+slug(rec.universe),{name:rec.universe,author,universe:true}).subs.push(sub);
@@ -785,7 +815,7 @@ function topsView(){
     groups=tidyGroups(groups);
     const used=new Set();
     const G=groups.map(g=>({name:g.name,pending:g.pending,hidden:hg.has(norm(g.name)),entries:(g.books||[]).map(e=>{const title=ren[norm(e.title)]||e.title;const o=owner(title);if(o)used.add(o.book);
-      return{number:e.number,title,orig:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))};})}));
+      return{number:e.number,title,orig:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,added:!!e.added,book:o?o.book:null,via:o?o.via:null,hidden:hb.has(norm(e.title))||hb.has(norm(title))};})}));
     for(const sb of t.subs)for(const b of sb.owned){if(used.has(b))continue;used.add(b);
       let g=G.find(x=>norm(x.name)===norm(sb.name));if(!g){g={name:sb.name,entries:[],hidden:hg.has(norm(sb.name))};G.push(g);}
       g.entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,hidden:hb.has(norm(b.title))});}
@@ -800,40 +830,13 @@ function topsView(){
   out.sort((a,b)=>(b.missing.length>0)-(a.missing.length>0)||a.name.localeCompare(b.name));
   return out;
 }
-function seriesView(){
-  const owned=new Map();
-  for(const b of live("book")){if(!b.seriesId)continue;if(!owned.has(b.seriesId))owned.set(b.seriesId,[]);owned.get(b.seriesId).push(b);}
-  const out=[];
-  for(const[sid,books]of owned){
-    const rec=S.records.get(sid);const hasRec=rec&&!rec.deleted;
-    const catalog=hasRec&&Array.isArray(rec.books)?rec.books:[];
-    const used=new Set(),omni=new Set(),entries=[];
-    for(const e of catalog){
-      let m=books.find(b=>!used.has(b)&&!(b.contains&&b.contains.length)&&b.seriesNumber!=null&&e.number!=null&&Number(b.seriesNumber)===Number(e.number)&&!e.novella);
-      if(!m)m=books.find(b=>!used.has(b)&&titleMatch(b.title,e.title));
-      let via=null;
-      if(m)used.add(m);
-      else{const o=books.find(b=>(b.contains||[]).some(t=>titleMatch(t,e.title)));if(o){m=o;via=o.title;omni.add(o);}}
-      entries.push({number:e.number,title:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,book:m||null,via});
-    }
-    for(const b of books)if(!used.has(b)&&!omni.has(b))entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,extra:true});
-    entries.sort((a,b)=>(a.number??999)-(b.number??999)||(a.year||0)-(b.year||0));
-    const main=entries.filter(e=>!e.novella),nov=entries.filter(e=>e.novella);
-    out.push({sid,name:(hasRec&&rec.name)||books[0].seriesName||"Untitled series",author:(hasRec&&rec.author)||books[0].author,entries,
-      main,nov,ownedMain:main.filter(e=>e.book).length,ownedNov:nov.filter(e=>e.book).length,
-      missing:entries.filter(e=>!e.book&&!e.upcoming),complete:hasRec?rec.complete:null,catalogued:catalog.length>0,
-      fresh:hasRec&&rec.catalogVersion===2,universe:hasRec?rec.universe||null:null});
-  }
-  out.sort((a,b)=>(b.missing.length>0)-(a.missing.length>0)||a.name.localeCompare(b.name));
-  return out;
-}
 function catalogPrompt(name,author){
   return `Give the complete reading list for the book series "${name}"${author?` by ${author}`:""}.
 Reply with only JSON: {"name":"Series name","universe":null,"complete":true,"books":[{"number":1,"title":"...","year":2001,"novella":false,"upcoming":false}]}
 Rules:
 - Main books in reading order with their series number. Include announced main books that are not out yet with "upcoming": true and "year": null.
 - Include novellas and short novels set in this series with "novella": true and a number that places them in reading order (for example 2.5 between books 2 and 3). Leave out single short stories and anthologies.
-- An omnibus, box set or special edition (deluxe, collector's, omnibus volumes) is never an entry and never a separate series; list the standard books inside it instead, using the standard numbering.
+- If the series name is a special edition with its own volume numbering (for example "Berserk Deluxe Edition"), list that edition's own volumes with its own numbering. Otherwise list the standard books; an omnibus or box set is never an entry, list the books inside it instead.
 - "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle); otherwise null.
 - "complete" is false if more main books are planned.
 List only books you are confident exist. Never include books from other authors or other series.`;
@@ -844,14 +847,14 @@ async function refreshSeries(sid,{quiet=false}={}){
   const name=(cur&&!cur.deleted&&cur.name)||(ob&&ob.seriesName);if(!name)return;const author=(cur&&cur.author)||(ob&&ob.author)||"";
   S.busySeries.add(sid);scheduleRender();
   try{
-    const res=await AI.json(catalogPrompt(name,author),{model:MODELS.smart});   // series facts always use the careful model
+    const res=await Claude.json(catalogPrompt(name,author),{model:MODELS.smart});   // series facts always use the careful model
     const books=cleanSeriesBooks(res&&res.books);
     if(!books.length)throw{code:"invalid_json"};
     const latest=S.records.get(sid);
     const rec=clone(latest&&!latest.deleted?latest:{kind:"series",id:sid,name,author});
     const before=(rec.books||[]).length;
-    rec.books=books;rec.catalogVersion=2;if(typeof res.complete==="boolean")rec.complete=res.complete;
-    if(cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=cleanStr(res.universe,150);else if(res.universe===null)rec.universe=rec.universe||null;
+    rec.books=books;rec.catalogVersion=editionNamed(rec.name)?3:2;if(typeof res.complete==="boolean")rec.complete=res.complete;
+    if(!rec.universe&&cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=stableUniverse(res.universe);
     await save(rec);
     if(rec.universe)queueUniverse(rec.universe,rec.author);
     if(!quiet)toast(books.length>before&&before?`Found ${plural(books.length-before,"more book")} in ${name}.`:`${name} is up to date.`);
@@ -860,7 +863,7 @@ async function refreshSeries(sid,{quiet=false}={}){
 }
 const seriesQueue=new Set();let seriesRunning=false;
 function queueSeriesRefresh(ids){
-  for(const id of ids){const r=S.records.get(id);if(!r||r.catalogVersion!==2)seriesQueue.add(id);}
+  for(const id of ids){if(needsCatalog(S.records.get(id)))seriesQueue.add(id);}
   if(seriesRunning||!canAsk())return;
   seriesRunning=true;(async()=>{try{while(seriesQueue.size&&canAsk()){const id=[...seriesQueue][0];seriesQueue.delete(id);await refreshSeries(id,{quiet:true});}}finally{seriesRunning=false;}})();
 }
@@ -870,7 +873,7 @@ async function loadUniverse(name,author){
   if(!canAsk())return;
   S.busySeries.add(id);scheduleRender();
   try{
-    const res=await AI.json(`List every book in "${name}"${author?` by ${author}`:""}, grouped by its sub-series, with the sub-series in reading order.
+    const res=await Claude.json(`List every book in "${name}"${author?` by ${author}`:""}, grouped by its sub-series, with the sub-series in reading order.
 Reply with only JSON: {"name":"${name}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false}]}]}
 Include novellas set in it with "novella": true, and announced books not out yet with "upcoming": true. Put standalone books in a group named "Standalone novels". An omnibus or box set is never an entry. List only books you are confident exist.`,{model:MODELS.smart,maxTokens:8000});
     const groups=(Array.isArray(res&&res.groups)?res.groups:[]).map(g=>({name:cleanStr(g&&g.name,150),books:cleanSeriesBooks(g&&g.books)})).filter(g=>g.name&&g.books.length);
@@ -887,10 +890,10 @@ function queueUniverse(name,author){
 }
 // Your own series: pasted text, every novel by an author, or a list turned into a series.
 async function catalogFor(name,author){
-  try{const res=await AI.json(catalogPrompt(name,author),{model:MODELS.smart});return cleanSeriesBooks(res&&res.books);}catch(e){return null;}
+  try{const res=await Claude.json(catalogPrompt(name,author),{model:MODELS.smart});return cleanSeriesBooks(res&&res.books);}catch(e){return null;}
 }
 async function authorWorks(author){
-  const res=await AI.json(`List every novel by ${author}, in order of publication.
+  const res=await Claude.json(`List every novel by ${author}, in order of publication.
 Reply with only JSON: {"books":[{"number":1,"title":"...","year":1965}]}
 Novels only (no story collections, plays, poetry or non-fiction). List only books you are confident exist.`,{model:MODELS.smart,maxTokens:4000});
   return cleanSeriesBooks(res&&res.books);
@@ -944,11 +947,11 @@ Reply with only a JSON array, one object per book, using the same "key" values:
 - "series" is null if the book is not part of a series, else {"name":"Series name","number":2,"universe":null}. "number" is its place in reading order (novellas get fractional places like 2.5; an omnibus gets null). "universe" is the larger series it belongs to, if any.`;
 }
 async function rebuildSeries(onStep){
-  if(!canAsk())throw{code:AI.key()?"offline":"no_key"};
+  if(!canAsk())throw{code:Claude.key()?"offline":"no_key"};
   const books=live("book");let split=0;const newIds=[];
   for(let i=0;i<books.length;i+=25){
     const batch=books.slice(i,i+25);onStep(`Checking series membership: ${Math.min(i+25,books.length)} of ${books.length}`);
-    const arr=await AI.json(seriesCheckPrompt(batch.map((b,k)=>({key:"k"+k,title:b.title,author:b.author||""}))),{model:MODELS.smart,maxTokens:6000});
+    const arr=await Claude.json(seriesCheckPrompt(batch.map((b,k)=>({key:"k"+k,title:b.title,author:b.author||""}))),{model:MODELS.smart,maxTokens:6000});
     const out=[],seriesMap=new Map();
     for(const d of Array.isArray(arr)?arr:[]){
       const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;
@@ -1015,7 +1018,7 @@ function parseListOffline(text){
 }
 async function parseListText(text){
   if(canAsk()){
-    try{const arr=await AI.json(listPrompt(text.slice(0,20000)),{maxTokens:8000});
+    try{const arr=await Claude.json(listPrompt(text.slice(0,20000)),{maxTokens:8000});
       if(Array.isArray(arr)&&arr.length)return{items:arr,tidy:true};}catch(e){}
   }
   return{items:parseListOffline(text),tidy:false};
@@ -1055,7 +1058,7 @@ async function suggest(){
   try{
     const owned=books.slice(0,300).map(b=>`${b.title} by ${b.author||"unknown"}`).join("\n");
     const saved=[...listItemsIndex().keys()].slice(0,150).join("; ");
-    const res=await AI.json(`Here are the books someone owns:
+    const res=await Claude.json(`Here are the books someone owns:
 ${owned}
 
 Recommend 8 books they don't own that fit their taste: mostly strong matches, plus a couple of less obvious picks. Don't include anything from the list above, or any of these titles they've already saved: ${saved||"none"}.
@@ -1106,21 +1109,6 @@ async function queuePhotos(blobs){
   if(!ok&&S.persist)toast("Your phone is low on space for photos. They’ll stay until you close the app.");
   scheduleRender();return recs.length;
 }
-// Photos that have been read are kept (marked read) so they can be looked at again later.
-async function keepPhotos(entries){
-  const ids=new Map(),recs=[];
-  for(const e of entries){
-    if(e.qid){const p=S.queued.find(x=>x.id===e.qid);if(p){recs.push({...p,read:true});ids.set(e,p.id);}continue;}
-    const small=await shrink(e.blob);const rec={id:uid("p"),blob:small,addedAt:Date.now(),read:true};recs.push(rec);ids.set(e,rec.id);
-  }
-  if(recs.length){
-    const ok=await store.put(recs,"photos");
-    const read=new Set(recs.map(r=>r.id));S.queued=S.queued.filter(p=>!read.has(p.id));
-    if(ok)S.savedPhotos+=recs.length;
-    scheduleRender();
-  }
-  return ids;
-}
 async function removeQueued(ids){
   if(!ids.length)return;
   S.queued=S.queued.filter(p=>!ids.includes(p.id));await store.del(ids,"photos");scheduleRender();
@@ -1165,7 +1153,7 @@ async function processQueue(){
       const p=S.queued.find(x=>!S.readFail.has(x.id));if(!p)break;
       S.reading.total=Math.max(S.reading.total,S.reading.done+S.queued.filter(x=>!S.readFail.has(x.id)).length);scheduleRender();
       let arr;
-      try{const imgs=await prepImages(p.blob);const res=await AI.json(identifyPrompt(imgs.length,imgs.split),{images:imgs});
+      try{const imgs=await prepImages(p.blob);const res=await Claude.json(identifyPrompt(imgs.length,imgs.split),{images:imgs});
         arr=Array.isArray(res&&res.books)?res.books:(Array.isArray(res)?res:[]);}
       catch(e){if(stopsRun(e)){note=sampleMsg(e);break;}S.readFail.add(p.id);note=sampleMsg(e)||note;S.reading.done++;continue;}
       const seen=new Map();
@@ -1203,86 +1191,6 @@ function openPending(){
       const dr=$("#pDrop",body);dr.onclick=async()=>{if(!dr.dataset.armed){dr.dataset.armed="1";dr.textContent="Tap again to discard";return;}
         closeSheet();await save(recs.map(r=>({kind:"pending",id:r.id,deleted:true})));toast("Discarded.");};
     });
-}
-function startReading(entries){
-  openSheet(`<h2 class="sheet-title">Reading your shelves</h2><p class="progress-line">Getting started…</p>`);
-  readPhotos(entries);
-}
-async function readPhotos(entries){
-  const ctl=new AbortController();S.photoCtl=ctl;
-  const found=[],errors=[],ok=[],failed=[];
-  for(let i=0;i<entries.length;i++){
-    if(ctl.signal.aborted)break;
-    const body=$("#sheet .sheet-body");if(!body){ctl.abort();break;}
-    body.innerHTML=`<h2 class="sheet-title">Reading your shelves</h2>
-      <p class="progress-line">${entries.length>1?`Photo ${i+1} of ${entries.length}…`:"Reading the photo…"}</p>
-      <div class="bar"><span style="width:${Math.round((i+.15)/entries.length*100)}%"></span></div>
-      <p class="muted">Claude is reading each spine. A full shelf can take up to a minute.</p>
-      <button class="btn wide" id="stopRead">Stop</button>`;
-    $("#stopRead").onclick=()=>ctl.abort();
-    try{
-      const imgs=await prepImages(entries[i].blob);
-      const res=await AI.json(identifyPrompt(imgs.length,imgs.split),{images:imgs,signal:ctl.signal});
-      const arr=Array.isArray(res&&res.books)?res.books:(Array.isArray(res)?res:[]);
-      for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;
-        found.push({title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),
-          color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false,entry:entries[i]});}
-      ok.push(entries[i]);
-    }catch(e){
-      if(e&&e.code==="cancelled")break;
-      const m=sampleMsg(e);if(m)errors.push(m);failed.push(entries[i]);
-      if(stopsRun(e)){for(let j=i+1;j<entries.length;j++)failed.push(entries[j]);break;}
-    }
-  }
-  S.photoCtl=null;
-  const fresh=failed.filter(e=>!e.qid);
-  if(fresh.length)await queuePhotos(fresh.map(e=>e.blob));
-  if(!$("#sheet"))return;
-  const seen=new Map();
-  for(const c of found){const k=norm(c.title)+"|"+lastName(c.author);const p=seen.get(k);if(!p||(!p.sure&&c.sure))seen.set(k,c);}
-  review([...seen.values()],errors,ok,fresh.length,entries.length);
-}
-function review(cands,errors,ok,savedCount,n){
-  const body=$("#sheet .sheet-body");if(!body)return;
-  const savedNote=savedCount?` ${plural(savedCount,"photo")} couldn’t be read and ${savedCount===1?"was":"were"} saved to your waiting pile.`:"";
-  cands.forEach(c=>{c.owned=isOwned(c);c.on=!c.owned;});
-  if(!cands.length){
-    const queuedIds=ok.filter(e=>e.qid).map(e=>e.qid);
-    body.innerHTML=`<h2 class="sheet-title">No books found</h2>
-      <p>${esc(errors[0]||`Claude couldn’t make out any titles in ${n>1?"those photos":"that photo"}.`)}${esc(savedNote)}</p>
-      <p class="muted">Sharp spine text works best: get close enough that one shelf fills the frame, and tilt the phone to avoid glare.</p>
-      <div class="actions"><button class="btn brass" id="again">Try another photo</button>${S.queued.length?`<button class="btn" id="typeIt">Type it in yourself</button>`:""}<button class="btn quiet" id="done">Close</button></div>`;
-    $("#again").onclick=openAdd;$("#done").onclick=()=>closeSheet();
-    const ti=$("#typeIt");if(ti)ti.onclick=()=>openTypeFromPhoto(Math.max(0,S.queued.findIndex(p=>queuedIds.includes(p.id))));
-    return;
-  }
-  body.innerHTML=`<h2 class="sheet-title">Found ${plural(cands.length,"book")}</h2>
-    <p class="muted" style="margin-top:-6px">Untick anything that’s wrong and fix any title Claude misread.${esc(savedNote)}</p>
-    <div id="cands">${cands.map((c,i)=>{const{c:col}=colors({id:c.title,color:c.color});return`
-      <div class="cand">
-        <input type="checkbox" data-i="${i}" ${c.on?"checked":""} aria-label="Add ${esc(c.title)}">
-        <div class="swatch" style="background:${col}"></div>
-        <div class="cand-fields">
-          <input class="ct" data-i="${i}" value="${esc(c.title)}" aria-label="Title">
-          <input class="ca" data-i="${i}" value="${esc(c.author)}" placeholder="Author" aria-label="Author">
-          ${c.owned?`<span><span class="tag soft">Already on your shelves</span></span>`:!c.sure?`<span><span class="tag warn">Check this one</span></span>`:""}
-        </div>
-      </div>`;}).join("")}</div>
-    <div class="sticky-foot"><button class="btn brass wide" id="addFound"></button></div>`;
-  const btn=$("#addFound");
-  const upd=()=>{const k=body.querySelectorAll("#cands input[type=checkbox]:checked").length;btn.textContent=k?`Add ${plural(k,"book")}`:"Nothing selected";btn.disabled=!k;};
-  body.querySelectorAll("#cands input[type=checkbox]").forEach(cb=>cb.onchange=upd);upd();
-  btn.onclick=async()=>{
-    const items=[];
-    body.querySelectorAll("#cands input[type=checkbox]:checked").forEach(cb=>{const i=+cb.dataset.i;const c=cands[i];
-      items.push({title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value,color:c.color,textColor:c.textColor,
-        translator:c.translator,publisher:c.publisher,entry:c.entry});});
-    closeSheet();
-    const photoIds=await keepPhotos(ok);
-    items.forEach(it=>{it.photoId=photoIds.get(it.entry)||null;delete it.entry;});
-    await addBooks(items);
-    toast(canAsk()?`Added ${plural(items.length,"book")}. Looking up details…`:`Added ${plural(items.length,"book")}.`);
-  };
 }
 async function openTypeFromPhoto(idx){
   const p=S.queued[idx];if(!p){closeSheet();return;}
@@ -1373,7 +1281,8 @@ function canonMaps(){
   for(const r of recs)for(const e of r.books||[]){const k=norm(e.title);if(!k)continue;if(byTitle.has(k))union(byTitle.get(k),r.id);else byTitle.set(k,r.id);}
   const byBase=new Map();for(const r of recs){const k=seriesBase(r.name);if(!k)continue;if(byBase.has(k))union(byBase.get(k),r.id);else byBase.set(k,r.id);}
   const bySeries=new Map();for(const b of live("book"))if(b.seriesId){const k=seriesBase(b.seriesName||"");if(k){if(bySeries.has(k))union(bySeries.get(k),b.seriesId);else bySeries.set(k,b.seriesId);}}
-  _canon={find,byTitle};_canonAt=S.version;return _canon;
+  const members=new Map();for(const r of recs){const k=find(r.id);if(!members.has(k))members.set(k,[]);members.get(k).push(r);}
+  _canon={find,byTitle,members};_canonAt=S.version;return _canon;
 }
 function seriesKeyOf(b){
   const c=canonMaps();
@@ -1381,6 +1290,14 @@ function seriesKeyOf(b){
   const hit=c.byTitle.get(norm(b.title))||(b.contains||[]).map(t=>c.byTitle.get(norm(t))).find(Boolean);
   return hit?c.find(hit):null;
 }
+// When several editions fold into one series, show the list for the edition you actually own.
+function bestRecord(key,owned){
+  const ms=(canonMaps().members.get(key)||[]);if(!ms.length)return S.records.get(key);
+  const score=r=>owned.filter(b=>b.seriesId===r.id||(r.books||[]).some(e=>norm(e.title)===norm(b.title))).length*10+((r.books||[]).length?1:0);
+  return ms.reduce((best,r)=>score(r)>score(best)?r:best,ms[0]);
+}
+const editionNamed=n=>!!n&&seriesBase(n)!==norm(n).replace(/\bseries\b/g," ").replace(/\s+/g," ").trim();
+const needsCatalog=r=>!r||r.deleted||!(r.catalogVersion>=2)||(editionNamed(r.name)&&r.catalogVersion<3);
 const nodeOf=b=>{const k=seriesKeyOf(b);if(!k)return"b:"+b.id;const r=S.records.get(k);return"s:"+(r&&!r.deleted&&r.universe?"u_"+slug(r.universe):k);};
 function setForGenre(g){g=g||"";return STYLE_SETS[/Western/.test(g)?"western":/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
   /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other"];}
@@ -1625,13 +1542,13 @@ Use what you know about publishers' editions (for example, which translation a g
 const isTranslated=b=>!!b.originalLanguage;
 const translatorKnown=b=>b.translator&&["spine","photo","you"].includes(b.translatorSource);
 async function findTranslators(onStep){
-  if(!canAsk())throw{code:AI.key()?"offline":"no_key"};
+  if(!canAsk())throw{code:Claude.key()?"offline":"no_key"};
   let books=live("book").filter(b=>!b.translationChecked||(isTranslated(b)&&!b.translator));
   const res={checked:0,translated:0,fromPhotos:0,inferred:0};
   // 1. which books are translations, plus edition-based guesses
   for(let i=0;i<books.length;i+=40){
     const batch=books.slice(i,i+40);onStep(`Checking which books are translations: ${Math.min(i+40,books.length)} of ${books.length}`);
-    const arr=await AI.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
+    const arr=await Claude.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
     const out=[];
     for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;
       const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;const c=clone(cur);applyTranslation(c,d);out.push(c);}
@@ -1646,7 +1563,7 @@ async function findTranslators(onStep){
       n++;onStep(`Looking at your saved photos again: ${n} of ${byPhoto.size}`);
       const p=photos.get(pid);if(!p||!p.blob)continue;
       const imgs=await prepImages(p.blob);
-      const arr=await AI.json(rescanPrompt(imgs.length,list.map(b=>b.title)),{images:imgs,model:MODELS.smart});
+      const arr=await Claude.json(rescanPrompt(imgs.length,list.map(b=>b.title)),{images:imgs,model:MODELS.smart});
       const out=[];
       for(const d of Array.isArray(arr)?arr:[]){const b=list.find(x=>titleMatch(x.title,d&&d.title));if(!b)continue;
         const c=clone(S.records.get(b.id));const t=cleanStr(d.translator,160);
@@ -1662,7 +1579,7 @@ async function findTranslators(onStep){
   const left=live("book").filter(b=>isTranslated(b)&&!translatorKnown(b));
   for(let i=0;i<left.length;i+=25){
     const batch=left.slice(i,i+25);onStep(`Working out editions: ${Math.min(i+25,left.length)} of ${left.length}`);
-    const arr=await AI.json(inferPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||"",originalLanguage:b.originalLanguage};
+    const arr=await Claude.json(inferPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||"",originalLanguage:b.originalLanguage};
       for(const f of["publisher","edition","design","year"])if(b[f])o[f]=b[f];if(b.translator)o.currentGuess=b.translator;return o;})),{model:MODELS.smart});
     const out=[];
     for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;
@@ -1677,7 +1594,7 @@ async function findTranslators(onStep){
 async function translationsOf(b){
   if(b.translations&&b.translations.length)return b.translations;   // stored when the book was added: works offline
   if(!canAsk())return[];
-  const res=await AI.json(`List the English translations of "${b.title}" by ${b.author||"its author"} that are in print or commonly found, most common first.
+  const res=await Claude.json(`List the English translations of "${b.title}" by ${b.author||"its author"} that are in print or commonly found, most common first.
 Reply with only JSON: {"translations":[{"translator":"","publisher":"","year":2003,"note":"what the edition looks like or is known for"}]}
 List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:1500});
   const list=cleanTranslations(res&&res.translations);
@@ -1698,18 +1615,6 @@ async function openPickTranslation(id){
     c.translator=x.translator;c.translatorSource="you";if(x.publisher&&!c.publisher)c.publisher=x.publisher;await save(c);openBook(id);toast(`Translator: ${x.translator}.`);});
   $("#pkBack",body).onclick=()=>openBook(id);
 }
-async function readTitlePage(id,file){
-  const b=S.records.get(id);if(!b)return;
-  const imgs=await prepImages(file);
-  const d=await AI.json(`This photo shows the spine, cover, title page or copyright page of "${b.title}"${b.author?` by ${b.author}`:""}. Read the translator's name and the publisher if they are shown. Do not guess: use null for anything you cannot read.
-Reply with only JSON: {"translator":null,"publisher":null,"originalLanguage":null}
-"originalLanguage" is the language the book was first written in, or null if English.`,{images:imgs,model:MODELS.smart,maxTokens:300});
-  const c=clone(S.records.get(id));const t=cleanStr(d&&d.translator,160);
-  if(t){c.translator=t;c.translatorSource="photo";}
-  if(cleanStr(d&&d.publisher))c.publisher=cleanStr(d.publisher,80);
-  const lang=cleanStr(d&&d.originalLanguage,40);if(lang&&norm(lang)!=="english")c.originalLanguage=lang;
-  await save(c);return t;
-}
 
 /* ---------- paste from Claude ---------- */
 // Accepts {"study":1,"books":[...],"lists":[...]} written by Claude in chat, or a full backup file's JSON.
@@ -1717,8 +1622,8 @@ async function importFromClaude(text){
   let j;try{j=parseJSON(text);}catch(e){throw new Error("That text doesn’t look like a book list from Claude. Copy the whole block and try again.");}
   if(Array.isArray(j))j={books:j};
   if(Array.isArray(j&&j.records)){
-    const ok=j.records.filter(r=>r&&typeof r.id==="string"&&/^[A-Za-z0-9_\-]+$/.test(r.id)&&["book","list","series"].includes(r.kind));
-    const take=ok.filter(r=>{const l=S.records.get(r.id);return!l||(r.updatedAt||0)>(l.updatedAt||0);}).map(r=>{const c=clone(r);delete c._synced;return c;});
+    const ok=j.records.filter(r=>r&&typeof r.id==="string"&&/^[A-Za-z0-9_\-]+$/.test(r.id)&&BACKUP_KINDS.includes(r.kind));
+    const take=ok.filter(r=>{const l=S.records.get(r.id);return!l||(r.updatedAt||0)>(l.updatedAt||0);}).map(r=>{const c=cleanRecord(r);delete c._synced;return c;});
     if(take.length)await save(take);
     return{added:take.filter(r=>r.kind==="book").length,updated:0,skipped:ok.length-take.length,listed:0};
   }
@@ -1807,7 +1712,7 @@ function openAdd(){
       pi.onchange=async()=>{const f=[...pi.files];if(!f.length)return;
         closeSheet();const k=await queuePhotos(f);
         if(canRead()){toast(`Reading ${plural(k,"photo")} in the background. Keep using the app.`);processQueue();}
-        else toast(`${plural(k,"photo")} saved. ${AI.key()?"They’ll be read automatically once you’re back online.":"Add your API key in Settings and they’ll be read automatically."}`);};
+        else toast(`${plural(k,"photo")} saved. ${Claude.key()?"They’ll be read automatically once you’re back online.":"Add your API key in Settings and they’ll be read automatically."}`);};
       $("#mAdd",body).onclick=async()=>{const items=parseLines($("#mList",body).value);if(!items.length){$("#mList",body).focus();return;}
         closeSheet();const k=await addBooks(items);toast(`Added ${plural(k,"book")}.${canAsk()?"":" Details fill in once you’re online."}`);};
     });
@@ -1849,7 +1754,6 @@ async function setRating(key,v){
 const STATUS={want:"Want to read",reading:"Currently reading",read:"Read"};
 function openBook(id){
   const b=S.records.get(id);if(!b||b.deleted)return;
-  const{c,t}=colors(b);
   openSheet(`${book3dHTML(b)}<div class="bookhead">
       <div><h2 class="b-title">${esc(b.title)}</h2>
         <p class="b-author">${esc(b.author||"Author unknown")}</p>
@@ -1943,7 +1847,7 @@ function listSheet({listId,title,needName}){
 function openItemSheet(listId){const l=S.records.get(listId);if(l)listSheet({listId,title:`Add to ${l.name}`});}
 function openNewList(){listSheet({title:"New list",needName:true});}
 function openMenu(){
-  const sp=spend();const key=AI.key();
+  const sp=spend();const key=Claude.key();
   openSheet(`<h2 class="sheet-title">Settings</h2>
     <p>${plural(live("book").length,"book")}, ${plural(topsView().length,"series","series")} and ${plural(live("list").length,"list")}.</p>
     <h3 class="sub">Anthropic API key</h3>
@@ -1975,7 +1879,7 @@ function openMenu(){
     <button class="btn wide danger-text" id="clearAll">Clear everything</button>`,body=>{
       $("#saveKey",body).onclick=()=>{const v=$("#apiKey",body).value.trim();if(!v){$("#apiKey",body).focus();return;}LS.set("study-api-key",v);toast("API key saved.");scheduleRender();openMenu();};
       const tk=$("#testKey",body);if(tk)tk.onclick=async()=>{tk.disabled=true;tk.textContent="Testing…";
-        try{await AI.json(`Reply with {"ok":true}`,{model:MODELS.cheap,maxTokens:20});toast("Your key works.");}catch(e){toast(sampleMsg(e)||"Test cancelled.");}
+        try{await Claude.json(`Reply with {"ok":true}`,{model:MODELS.cheap,maxTokens:20});toast("Your key works.");}catch(e){toast(sampleMsg(e)||"Test cancelled.");}
         tk.disabled=false;tk.textContent="Test key";};
       const ck=$("#clearKey",body);if(ck)ck.onclick=()=>{if(!ck.dataset.armed){ck.dataset.armed="1";ck.textContent="Tap again to remove";return;}LS.del("study-api-key");toast("API key removed.");scheduleRender();openMenu();};
       const ft=$("#findTr",body);if(ft)ft.onclick=async()=>{
@@ -2000,7 +1904,7 @@ function openMenu(){
       $("#checkAll",body).onchange=e=>{LS.set("study-check-all",e.target.checked?"1":"0");};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
       $("#exp",body).onclick=async()=>{
-        const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=clone(r);delete c._synced;return c;});
+        const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=cleanRecord(r);delete c._synced;return c;});
         const name=`the-study-backup-${new Date().toISOString().slice(0,10)}.json`;
         const blob=new Blob([JSON.stringify({app:"shelves",version:1,exportedAt:new Date().toISOString(),records:recs})],{type:"application/json"});
         try{
@@ -2014,8 +1918,8 @@ function openMenu(){
         const f=e.target.files[0];if(!f)return;
         try{
           const j=JSON.parse(await f.text());const recs=Array.isArray(j&&j.records)?j.records:[];
-          const ok=recs.filter(r=>r&&typeof r.id==="string"&&/^[A-Za-z0-9_\-]+$/.test(r.id)&&["book","list","series"].includes(r.kind));
-          const take=ok.filter(r=>{const l=S.records.get(r.id);return!l||(r.updatedAt||0)>(l.updatedAt||0);}).map(r=>{const c=clone(r);delete c._synced;return c;});
+          const ok=recs.filter(r=>r&&typeof r.id==="string"&&/^[A-Za-z0-9_\-]+$/.test(r.id)&&BACKUP_KINDS.includes(r.kind));
+          const take=ok.filter(r=>{const l=S.records.get(r.id);return!l||(r.updatedAt||0)>(l.updatedAt||0);}).map(r=>{const c=cleanRecord(r);delete c._synced;return c;});
           if(take.length)await save(take);
           closeSheet();toast(take.length?`Restored ${plural(take.length,"item")}.`:"Everything in that file is already here.");
         }catch(err){toast("That file isn’t a backup from The Study.");}
@@ -2073,7 +1977,7 @@ function banners(){
     out+=`<div class="banner leather"><div style="flex:1"><div>Reading your shelves: photo ${Math.min(done+1,total)} of ${total}</div><div class="bar"><span style="width:${Math.round(done/Math.max(total,1)*100)}%"></span></div><div class="muted" style="font-size:14px;margin-top:4px">Keep using the app. If you close it, the rest picks up next time.</div></div></div>`;}
   else if(S.queued.length){
     const n=S.queued.length;
-    out+=`<div class="banner leather"><span>${plural(n,"photo")} waiting to be read.${canRead()?" Starting…":AI.key()?" They’ll be read automatically once you’re online.":" Add your API key in Settings and they’ll be read automatically."}</span>
+    out+=`<div class="banner leather"><span>${plural(n,"photo")} waiting to be read.${canRead()?" Starting…":Claude.key()?" They’ll be read automatically once you’re online.":" Add your API key in Settings and they’ll be read automatically."}</span>
       <span class="banner-btns"><button class="btn small" data-act="typeQueue">Type them in</button></span></div>`;
   }
   const pend=live("pending").reduce((n,r)=>n+(r.items||[]).length,0);
@@ -2083,7 +1987,7 @@ function banners(){
   else{
     const need=live("book").filter(b=>b.needsDetails).length;
     if(need)out+=canAsk()?`<div class="banner leather"><span>${plural(need,"book")} still ${need===1?"needs":"need"} details.</span><button class="btn small" data-act="fill">Fill in details</button></div>`
-      :`<div class="banner leather"><span>${plural(need,"book")} will get details once ${AI.key()?"you’re online":"you add your API key in Settings"}.</span></div>`;
+      :`<div class="banner leather"><span>${plural(need,"book")} will get details once ${Claude.key()?"you’re online":"you add your API key in Settings"}.</span></div>`;
   }
   return out;
 }
@@ -2091,7 +1995,7 @@ function renderShelves(){
   const all=live("book");
   if(!all.length){
     return bookcase("Awaiting your books",null,"",{blank:true,extra:`<div class="empty-card parch"><h2>The shelves are bare</h2>
-      <p>${canRead()?"Photograph a shelf and Claude will read the spines.":(AI.key()?"Type a few books in, or save shelf photos for Claude to read once you’re online.":"Send your shelf photos to Claude in chat and paste what it gives you, or type a few books in.")}</p>
+      <p>${canRead()?"Photograph a shelf and Claude will read the spines.":(Claude.key()?"Type a few books in, or save shelf photos for Claude to read once you’re online.":"Send your shelf photos to Claude in chat and paste what it gives you, or type a few books in.")}</p>
       <button class="btn brass" data-act="add">Add books</button></div>`});
   }
   const{books,groups}=shelfLayout();const q=norm(S.q);
@@ -2126,7 +2030,7 @@ function shelfLayout(){
 const PEN=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>`;
 function entryHTML(t,gi,ei,e,listed){
   const ed=S.editing.has(t.id),num=e.number!=null&&!e.novella?e.number:"",nov=e.novella?` <span class="tag novtag">novella</span>`:"";
-  const key=`${t.id}|${gi}|${ei}`;
+  const key=`${t.id}|${encodeURIComponent(t.groups[gi].name)}|${encodeURIComponent(e.orig||e.title)}`;
   let right;
   if(ed)right=`<span class="entry-acts">${e.hidden?"":`<button class="btn small quiet" data-rename="${key}" aria-label="Rename ${esc(e.title)}">${PEN}</button>`}<button class="btn small quiet ${e.hidden?"":"danger-text"}" data-hide-book="${key}">${e.hidden?"Put back":"Remove"}</button></span>`;
   else if(e.book)right=`<span class="owned">on your shelf</span>`;
@@ -2149,7 +2053,7 @@ function topCardHTML(t,listed){
     if(g.hidden&&!ed)return;
     const ents=g.entries.map((e,ei)=>({e,ei})).filter(x=>ed||!x.e.hidden);
     if(multi||ed){const own=g.entries.filter(e=>e.book&&!e.hidden).length,tot=g.entries.filter(e=>!e.hidden).length;
-      body+=`<div class="grp-head${g.hidden?" gone":""}"><span>${esc(g.name)} <small>${g.pending?"loading…":`${own} of ${tot}`}</small></span>${ed?`<button class="btn small quiet ${g.hidden?"":"danger-text"}" data-hide-group="${t.id}|${gi}">${g.hidden?"Put back":"Remove series"}</button>`:""}</div>`;}
+      body+=`<div class="grp-head${g.hidden?" gone":""}"><span>${esc(g.name)} <small>${g.pending?"loading…":`${own} of ${tot}`}</small></span>${ed?`<button class="btn small quiet ${g.hidden?"":"danger-text"}" data-hide-group="${t.id}|${encodeURIComponent(g.name)}">${g.hidden?"Put back":"Remove series"}</button>`:""}</div>`;}
     if(!g.hidden)body+=ents.map(({e,ei})=>entryHTML(t,gi,ei,e,listed)).join("");
   });
   const foot=ed?`${t.custom?"":`<button class="btn small" data-add-entry="${t.id}">Add a book or novella</button>`}${t.custom?`<button class="btn small" data-add-custom="${t.id}">Add to this series</button><button class="btn small quiet danger-text" data-del-custom="${t.id}">${S.confirmDel===t.id?"Tap again to delete":"Delete series"}</button>`
@@ -2184,16 +2088,24 @@ function renderSeries(){
   const listed=listItemsIndex();
   return head+(shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+shown.map(t=>topCardHTML(t,listed)).join("");
 }
-async function haveBook(tid,gi,ei){
-  const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[gi];const e=g&&g.entries[ei];if(!e||e.book)return;
+// Look an entry up by its series, sub-series name and original title (never by position, which can shift
+// while a list refreshes in the background).
+function findEntry(key){
+  const[tid,gname,title]=key.split("|").map((x,i)=>i?decodeURIComponent(x):x);
+  const t=topsView().find(x=>x.id===tid);if(!t)return{};
+  const g=t.groups.find(x=>x.name===gname);const e=g&&g.entries.find(x=>(x.orig||x.title)===title);
+  return{t,g,e,tid};
+}
+async function haveBook(key){
+  const{t,g,e,tid}=findEntry(key);if(!e||e.book)return;
   const sb=(t.subs||[]).find(x=>norm(x.name)===norm(g.name))||(t.subs||[])[0];
   const mate=live("book").find(b=>nodeOf(b)==="s:"+tid)||(sb&&sb.owned[0]);
   const b=newBook({title:e.title,author:t.author||(mate&&mate.author)});
   if(sb){b.seriesId=sb.sid;b.seriesName=sb.name;}b.seriesNumber=e.novella?null:e.number;if(mate){b.genre=mate.genre;b.format=mate.format;}
   await save(b);fillDetails([b.id]);toast(`Added ${e.title} to your shelves.`);
 }
-function openRename(tid,gi,ei){
-  const t=topsView().find(x=>x.id===tid);const e=t&&t.groups[gi]&&t.groups[gi].entries[ei];if(!e)return;
+function openRename(key){
+  const{e,tid}=findEntry(key);if(!e)return;
   openSheet(`<h2 class="sheet-title">Fix this title</h2>
     <div class="field"><label for="rnT">Title</label><input id="rnT" value="${esc(e.title)}" autocomplete="off"></div>
     <p class="muted" style="margin-top:-2px">If it matches a book on your shelves, it’ll count as owned.</p>
@@ -2298,6 +2210,12 @@ function openMoveTo(){
 function syncHeadHeight(){const t=$(".top");if(t)document.documentElement.style.setProperty("--head-h",t.offsetHeight+"px");}
 window.addEventListener("resize",syncHeadHeight);
 function render(){
+  try{renderInner();}catch(err){
+    console.error(err);
+    $("#main").innerHTML=`<div class="banner leather" style="margin-top:20px"><span>Something in your library couldn’t be shown. Your books are safe. Try another tab, or restore a backup from Settings.</span></div>`;
+  }
+}
+function renderInner(){
   if(!S.loaded)return;
   document.querySelectorAll(".nav [data-tab]").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab?"page":"false"));
   $("#shelfTools").hidden=!(S.tab==="shelves"||S.tab==="series");
@@ -2306,8 +2224,10 @@ function render(){
   qi.placeholder=S.tab==="series"?"Search series or authors":"Search titles, authors, translators";
   $("#offline").hidden=navigator.onLine!==false;
   assignStyles(shelfLayout().groups.map(g=>g[1]));
+  const anchorEl=S.anchor&&document.getElementById(S.anchor),anchorTop=anchorEl?anchorEl.getBoundingClientRect().top:null;
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
+  if(anchorTop!=null){const el=document.getElementById(S.anchor);if(el){const d=el.getBoundingClientRect().top-anchorTop;if(Math.abs(d)>1)window.scrollBy(0,d);}}
   selectBar();syncHeadHeight();
   if(S.tab==="series"){mountStars($("#main"),(k,v)=>setRating(k,v));const ss=$("#seriesSort");if(ss)ss.onchange=e=>{S.seriesSort=e.target.value;LS.set("study-series-sort",S.seriesSort);render();};}
   const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
@@ -2316,6 +2236,7 @@ function render(){
 
 /* ---------- events ---------- */
 $("#main").addEventListener("click",e=>{
+  const card=e.target.closest(".ledger,.case");S.anchor=card&&card.id?card.id:null;
   if(e.target.closest(".stars"))return;
   const t=e.target.closest("button,[data-book]");if(!t)return;const d=t.dataset;
   if(d.shelf!==undefined)return toggleShelf(t);
@@ -2323,19 +2244,19 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="selectMode"){S.selecting=!S.selecting;S.selected.clear();return render();}
   if(d.toggleSeries){S.openSeries.has(d.toggleSeries)?S.openSeries.delete(d.toggleSeries):S.openSeries.add(d.toggleSeries);return render();}
   if(d.toggleList){S.openLists.has(d.toggleList)?S.openLists.delete(d.toggleList):S.openLists.add(d.toggleList);return render();}
-  if(d.want){const[tid,gi,ei]=d.want.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[+gi];const m=g&&g.entries[+ei];
+  if(d.want){const{t,g,e:m}=findEntry(d.want);
     if(m)addToList(WISHLIST,{title:m.title,author:t.author,note:`${g.name}${m.number!=null&&!m.novella?`, book ${m.number}`:""}`});return;}
   if(d.refreshTop){const tid=d.refreshTop;const t=topsView().find(x=>x.id===tid);if(!t)return;
     if(!canAsk()){toast("Checking a series needs a connection to Claude.");return;}
     (async()=>{S.busySeries.add(tid);render();for(const sb of t.subs||[])await refreshSeries(sb.sid,{quiet:true});
       if(t.universe){const u=S.records.get(t.id);if(u)await save({kind:"universe",id:t.id,deleted:true});S.uniTried.delete(t.id);await loadUniverse(t.name,t.author);}
       S.busySeries.delete(tid);render();toast(`${t.name} is up to date.`);})();return;}
-  if(d.have){const[tid,gi,ei]=d.have.split("|");return haveBook(tid,+gi,+ei);}
-  if(d.rename){const[tid,gi,ei]=d.rename.split("|");return openRename(tid,+gi,+ei);}
+  if(d.have)return haveBook(d.have);
+  if(d.rename)return openRename(d.rename);
   if(d.addEntry)return openAddEntry(d.addEntry);
-  if(d.hideBook){const[tid,gi,ei]=d.hideBook.split("|");const t=topsView().find(x=>x.id===tid);const e=t&&t.groups[+gi]&&t.groups[+gi].entries[+ei];if(!e)return;
-    const k=norm(e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
-  if(d.hideGroup){const[tid,gi]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups[+gi];if(!g)return;
+  if(d.hideBook){const{e,tid}=findEntry(d.hideBook);if(!e)return;
+    const k=norm(e.orig||e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
+  if(d.hideGroup){const[tid,gn]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups.find(x=>x.name===decodeURIComponent(gn));if(!g)return;
     const k=norm(g.name);return setPrefs(tid,p=>{p.hiddenGroups=p.hiddenGroups.includes(k)?p.hiddenGroups.filter(x=>x!==k):[...p.hiddenGroups,k];});}
   if(d.hideTop)return setPrefs(d.hideTop,p=>{p.hidden=!p.hidden;});
   if(d.resetTop)return setPrefs(d.resetTop,p=>{p.hiddenGroups=[];p.hiddenBooks=[];p.hidden=false;});
@@ -2361,7 +2282,7 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="showHidden"){S.showHidden=!S.showHidden;return render();}
   if(d.act==="newSeries")return openNewSeries();
 });
-document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;if(S.tab!=="shelves"){S.selecting=false;S.selected.clear();}render();window.scrollTo(0,0);});
+document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;S.anchor=null;if(S.tab!=="shelves"){S.selecting=false;S.selected.clear();}render();window.scrollTo(0,0);});
 $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
