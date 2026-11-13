@@ -121,7 +121,7 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
   background:linear-gradient(90deg,rgba(0,0,0,.45),rgba(255,235,200,.11) 28%,rgba(255,235,200,.03) 56%,rgba(0,0,0,.48)),var(--c);
   writing-mode:vertical-rl;display:flex;align-items:center;justify-content:flex-start;overflow:hidden;cursor:pointer;
   font-family:var(--serif);font-weight:600;font-size:13px;letter-spacing:.02em;line-height:1.1;box-shadow:1px 0 0 rgba(0,0,0,.55),0 -1px 0 rgba(255,230,190,.08)}
-.spine span{max-height:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spine:not(.drawn) span{max-height:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .spine.banded::after{content:"";position:absolute;left:0;right:0;top:11px;height:2px;background:var(--t);opacity:.5}
 .spine.bound{padding:28px 0;color:var(--gilt)}
 .spine.bound::before,.spine.bound::after{content:"";position:absolute;left:0;right:0;height:14px;opacity:1;
@@ -242,6 +242,25 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+/* series extras */
+.tag.novtag{font-size:12px;font-weight:500;color:var(--text-2);border:1px solid var(--line);vertical-align:2px;padding:0 6px}
+.entry.nov .et{font-size:16px}
+.pip.nv{height:16px;width:7px}
+.pip.up{opacity:.35}
+.universe{margin-top:16px;border-top:1px solid rgba(196,154,69,.35);padding-top:8px}
+.uni-title{font-family:var(--display);font-size:20px;color:var(--brass-hi);margin:6px 0 4px}
+.uni-group{margin:14px 0 2px;font-weight:600;color:var(--text)}
+.uni-group small{font-weight:400;color:var(--text-2);font-style:italic;margin-left:6px}
+.uni-group.here{color:var(--brass-hi)}
+#group[hidden]{display:none}
+/* drawn book art */
+.spine.drawn{padding:0;background:none;color:inherit;box-shadow:1px 0 0 rgba(0,0,0,.55)}
+.art{position:absolute;inset:0;overflow:hidden;display:block;border-radius:inherit}
+.art::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(255,235,200,.10) 26%,rgba(255,235,200,.02) 56%,rgba(0,0,0,.42))}
+.art.jacket::after{background:linear-gradient(90deg,rgba(0,0,0,.35) 0 5px,rgba(255,235,200,.08) 5px 7px,transparent 22%,transparent 92%,rgba(0,0,0,.15))}
+.art .dk{position:absolute;display:block}
+.art .vt{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;text-align:center;white-space:nowrap;overflow:hidden}
+.art .hz{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
 .spine.photo{padding:0;background-size:100% 100%;background-color:#1a120c;box-shadow:inset 2px 0 0 rgba(255,235,200,.1),inset -3px 0 0 rgba(0,0,0,.35),1px 0 0 rgba(0,0,0,.55)}
 .stage{height:300px;display:flex;align-items:center;justify-content:center;perspective:1000px;touch-action:none;cursor:grab;margin:6px 0 0;user-select:none;-webkit-user-select:none}
 .book3d{--bw:150px;--bh:225px;position:relative;width:var(--bw);height:var(--bh);transform-style:preserve-3d;transform:rotateX(var(--rx,-8deg)) rotateY(var(--ry,28deg));transition:transform .55s cubic-bezier(.2,.8,.2,1)}
@@ -328,7 +347,7 @@ const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><d
 const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
-  persist:true,persisted:false,savedPhotos:0,translating:false,imgs:new Map(),
+  persist:true,persisted:false,savedPhotos:0,translating:false,imgs:new Map(),sq:"",openUniverse:new Set(),
   queue:new Set(),jobRunning:false,jobDone:0,jobTotal:0,suggesting:false,busySeries:new Set(),confirmDel:null,loaded:false,photoCtl:null};
 
 /* ---------- helpers ---------- */
@@ -440,11 +459,9 @@ const stopsRun=e=>STOPS.includes(e&&e.code);
 function identifyPrompt(parts,split){
   return `You are cataloguing a person's home library from a photo of their books.
 ${parts>1?"The images are overlapping sections of ONE photo (left/right or top/bottom). A book visible in both sections counts once.":"The image is one photo of a shelf or a stack of books."}
-List every book whose title you can actually read on its spine or cover. Use your knowledge to complete a partly visible title or an author's full name, but never invent books you cannot see. Ignore objects that aren't books. A boxed set counts as one entry.
+List every book whose title you can actually read on its spine or cover. Use your knowledge to complete a partly visible title or an author's full name, but never invent books you cannot see. Ignore objects that aren't books. For a boxed set or slipcase, list each book inside it separately (use the spines you can see and what the box says) and never list the set itself. A single-volume omnibus (several books bound in one) is one entry.
 Reply with only JSON in this shape:
-{"books":[{"title":"Full Title","author":"Author Name","translator":null,"publisher":null,"color":"#RRGGBB","textColor":"#RRGGBB","sure":true,"box":[0.10,0.05,0.14,0.95],"look":"upright"}]}
-"box" is where this book's spine (or its cover, if the cover faces the camera) sits in the WHOLE original photo, as [left, top, right, bottom], each a fraction from 0 to 1 of the photo's width or height. Be as tight and exact as you can; it is used to cut the spine out of the photo.${split==="h"?" The first image is the left part of the photo (x from 0 to 0.56) and the second is the right part (x from 0.44 to 1); give boxes in whole-photo coordinates.":split==="v"?" The first image is the top part of the photo (y from 0 to 0.56) and the second is the bottom part (y from 0.44 to 1); give boxes in whole-photo coordinates.":""}
-"look" is "upright" for a standing book showing its spine, "flat" for a book lying on its side showing its spine, "face" for a book whose front cover faces the camera.
+{"books":[{"title":"Full Title","author":"Author Name","translator":null,"publisher":null,"color":"#RRGGBB","textColor":"#RRGGBB","sure":true}]}
 "translator" is the translator's name only when it is printed and readable on the spine or cover (for example "Pevear and Volokhonsky, translators" or "A new translation by Oliver Ready"); otherwise null. "publisher" is the imprint name or logo you can read on the spine (for example "Penguin Classics", "Vintage", "Tor"); otherwise null.
 "color" is the spine's main background color as it looks in the photo; "textColor" is the color of the spine lettering. Set "sure" to false when you are guessing at hard-to-read text. Order books as they sit on the shelf.`;
 }
@@ -452,9 +469,9 @@ function enrichPrompt(items){
   return `Give catalogue details for each book below, for a home-library app.
 Books: ${JSON.stringify(items)}
 Reply with only a JSON array, one object per book, using the same "key" values:
-[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null}]
+[{"key":"k0","title":"Correct full title","author":"Author's full name","genre":"one of: ${GENRES.join(" | ")}","year":1999,"blurb":"2-3 sentences in your own words on what the book is about. No spoilers beyond the opening premise.","color":"#RRGGBB","originalLanguage":null,"translator":null,"translatorLikely":false,"series":null,"contains":[]}]
 "originalLanguage" is the language the book was first written in, or null if it was written in English. For a book first written in another language: if a translator is given in the input, repeat it; otherwise give the translator of this edition only when the publisher or edition makes it fairly clear, set "translatorLikely" to true, and use null when you can't tell.
-"color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"books":[{"number":1,"title":"...","year":2001}],"complete":true}: "books" lists every main numbered entry in reading order (leave out novellas and companion books unless the series numbers them), and "complete" says whether the series has finished. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
+"color" is the typical spine color of a common edition. When the book belongs to a series, "series" is {"name":"Series name","number":2,"universe":null}: "number" is its place in reading order (a novella gets a fractional place such as 2.5), and "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle). If the book is a single-volume omnibus of several books, set "number" to null and list the titles it contains in "contains"; otherwise "contains" is []. If you don't recognise a book, keep its title and author as given, give your best genre guess, and set "blurb" to "".`;
 }
 
 /* ---------- books ---------- */
@@ -473,7 +490,7 @@ async function addBooks(items,opts={}){
 }
 function cleanSeriesBooks(list){
   if(!Array.isArray(list))return[];
-  return list.map(e=>({number:num(e&&e.number),title:cleanStr(e&&e.title,200),year:num(e&&e.year)})).filter(e=>e.title).slice(0,120);
+  return list.map(e=>({number:num(e&&e.number),title:cleanStr(e&&e.title,200),year:num(e&&e.year),novella:!!(e&&e.novella),upcoming:!!(e&&e.upcoming)})).filter(e=>e.title).slice(0,150);
 }
 function applyTranslation(book,d){
   if(!d||!("originalLanguage" in d||"translator" in d))return;
@@ -494,18 +511,21 @@ function applyDetails(book,d,seriesMap){
   if(!hex(book.color))book.color=hex(d.color);
   applyTranslation(book,d);
   book.needsDetails=false;
-  const s=d.series;
-  if(s&&typeof s==="object"&&cleanStr(s.name)){
-    const name=cleanStr(s.name,150),sid="s_"+slug(name);
-    book.seriesId=sid;book.seriesName=name;book.seriesNumber=num(s.number);
-    const books=cleanSeriesBooks(s.books);
-    const fresh={kind:"series",id:sid,name,author:book.author,books:[],complete:null};
-    let rec=seriesMap.get(sid)||(S.records.get(sid)?clone(S.records.get(sid)):fresh);
-    if(rec.deleted)rec=fresh;
-    if(books.length>=(rec.books||[]).length){rec.books=books;rec.complete=typeof s.complete==="boolean"?s.complete:rec.complete;}
-    rec.name=rec.name||name;rec.author=rec.author||book.author;
-    seriesMap.set(sid,rec);
-  }
+  if(Array.isArray(d.contains))book.contains=d.contains.map(x=>cleanStr(typeof x==="string"?x:x&&x.title,200)).filter(Boolean).slice(0,30);
+  applySeries(book,d.series,seriesMap);
+}
+function applySeries(book,s,seriesMap){
+  if(!s||typeof s!=="object"||!cleanStr(s.name))return;
+  const name=cleanStr(s.name,150),sid="s_"+slug(name);
+  book.seriesId=sid;book.seriesName=name;book.seriesNumber=book.contains&&book.contains.length>1?null:num(s.number);
+  const fresh={kind:"series",id:sid,name,author:book.author,books:[],complete:null};
+  let rec=seriesMap.get(sid)||(S.records.get(sid)?clone(S.records.get(sid)):fresh);
+  if(rec.deleted)rec=fresh;
+  const books=cleanSeriesBooks(s.books);   // only used if a full list came along (pasted from a chat)
+  if(books.length&&rec.catalogVersion!==2&&books.length>=(rec.books||[]).length){rec.books=books;if(typeof s.complete==="boolean")rec.complete=s.complete;}
+  if(cleanStr(s.universe)&&norm(s.universe)!==norm(name))rec.universe=cleanStr(s.universe,150);
+  rec.name=rec.name||name;rec.author=rec.author||book.author;
+  seriesMap.set(sid,rec);
 }
 function fillDetails(ids){
   if(!canAsk()){if(ids.length)scheduleRender();return;}
@@ -532,7 +552,7 @@ async function runJob(){
           const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;
           const copy=clone(cur);applyDetails(copy,d,seriesMap);out.push(copy);
         }
-        if(out.length){await save([...out,...seriesMap.values()]);fetchCovers(out.map(b=>b.id));}
+        if(out.length){await save([...out,...seriesMap.values()]);queueSeriesRefresh([...seriesMap.keys()]);}
       }catch(e){const m=sampleMsg(e);if(m)toast(m);if(stopsRun(e))break;}
       S.jobDone+=books.length;scheduleRender();
     }
@@ -540,6 +560,11 @@ async function runJob(){
 }
 
 /* ---------- series ---------- */
+// A book owns a series entry directly, or through an omnibus volume that contains it.
+function ownerOf(title,books){
+  const d=books.find(b=>titleMatch(b.title,title));if(d)return{book:d,via:null};
+  const o=books.find(b=>(b.contains||[]).some(t=>titleMatch(t,title)));return o?{book:o,via:o.title}:null;
+}
 function seriesView(){
   const owned=new Map();
   for(const b of live("book")){if(!b.seriesId)continue;if(!owned.has(b.seriesId))owned.set(b.seriesId,[]);owned.get(b.seriesId).push(b);}
@@ -547,39 +572,113 @@ function seriesView(){
   for(const[sid,books]of owned){
     const rec=S.records.get(sid);const hasRec=rec&&!rec.deleted;
     const catalog=hasRec&&Array.isArray(rec.books)?rec.books:[];
-    const used=new Set(),entries=[];
+    const used=new Set(),omni=new Set(),entries=[];
     for(const e of catalog){
-      let m=books.find(b=>!used.has(b)&&b.seriesNumber!=null&&e.number!=null&&Number(b.seriesNumber)===Number(e.number));
+      let m=books.find(b=>!used.has(b)&&!(b.contains&&b.contains.length)&&b.seriesNumber!=null&&e.number!=null&&Number(b.seriesNumber)===Number(e.number)&&!e.novella);
       if(!m)m=books.find(b=>!used.has(b)&&titleMatch(b.title,e.title));
+      let via=null;
       if(m)used.add(m);
-      entries.push({number:e.number,title:e.title,year:e.year,book:m||null});
+      else{const o=books.find(b=>(b.contains||[]).some(t=>titleMatch(t,e.title)));if(o){m=o;via=o.title;omni.add(o);}}
+      entries.push({number:e.number,title:e.title,year:e.year,novella:!!e.novella,upcoming:!!e.upcoming,book:m||null,via});
     }
-    for(const b of books)if(!used.has(b))entries.push({number:b.seriesNumber,title:b.title,year:b.year,book:b});
-    entries.sort((a,b)=>(a.number??999)-(b.number??999));
-    out.push({sid,name:(hasRec&&rec.name)||books[0].seriesName,author:(hasRec&&rec.author)||books[0].author,entries,
-      missing:entries.filter(e=>!e.book),complete:hasRec?rec.complete:null,catalogued:catalog.length>0});
+    for(const b of books)if(!used.has(b)&&!omni.has(b))entries.push({number:b.seriesNumber,title:b.title,year:b.year,novella:false,upcoming:false,book:b,via:null,extra:true});
+    entries.sort((a,b)=>(a.number??999)-(b.number??999)||(a.year||0)-(b.year||0));
+    const main=entries.filter(e=>!e.novella),nov=entries.filter(e=>e.novella);
+    out.push({sid,name:(hasRec&&rec.name)||books[0].seriesName||"Untitled series",author:(hasRec&&rec.author)||books[0].author,entries,
+      main,nov,ownedMain:main.filter(e=>e.book).length,ownedNov:nov.filter(e=>e.book).length,
+      missing:entries.filter(e=>!e.book&&!e.upcoming),complete:hasRec?rec.complete:null,catalogued:catalog.length>0,
+      fresh:hasRec&&rec.catalogVersion===2,universe:hasRec?rec.universe||null:null});
   }
   out.sort((a,b)=>(b.missing.length>0)-(a.missing.length>0)||a.name.localeCompare(b.name));
   return out;
 }
-async function refreshSeries(sid){
-  if(!canAsk()){toast("Checking for newer books needs a connection to Claude.");return;}
-  const sv=seriesView().find(s=>s.sid===sid);if(!sv)return;
+function catalogPrompt(name,author){
+  return `Give the complete reading list for the book series "${name}"${author?` by ${author}`:""}.
+Reply with only JSON: {"name":"Series name","universe":null,"complete":true,"books":[{"number":1,"title":"...","year":2001,"novella":false,"upcoming":false}]}
+Rules:
+- Main books in reading order with their series number. Include announced main books that are not out yet with "upcoming": true and "year": null.
+- Include novellas and short novels set in this series with "novella": true and a number that places them in reading order (for example 2.5 between books 2 and 3). Leave out single short stories and anthologies.
+- An omnibus or box set is never an entry; list the books inside it instead.
+- "universe" is the larger series this one belongs to, if any (for example The Riftwar Saga belongs to The Riftwar Cycle); otherwise null.
+- "complete" is false if more main books are planned.
+List only books you are confident exist. Never include books from other authors or other series.`;
+}
+async function refreshSeries(sid,{quiet=false}={}){
+  if(!canAsk()){if(!quiet)toast("Checking a series needs a connection to Claude.");return;}
+  const sv=seriesView().find(s=>s.sid===sid);const cur=S.records.get(sid);
+  const name=(sv&&sv.name)||(cur&&cur.name);if(!name)return;const author=(sv&&sv.author)||(cur&&cur.author)||"";
   S.busySeries.add(sid);scheduleRender();
   try{
-    const res=await AI.json(`List every main numbered entry in the book series "${sv.name}" by ${sv.author||"its author"}, in reading order, including the newest released or announced books you know of. Leave out novellas and companion books unless the series numbers them.
-Reply with only JSON: {"name":"Series name","books":[{"number":1,"title":"...","year":2001}],"complete":true}
-"complete" says whether the series has finished.`);
+    const res=await AI.json(catalogPrompt(name,author),{model:MODELS.smart});   // series facts always use the careful model
     const books=cleanSeriesBooks(res&&res.books);
     if(!books.length)throw{code:"invalid_json"};
-    const cur=S.records.get(sid);
-    const rec=clone(cur&&!cur.deleted?cur:{kind:"series",id:sid,name:sv.name,author:sv.author});
+    const latest=S.records.get(sid);
+    const rec=clone(latest&&!latest.deleted?latest:{kind:"series",id:sid,name,author});
     const before=(rec.books||[]).length;
-    rec.books=books;if(typeof res.complete==="boolean")rec.complete=res.complete;
+    rec.books=books;rec.catalogVersion=2;if(typeof res.complete==="boolean")rec.complete=res.complete;
+    if(cleanStr(res.universe)&&norm(res.universe)!==norm(rec.name))rec.universe=cleanStr(res.universe,150);else if(res.universe===null)rec.universe=rec.universe||null;
     await save(rec);
-    toast(books.length>before&&before?`Found ${plural(books.length-before,"more book")} in ${sv.name}.`:`${sv.name} is up to date.`);
-  }catch(e){const m=sampleMsg(e);if(m)toast(m);}
+    if(!quiet)toast(books.length>before&&before?`Found ${plural(books.length-before,"more book")} in ${name}.`:`${name} is up to date.`);
+  }catch(e){if(!quiet){const m=sampleMsg(e);if(m)toast(m);}}
   finally{S.busySeries.delete(sid);scheduleRender();}
+}
+const seriesQueue=new Set();let seriesRunning=false;
+function queueSeriesRefresh(ids){
+  for(const id of ids){const r=S.records.get(id);if(!r||r.catalogVersion!==2)seriesQueue.add(id);}
+  if(seriesRunning||!canAsk())return;
+  seriesRunning=true;(async()=>{try{while(seriesQueue.size&&canAsk()){const id=[...seriesQueue][0];seriesQueue.delete(id);await refreshSeries(id,{quiet:true});}}finally{seriesRunning=false;}})();
+}
+// The wider series a sub-series belongs to (the whole Riftwar Cycle, the whole Cosmere...).
+async function loadUniverse(sid){
+  const rec=S.records.get(sid);if(!rec||!rec.universe)return;
+  if(!canAsk()){toast("Loading the whole series needs a connection to Claude.");return;}
+  S.busySeries.add("u:"+sid);scheduleRender();
+  try{
+    const res=await AI.json(`List every book in "${rec.universe}"${rec.author?` by ${rec.author}`:""}, grouped by its sub-series, with the sub-series in reading order.
+Reply with only JSON: {"name":"${rec.universe}","groups":[{"name":"Sub-series name","books":[{"number":1,"title":"...","year":1982,"novella":false,"upcoming":false}]}]}
+Include novellas set in it with "novella": true, and announced books not out yet with "upcoming": true. Put standalone books in a group named "Standalone novels". An omnibus or box set is never an entry. List only books you are confident exist.`,{model:MODELS.smart,maxTokens:8000});
+    const groups=(Array.isArray(res&&res.groups)?res.groups:[]).map(g=>({name:cleanStr(g&&g.name,150),books:cleanSeriesBooks(g&&g.books)})).filter(g=>g.name&&g.books.length);
+    if(!groups.length)throw{code:"invalid_json"};
+    await save({kind:"universe",id:"u_"+slug(rec.universe),name:rec.universe,author:rec.author,groups});
+    S.openUniverse.add(sid);
+  }catch(e){const m=sampleMsg(e);if(m)toast(m);}
+  finally{S.busySeries.delete("u:"+sid);scheduleRender();}
+}
+// One-time cleanup: split box sets, mark omnibus volumes, fix series membership, then rebuild every series list.
+function seriesCheckPrompt(items){
+  return `For each book in this home library, say how it fits into a series.
+Books: ${JSON.stringify(items)}
+Reply with only a JSON array, one object per book, using the same "key" values:
+[{"key":"k0","boxSet":false,"boxBooks":[],"contains":[],"series":null}]
+- "boxSet" is true when the entry is a boxed set or slipcase of separate books (for example "His Dark Materials box set" or "The Licanius Trilogy" slipcase); then "boxBooks" lists each book in it as {"title":"","author":""}.
+- "contains" is for a single-volume omnibus (several books bound in one, like The Illustrated Gormenghast Trilogy): the titles of the books inside. Otherwise [].
+- "series" is null if the book is not part of a series, else {"name":"Series name","number":2,"universe":null}. "number" is its place in reading order (novellas get fractional places like 2.5; an omnibus gets null). "universe" is the larger series it belongs to, if any.`;
+}
+async function rebuildSeries(onStep){
+  if(!canAsk())throw{code:AI.key()?"offline":"no_key"};
+  const books=live("book");let split=0;const newIds=[];
+  for(let i=0;i<books.length;i+=25){
+    const batch=books.slice(i,i+25);onStep(`Checking series membership: ${Math.min(i+25,books.length)} of ${books.length}`);
+    const arr=await AI.json(seriesCheckPrompt(batch.map((b,k)=>({key:"k"+k,title:b.title,author:b.author||""}))),{model:MODELS.smart,maxTokens:6000});
+    const out=[],seriesMap=new Map();
+    for(const d of Array.isArray(arr)?arr:[]){
+      const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;
+      if(d.boxSet&&Array.isArray(d.boxBooks)&&d.boxBooks.length>1){
+        const parts=d.boxBooks.map(x=>newBook({title:x&&x.title,author:(x&&x.author)||cur.author,color:cur.color,textColor:cur.textColor,publisher:cur.publisher,photoId:cur.photoId})).filter(x=>x.title);
+        if(parts.length){out.push(...parts,{kind:"book",id:cur.id,deleted:true});newIds.push(...parts.map(x=>x.id));split++;continue;}
+      }
+      const c=clone(cur);
+      c.contains=Array.isArray(d.contains)?d.contains.map(x=>cleanStr(typeof x==="string"?x:x&&x.title,200)).filter(Boolean):[];
+      if(d.series&&cleanStr(d.series.name))applySeries(c,d.series,seriesMap);
+      else{c.seriesId=null;c.seriesName=null;c.seriesNumber=null;}
+      out.push(c);
+    }
+    if(out.length)await save([...out,...seriesMap.values()]);
+  }
+  if(newIds.length)fillDetails(newIds);
+  const ids=[...new Set(live("book").map(b=>b.seriesId).filter(Boolean))];
+  for(let k=0;k<ids.length;k++){onStep(`Rebuilding series lists: ${k+1} of ${ids.length}`);await refreshSeries(ids[k],{quiet:true});}
+  return{split,series:ids.length};
 }
 
 /* ---------- lists ---------- */
@@ -758,7 +857,7 @@ async function readPhotos(entries){
       const arr=Array.isArray(res&&res.books)?res.books:(Array.isArray(res)?res:[]);
       for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;
         found.push({title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),
-          color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false,entry:entries[i],box:validBox(r.box),look:["upright","flat","face"].includes(r.look)?r.look:"upright"});}
+          color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false,entry:entries[i]});}
       ok.push(entries[i]);
     }catch(e){
       if(e&&e.code==="cancelled")break;
@@ -802,29 +901,18 @@ function review(cands,errors,ok,savedCount,n){
       </div>`;}).join("")}</div>
     <div class="sticky-foot"><button class="btn brass wide" id="addFound"></button></div>`;
   const btn=$("#addFound");
-  const ownedPics=cands.filter(c=>c.owned&&c.box).length;
-  const upd=()=>{const k=body.querySelectorAll("#cands input[type=checkbox]:checked").length;
-    btn.textContent=k?`Add ${plural(k,"book")}${ownedPics?` and save ${ownedPics} spines`:""}`:ownedPics?`Save ${plural(ownedPics,"spine")} for books already here`:"Nothing selected";btn.disabled=!k&&!ownedPics;};
+  const upd=()=>{const k=body.querySelectorAll("#cands input[type=checkbox]:checked").length;btn.textContent=k?`Add ${plural(k,"book")}`:"Nothing selected";btn.disabled=!k;};
   body.querySelectorAll("#cands input[type=checkbox]").forEach(cb=>cb.onchange=upd);upd();
   btn.onclick=async()=>{
     const items=[];
     body.querySelectorAll("#cands input[type=checkbox]:checked").forEach(cb=>{const i=+cb.dataset.i;const c=cands[i];
       items.push({title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value,color:c.color,textColor:c.textColor,
-        translator:c.translator,publisher:c.publisher,entry:c.entry,box:c.box,look:c.look});});
+        translator:c.translator,publisher:c.publisher,entry:c.entry});});
     closeSheet();
     const photoIds=await keepPhotos(ok);
-    const pics=items.map(it=>({entry:it.entry,box:it.box,look:it.look}));
-    items.forEach(it=>{it.photoId=photoIds.get(it.entry)||null;delete it.entry;delete it.box;delete it.look;});
-    const recs=await addBooks(items,{returnRecs:true});
-    (async()=>{
-      for(let k=0;k<recs.length;k++){const p=pics[k];if(p&&p.box)await savePictureFromShelf(recs[k].id,p.entry,p.box,p.look);}
-      for(const c of cands.filter(c=>c.owned&&c.box)){
-        const b=live("book").find(x=>titleMatch(x.title,c.title)&&(!c.author||!x.author||lastName(x.author)===lastName(c.author)));
-        if(!b)continue;await savePictureFromShelf(b.id,c.entry,c.box,c.look);
-        if(!b.photoId&&photoIds.get(c.entry)){const x=clone(S.records.get(b.id));x.photoId=photoIds.get(c.entry);await save(x);}
-      }
-    })();
-    toast(items.length?(canAsk()?`Added ${plural(items.length,"book")}. Looking up details…`:`Added ${plural(items.length,"book")}.`):`Saving ${plural(ownedPics,"spine")} from your photo.`);
+    items.forEach(it=>{it.photoId=photoIds.get(it.entry)||null;delete it.entry;});
+    await addBooks(items);
+    toast(canAsk()?`Added ${plural(items.length,"book")}. Looking up details…`:`Added ${plural(items.length,"book")}.`);
   };
 }
 async function openTypeFromPhoto(idx){
@@ -850,89 +938,151 @@ async function openTypeFromPhoto(idx){
     });
 }
 
-/* ---------- pictures: covers, spines, 3D book ---------- */
-const picKey=(id,part)=>`${id}:${part}`;
-const pic=(id,part)=>S.imgs.get(picKey(id,part));
-async function imgPut(key,blob){
-  if(!blob)return;await store.put([{key,blob,at:Date.now()}],"images");
-  const old=S.imgs.get(key);if(old)URL.revokeObjectURL(old);S.imgs.set(key,URL.createObjectURL(blob));scheduleRender();
+/* ---------- book art: drawn spines, covers and the 3D book ---------- */
+const GOLD="#D9B864",CREAM="#EFE6CF",PAPER="#ECE6D8";
+// Single quotes: these names go inside style="..." attributes.
+const F_DISPLAY="'IM Fell English',Georgia,serif",F_SERIF="'EB Garamond',Georgia,serif",
+      F_SANS="'Avenir Next','Helvetica Neue',Helvetica,Arial,sans-serif",F_COND="'Avenir Next Condensed','Arial Narrow','Helvetica Neue',Arial,sans-serif";
+const ACCENTS=["#C8553D","#2E86AB","#E0A458","#3B7A57","#8E5572","#D9B864","#1F4E79","#B23A48","#5C946E","#E07A5F"];
+function mix(h1,h2,t){const a=parseInt(h1.slice(1),16),b=parseInt(h2.slice(1),16);
+  const r=Math.round((a>>16)*(1-t)+(b>>16)*t),g=Math.round((a>>8&255)*(1-t)+(b>>8&255)*t),bl=Math.round((a&255)*(1-t)+(b&255)*t);
+  return"#"+((1<<24)|(r<<16)|(g<<8)|bl).toString(16).slice(1);}
+const shade=(h,t)=>t<0?mix(h,"#000000",-t):mix(h,"#ffffff",t);
+const inkOn=bg=>lum(bg)>.3?"#1E1A14":"#F3ECDB";
+const goldOn=bg=>lum(bg)>.35?"#5A4310":GOLD;
+let _mctx;const _fit=new Map();
+function textW(str,font){_mctx=_mctx||document.createElement("canvas").getContext("2d");_mctx.font=font.replace("{s}","100px");return _mctx.measureText(str).width/100;}
+const fontStr=f=>`${f.it?"italic ":""}${f.wt||400} {s} ${f.fam}`;
+// Fit a title along a spine: 1 to 3 lines, as large as the length and thickness allow.
+function fitVertical(str,f,len,thick,maxFs){
+  const key=[str,f.fam,f.wt,f.it,f.ls,len|0,thick|0,maxFs].join("|");if(_fit.has(key))return _fit.get(key);
+  const w=t=>textW(t,fontStr(f))+(f.ls||0)*t.length;
+  const words=str.split(/\s+/).filter(Boolean);let best=null;
+  const tryLines=lines=>{const mw=Math.max(...lines.map(w));const fs=Math.min(maxFs,len/mw,thick/(lines.length*1.08));
+    if(!best||fs>best.fs*1.18)best={fs,lines};};
+  tryLines([words.join(" ")]);
+  if(words.length>=2){let b2=null;for(let i=1;i<words.length;i++){const l=[words.slice(0,i).join(" "),words.slice(i).join(" ")];const m=Math.max(...l.map(w));if(!b2||m<b2.m)b2={m,l};}tryLines(b2.l);}
+  if(words.length>=3&&thick>34){let b3=null;for(let i=1;i<words.length-1;i++)for(let j=i+1;j<words.length;j++){const l=[words.slice(0,i).join(" "),words.slice(i,j).join(" "),words.slice(j).join(" ")];const m=Math.max(...l.map(w));if(!b3||m<b3.m)b3={m,l};}tryLines(b3.l);}
+  best.fs=Math.max(5,Math.floor(best.fs*10)/10);_fit.set(key,best);return best;
 }
-async function imgDel(key){await store.del([key],"images");const old=S.imgs.get(key);if(old)URL.revokeObjectURL(old);S.imgs.delete(key);scheduleRender();}
-function validBox(b){
-  if(!Array.isArray(b)||b.length!==4)return null;const v=b.map(Number);
-  if(v.some(x=>!Number.isFinite(x)||x<-0.02||x>1.02))return null;
-  const[l,t,r,bt]=v;if(r-l<0.003||bt-t<0.02)return null;return v;
+// Fit horizontal text in a box with word wrap (covers).
+function wrapFit(text,f,maxW,maxH,maxFs,minFs){
+  const key=["w",text,f.fam,f.wt,f.it,f.ls,maxW,maxH,maxFs].join("|");if(_fit.has(key))return _fit.get(key);
+  const words=String(text).split(/\s+/).filter(Boolean);let res=null;
+  for(let fs=maxFs;fs>=minFs;fs-=0.5){
+    const W=t=>(textW(t,fontStr(f))+(f.ls||0)*t.length)*fs;const lines=[];let cur="";
+    for(const wd of words){const t=cur?cur+" "+wd:wd;if(!cur||W(t)<=maxW)cur=t;else{lines.push(cur);cur=wd;}}if(cur)lines.push(cur);
+    if(Math.max(...lines.map(W))<=maxW&&lines.length*fs*1.12<=maxH){res={fs,lines};break;}
+  }
+  res=res||{fs:minFs,lines:[text]};_fit.set(key,res);return res;
 }
-async function shrinkTo(blob,max){
-  const bmp=await decode(blob);if(!bmp)return blob;
-  try{const sc=Math.min(1,max/Math.max(bmp.width,bmp.height));const c=document.createElement("canvas");c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);
-    c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,"image/jpeg",.86))||blob;}
-  finally{if(bmp.close)bmp.close();}
+const surname=a=>{const p=String(a||"").trim().split(/\s+/);return p.length?p[p.length-1]:"";};
+function palette(b){const h=hash(b.id);const base=hex(b.color)||PALETTE[h%PALETTE.length];
+  return{c:base,dark:shade(base,-.45),deep:shade(base,-.7),light:shade(base,.35),acc:ACCENTS[(h>>3)%ACCENTS.length],ink:inkOn(base)};}
+const STYLE_SETS={classic:["gilt","hubs","label","minimal","penguin","deco"],fantasy:["gilt","gradient","deco","hubs","twotone","monogram","label"],
+  scifi:["pulp","minimal","gradient","twotone","stripes","deco"],dark:["pulp","twotone","stripes","deco","gradient","monogram"],
+  young:["paperback","stripes","pulp","twotone","monogram"],other:["paperback","twotone","minimal","stripes","label","penguin","monogram","gradient"]};
+function styleOf(b){
+  const g=b.genre||"";const set=/Classic|Literary|Poetry|Philosophy|History|Biography/.test(g)?"classic":/Fantasy/.test(g)?"fantasy":/Science/.test(g)?"scifi":
+    /Mystery|Horror/.test(g)?"dark":/Young|Children/.test(g)?"young":"other";
+  const list=STYLE_SETS[set];return list[hash(b.seriesId||b.id)%list.length];   // a series shares one design, like real editions
 }
-// Cut one book out of a shelf photo. Flat books are turned so their spine stands up like the rest.
-async function cropFromPhoto(blob,box,look){
-  const bmp=await decode(blob);if(!bmp)return null;
-  try{
-    const W=bmp.width,H=bmp.height;let[l,t,r,b]=box;
-    const px=look==="upright"?0.004:0.012,py=look==="flat"?0.004:0.012;
-    l=Math.max(0,l-px);r=Math.min(1,r+px);t=Math.max(0,t-py);b=Math.min(1,b+py);
-    const sx=l*W,sy=t*H,sw=(r-l)*W,sh=(b-t)*H;if(sw<4||sh<4)return null;
-    const rot=look==="flat",outW=rot?sh:sw,outH=rot?sw:sh;
-    const sc=Math.min(1,(look==="face"?1000:560)/Math.max(outW,outH));
-    const c=document.createElement("canvas");c.width=Math.max(1,Math.round(outW*sc));c.height=Math.max(1,Math.round(outH*sc));
-    const g=c.getContext("2d");
-    if(rot){g.translate(c.width,0);g.rotate(Math.PI/2);g.drawImage(bmp,sx,sy,sw,sh,0,0,c.height,c.width);}
-    else g.drawImage(bmp,sx,sy,sw,sh,0,0,c.width,c.height);
-    const out=await new Promise(res=>c.toBlob(res,"image/jpeg",.85));
-    return out?{blob:out,w:c.width,h:c.height}:null;
-  }finally{if(bmp.close)bmp.close();}
+function spineDims(b){const h=hash(b.id+b.title);const H=118+(h%30);const len=(b.title||"").length;
+  const W=Math.min(54,24+((h>>5)%12)+(len>16?6:0)+(len>28?8:0));return{W,H};}
+const vt=(text,top,L,f,W,maxFs,thick=.74)=>{if(!text||L<12)return"";const str=f.up?text.toUpperCase():text;const r=fitVertical(str,f,L*.94,W*thick,maxFs);
+  if(maxFs<=9&&r.fs<5.5)return"";   // an author name that can't be read at this size is left off
+  return`<span class="vt" style="top:${top}px;height:${L}px;font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.08 ${f.fam};letter-spacing:${f.ls||0}em;color:${f.col}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
+const box=(st)=>`<i class="dk" style="${st}"></i>`;
+// One spine, drawn at any size (shelf or 3D book).
+function spineArt(b,W,H){
+  const p=palette(b),st=styleOf(b),t=b.title||"",au=surname(b.author);let bg,deco="",out="";
+  const k=H/130;   // scale decorations with spine height
+  switch(st){
+    case"gilt":bg=p.c;deco=[8,H-22].map(y=>box(`top:${y*1}px;height:${14*k}px;left:0;right:0;background:linear-gradient(${GOLD} 0 1px,transparent 1px 3px,rgba(0,0,0,.45) 3px 4px,rgba(255,235,200,.22) 4px 7px,rgba(0,0,0,.45) 7px 8px,transparent 8px 10px,${GOLD} 10px 11px,transparent 11px)`)).join("");
+      out=vt(t,26*k,H-52*k,{fam:F_DISPLAY,col:goldOn(p.c)},W,15);break;
+    case"hubs":{bg=p.deep;const ys=[.12,.3,.7,.88].map(f=>f*H);deco=ys.map(y=>box(`top:${y-3}px;height:6px;left:0;right:0;background:linear-gradient(rgba(0,0,0,.5),rgba(255,235,200,.25) 45%,rgba(0,0,0,.5))`)).join("")+
+      box(`top:${.33*H}px;height:${.34*H}px;left:12%;right:12%;background:${p.c};box-shadow:inset 0 0 0 1px ${GOLD}`);
+      out=vt(t,.34*H,.32*H,{fam:F_SERIF,wt:600,col:goldOn(p.c)},W*.76,11)+vt(au,.13*H+4,.16*H,{fam:F_SERIF,it:1,col:GOLD},W,7);break;}
+    case"label":bg=`repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),${p.c}`;
+      deco=box(`top:${.1*H}px;height:${.46*H}px;left:14%;right:14%;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 2px ${PAPER},inset 0 0 0 3px ${p.dark}`)+
+        box(`bottom:${.08*H}px;height:${.1*H}px;left:22%;right:22%;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3)`);
+      out=vt(t,.12*H,.42*H,{fam:F_SERIF,wt:600,col:"#2B1E12"},W*.72,12);
+      out+=`<span class="vt" style="top:${.82*H}px;height:${.1*H}px;font:600 ${Math.min(8,W*.3)}px/1 ${F_SERIF};color:#2B1E12">${esc(au.slice(0,2))}</span>`;break;
+    case"paperback":bg=p.c;deco=box(`bottom:6px;left:50%;width:${Math.min(14,W*.45)}px;height:${Math.min(14,W*.45)}px;margin-left:-${Math.min(7,W*.225)}px;border-radius:50%;background:${p.ink};opacity:.85`);
+      out=vt(au,6,.28*H,{fam:F_SANS,wt:600,col:p.ink,ls:.06,up:1},W,8)+vt(t,.3*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink},W,14);break;
+    case"twotone":bg=`linear-gradient(${p.deep} 0 36%,${p.c} 36%)`;
+      out=vt(au,6,.36*H-10,{fam:F_SANS,wt:500,col:GOLD,ls:.08,up:1},W,8)+vt(t,.38*H,.58*H,{fam:F_SERIF,wt:600,col:p.ink},W,14);break;
+    case"penguin":bg=`linear-gradient(${p.acc} 0 22%,${CREAM} 22% 80%,${p.acc} 80%)`;
+      deco=box(`bottom:${.07*H}px;left:50%;width:${Math.min(10,W*.4)}px;height:${Math.min(14,W*.5)}px;margin-left:-${Math.min(5,W*.2)}px;border-radius:50%;background:${CREAM}`);
+      out=vt(t,.24*H,.54*H,{fam:F_SANS,wt:600,col:"#1E1A14"},W,12)+vt(au,4,.22*H-8,{fam:F_SANS,wt:500,col:inkOn(p.acc)},W,7);break;
+    case"deco":bg=`linear-gradient(90deg,${p.deep},${shade(p.deep,.08)} 50%,${p.deep})`;
+      deco=box(`top:4px;bottom:4px;left:3px;right:3px;border-left:1px solid ${GOLD};border-right:1px solid ${GOLD};opacity:.8`)+
+        [10,H-18].map(y=>box(`top:${y}px;left:50%;width:7px;height:7px;margin-left:-3.5px;background:${GOLD};transform:rotate(45deg)`)).join("");
+      out=vt(t,22,H-44,{fam:F_SANS,wt:500,col:GOLD,ls:.14,up:1},W,10,.62);break;
+    case"pulp":bg=p.c;deco=box(`top:0;left:0;right:0;height:${.2*H}px;background:${p.acc}`)+box(`bottom:0;left:0;right:0;height:${.06*H}px;background:${p.deep}`);
+      out=vt(au,3,.2*H-6,{fam:F_COND,wt:700,col:inkOn(p.acc),up:1},W,8)+vt(t,.22*H,.68*H,{fam:F_COND,wt:800,col:p.ink,up:1},W,15);break;
+    case"minimal":bg=PAPER;deco=[.1,.88].map(f=>box(`top:${f*H}px;left:0;right:0;height:2px;background:${p.c}`)).join("");
+      out=vt(t,.14*H,.6*H,{fam:F_SERIF,it:1,col:shade(p.c,-.3)},W,13)+vt(au,.76*H,.1*H,{fam:F_SANS,wt:500,col:"#3A3229",up:1,ls:.05},W,6);break;
+    case"gradient":bg=`linear-gradient(${p.light},${p.c} 45%,${p.deep})`;
+      deco=box(`top:7px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${CREAM};box-shadow:0 0 6px ${CREAM}`);
+      out=vt(t,18,H-46,{fam:F_DISPLAY,col:CREAM},W,15)+vt(au,H-26,22,{fam:F_SERIF,it:1,col:CREAM},W,7);break;
+    case"stripes":bg=p.c;deco=[.06,.1,.86,.9].map(f=>box(`top:${f*H}px;left:0;right:0;height:${Math.max(2,.02*H)}px;background:${p.acc}`)).join("");
+      out=vt(t,.14*H,.56*H,{fam:F_SERIF,wt:600,col:p.ink},W,14)+vt(au,.72*H,.12*H,{fam:F_SANS,wt:500,col:p.ink,up:1},W,7);break;
+    default:{bg=p.dark;const d=Math.min(W*.7,20);deco=box(`top:6px;left:50%;width:${d}px;height:${d}px;margin-left:-${d/2}px;border-radius:50%;border:1px solid ${GOLD}`);
+      out=`<span class="vt" style="top:6px;height:${d}px;font:400 ${d*.62}px/1 ${F_DISPLAY};color:${GOLD};writing-mode:horizontal-tb">${esc(au.slice(0,1))}</span>`+vt(t,d+12,H-d-20,{fam:F_SERIF,wt:600,col:inkOn(p.dark)},W,13);}
+  }
+  return`<span class="art" style="background:${bg}">${deco}${out}</span>`;
 }
-// Save what a shelf photo shows of one book: its real spine, or its cover if it faces out.
-async function savePictureFromShelf(bookId,entry,box,look,{replace=true}={}){
-  if(!box||!entry||!entry.blob)return false;
-  const part=look==="face"?"cover":"spine";
-  if(!replace&&pic(bookId,part))return false;
-  const cut=await cropFromPhoto(entry.blob,box,look);if(!cut)return false;
-  await imgPut(picKey(bookId,part),cut.blob);
-  const cur=S.records.get(bookId);if(!cur)return true;const c=clone(cur);
-  if(part==="spine")c.spineAspect=+(cut.w/cut.h).toFixed(4);else c.coverSource="shelf";
-  await save(c);return true;
+const hz=(text,f,x,y,w,h,maxFs,minFs,align="center")=>{if(!text)return"";const r=wrapFit(f.up?String(text).toUpperCase():text,f,w,h,maxFs,minFs);
+  return`<span class="hz" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;justify-content:${align==="left"?"flex-start":"center"};text-align:${align};font:${f.it?"italic ":""}${f.wt||400} ${r.fs}px/1.12 ${f.fam};letter-spacing:${f.ls||0}em;color:${f.col};${f.up?"text-transform:uppercase;":""}"><span>${r.lines.map(esc).join("<br>")}</span></span>`;};
+function coverArt(b){
+  const p=palette(b),st=styleOf(b),t=b.title||"",a=b.author||"";let bg,d="",o="";
+  switch(st){
+    case"gilt":case"hubs":case"label":bg=st==="label"?`repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),${p.c}`:p.c;
+      d=box(`inset:9px;border:1px solid ${goldOn(p.c)}`)+box(`inset:13px;border:1px solid ${goldOn(p.c)};opacity:.6`);
+      if(st==="label")d+=box(`left:22px;right:22px;top:46px;height:88px;background:${PAPER};box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 3px ${PAPER},inset 0 0 0 4px ${p.dark}`);
+      o=st==="label"?hz(t,{fam:F_SERIF,wt:600,col:"#2B1E12"},30,52,90,76,20,9):hz(t,{fam:F_DISPLAY,col:goldOn(p.c)},20,48,110,92,24,10);
+      o+=`<span class="hz" style="left:0;right:0;top:142px;height:22px;justify-content:center;font:400 18px/1 ${F_DISPLAY};color:${goldOn(p.c)}">❧</span>`+hz(a,{fam:F_SERIF,it:1,col:goldOn(p.c)},20,170,110,30,13,8);break;
+    case"penguin":bg=`linear-gradient(${p.acc} 0 30%,${CREAM} 30% 72%,${p.acc} 72%)`;
+      d=box(`left:63px;top:184px;width:24px;height:30px;border-radius:50%;background:${CREAM}`);
+      o=hz(t,{fam:F_SANS,wt:600,col:"#1E1A14"},14,74,122,60,20,9)+hz(a,{fam:F_SANS,wt:400,col:"#1E1A14"},14,136,122,22,12,8);break;
+    case"twotone":bg=`linear-gradient(${p.deep} 0 40%,${p.c} 40%)`;
+      o=hz(a,{fam:F_SANS,wt:500,col:GOLD,ls:.12,up:1},14,26,122,50,13,7)+hz(t,{fam:F_SERIF,wt:600,col:p.ink},14,104,122,100,26,10);break;
+    case"pulp":bg=`linear-gradient(160deg,${p.c} 0 62%,${p.acc} 62% 70%,${p.c} 70%)`;
+      d=box(`left:10px;top:10px;padding:0;width:70px;height:20px;background:${p.acc}`);
+      o=hz(surname(a),{fam:F_COND,wt:700,col:inkOn(p.acc),up:1},12,10,66,20,11,7,"left")+hz(t,{fam:F_COND,wt:800,col:p.ink,up:1},12,40,126,110,30,10,"left");break;
+    case"stripes":bg=p.c;d=[96,104,112].map(y=>box(`left:0;right:0;top:${y}px;height:4px;background:${p.acc}`)).join("");
+      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink},14,20,122,70,24,10)+hz(a,{fam:F_SANS,wt:500,col:p.ink,up:1,ls:.06},14,130,122,40,12,7);break;
+    case"paperback":bg=p.c;d=box(`left:20px;right:20px;top:132px;height:1px;background:${p.ink};opacity:.6`)+box(`left:68px;top:198px;width:14px;height:14px;border-radius:50%;background:${p.ink};opacity:.8`);
+      o=hz(t,{fam:F_SERIF,wt:600,col:p.ink},14,26,122,100,26,10)+hz(a,{fam:F_SERIF,it:1,col:p.ink},14,142,122,40,14,8);break;
+    case"minimal":bg=PAPER;d=box(`inset:10px;border:2px solid ${p.c}`);
+      o=hz(t,{fam:F_SERIF,it:1,col:shade(p.c,-.35)},22,60,106,80,22,9)+hz(a,{fam:F_SANS,wt:500,col:"#3A3229",up:1,ls:.08},22,160,106,30,10,6);break;
+    case"deco":bg=`repeating-conic-gradient(from 0deg at 50% 46%,rgba(217,184,100,.12) 0 4deg,transparent 4deg 12deg),${p.deep}`;
+      d=box(`inset:8px;border:1px solid ${GOLD}`)+box(`left:50%;top:22px;width:10px;height:10px;margin-left:-5px;background:${GOLD};transform:rotate(45deg)`);
+      o=hz(t,{fam:F_SANS,wt:500,col:GOLD,ls:.14,up:1},18,56,114,90,18,8)+hz(a,{fam:F_SANS,wt:400,col:GOLD,ls:.1,up:1},18,170,114,30,9,6);break;
+    case"gradient":bg=`radial-gradient(circle at 50% 30%,${p.light},${p.c} 45%,${p.deep})`;
+      o=`<span class="hz" style="left:0;right:0;top:16px;height:16px;justify-content:center;font:12px/1 serif;color:${CREAM}">✦</span>`+
+        hz(t,{fam:F_DISPLAY,col:CREAM},14,44,122,110,28,10)+hz(a,{fam:F_SERIF,it:1,col:CREAM},14,180,122,30,13,8);break;
+    default:bg=p.dark;d=box(`left:50px;top:20px;width:50px;height:50px;border-radius:50%;border:1px solid ${GOLD}`);
+      o=`<span class="hz" style="left:50px;top:20px;width:50px;height:50px;justify-content:center;font:400 32px/1 ${F_DISPLAY};color:${GOLD}">${esc(surname(a).slice(0,1))}</span>`+
+        hz(t,{fam:F_SERIF,wt:600,col:inkOn(p.dark)},14,84,122,90,24,10)+hz(a,{fam:F_SERIF,it:1,col:GOLD},14,186,122,26,12,7);
+  }
+  return`<span class="art jacket" style="background:${bg}">${d}${o}</span>`;
 }
-async function lookupCover(b){
-  try{
-    const q=new URLSearchParams({title:b.title,limit:"1",fields:"cover_i"});if(b.author)q.set("author",b.author);
-    const r=await fetch("https://openlibrary.org/search.json?"+q);
-    if(r.ok){const j=await r.json();const id=j&&j.docs&&j.docs[0]&&j.docs[0].cover_i;if(id)return`https://covers.openlibrary.org/b/id/${id}-L.jpg`;}
-  }catch(e){}
-  try{
-    const q=`intitle:${b.title}`+(b.author?` inauthor:${b.author}`:"");
-    const r=await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=1&q="+encodeURIComponent(q));
-    if(r.ok){const j=await r.json();const l=j&&j.items&&j.items[0]&&j.items[0].volumeInfo&&j.items[0].volumeInfo.imageLinks;
-      const u=l&&(l.large||l.medium||l.thumbnail);if(u)return u.replace(/^http:/,"https:").replace(/&edge=curl/,"");}
-  }catch(e){}
-  return null;
+function backArt(b){
+  const p=palette(b),st=styleOf(b);const bg=st==="minimal"?PAPER:st==="penguin"?CREAM:st==="deco"||st==="twotone"||st==="monogram"?p.deep:p.c;const ink=inkOn(bg);
+  const blurb=b.blurb||b.title||"";const r=wrapFit(blurb,{fam:F_SERIF},118,150,11,6.5);
+  return`<span class="art jacket" style="background:${bg}"><span class="hz" style="left:16px;top:18px;width:118px;height:150px;align-items:flex-start;justify-content:flex-start;text-align:left;font:400 ${r.fs}px/1.4 ${F_SERIF};color:${ink}">${r.lines.map(esc).join(" ")}</span>
+    <i class="dk" style="right:14px;bottom:14px;width:44px;height:26px;background:#fff;padding:0"></i><i class="dk" style="right:17px;bottom:17px;width:38px;height:16px;background:repeating-linear-gradient(90deg,#111 0 1px,#fff 1px 2px,#111 2px 4px,#fff 4px 5px,#111 5px 6px,#fff 6px 8px)"></i>
+    ${b.publisher?`<span class="hz" style="left:16px;bottom:16px;width:70px;height:16px;justify-content:flex-start;font:italic 400 9px/1 ${F_SERIF};color:${ink}">${esc(b.publisher)}</span>`:""}</span>`;
 }
-// Covers come from Open Library (then Google Books). The app saves each picture so it shows offline.
-async function fetchCovers(ids,onStep,force){
-  if(navigator.onLine===false)return 0;
-  const books=(ids?ids.map(i=>S.records.get(i)):live("book")).filter(b=>b&&!b.deleted&&!b.coverUrl&&!pic(b.id,"cover")&&(force||!b.coverChecked));
-  const total=books.length;let found=0,done=0;const out=[];
-  const worker=async()=>{while(books.length){const b=books.shift();const url=await lookupCover(b);
-    const cur=S.records.get(b.id);if(cur&&!cur.deleted){const c=clone(cur);c.coverChecked=true;if(url){c.coverUrl=url;found++;fetch(url,{mode:"no-cors"}).catch(()=>{});}out.push(c);}
-    done++;if(onStep)onStep(done,total);if(out.length>=20)await save(out.splice(0));}};
-  await Promise.all([worker(),worker(),worker()]);
-  if(out.length)await save(out);
-  return found;
-}
-function coverSrc(b){return pic(b.id,"cover")||b.coverUrl||null;}
 function book3dHTML(b){
-  const{c,t}=colors(b);const cover=coverSrc(b),back=pic(b.id,"back"),sp=pic(b.id,"spine");
-  const T=Math.round(Math.max(18,Math.min(64,225*(b.spineAspect||0.15))));
+  const{W,H}=spineDims(b);const T=Math.round(Math.max(18,Math.min(60,225*W/H)));
   return`<div class="stage" id="stage" role="img" aria-label="${esc(b.title)}: drag to turn the book, tap to flip it">
-    <div class="book3d" id="b3d" style="--bt:${T}px;--c:${c};--t:${t}">
-      <div class="face front"><div class="drawn-cover"><span class="dt">${esc(b.title)}</span><span class="da">${esc(b.author||"")}</span></div>${cover?`<img src="${cover}" alt="" onerror="this.remove()">`:""}</div>
-      <div class="face back"><div class="drawn-back"><p>${esc(b.blurb||b.title)}</p><span class="da">${esc(b.publisher||"")}</span></div>${back?`<img src="${back}" alt="" onerror="this.remove()">`:""}</div>
-      <div class="face spine3"><div class="drawn-spine"><span>${esc(b.title)}</span></div>${sp?`<img src="${sp}" alt="" onerror="this.remove()">`:""}</div>
+    <div class="book3d" id="b3d" style="--bt:${T}px">
+      <div class="face front">${coverArt(b)}</div>
+      <div class="face back">${backArt(b)}</div>
+      <div class="face spine3">${spineArt(b,T,225)}</div>
       <div class="face edge right"></div><div class="face edge top"></div><div class="face edge bottom"></div>
     </div></div>
     <p class="turn-hint">Drag to turn the book. Tap to flip it.</p>`;
@@ -946,6 +1096,7 @@ function mountTurner(stage,el){
   const end=()=>{if(!drag)return;drag=false;el.classList.remove("dragging");if(moved<6){ry+=180;set();}};
   stage.addEventListener("pointerup",end);stage.addEventListener("pointercancel",end);set();
 }
+
 
 /* ---------- translations ---------- */
 function translationPrompt(items){
@@ -1125,11 +1276,7 @@ function openBook(id){
     ${b.blurb?`<p class="blurb parch">${esc(b.blurb)}</p>`:`<p class="muted" style="margin-top:14px">${b.needsDetails?(canAsk()?"Details are on their way, or tap Look up details.":"Details get looked up once you’re online."):"No description for this one."}</p>`}
     <div class="actions">
       ${canAsk()?`<button class="btn" id="refresh">${b.needsDetails?"Look up details":"Refresh details"}</button>`:""}
-      ${canAsk()&&isTranslated(b)&&!translatorKnown(b)?`<label class="btn" style="cursor:pointer">Snap the title page<input type="file" id="tpSnap" class="vh" accept="image/*"></label>`:""}
       <button class="btn" id="edit">Edit</button>
-      <label class="btn" style="cursor:pointer">Snap my cover<input type="file" id="snapCover" class="vh" accept="image/*"></label>
-      <label class="btn" style="cursor:pointer">Snap the back<input type="file" id="snapBack" class="vh" accept="image/*"></label>
-      ${pic(b.id,"spine")?`<button class="btn quiet" id="dropSpine">Use a drawn spine</button>`:""}
       <button class="btn quiet danger-text" id="remove">Remove</button>
     </div>`,body=>{
       const ts=$("#toSeries",body);if(ts)ts.onclick=()=>{closeSheet();S.tab="series";S.openSeries.add(b.seriesId);render();
@@ -1137,17 +1284,8 @@ function openBook(id){
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
       mountTurner($("#stage",body),$("#b3d",body));
-      for(const[sel,part]of[["#snapCover","cover"],["#snapBack","back"]]){const inp=$(sel,body);inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
-        await imgPut(picKey(b.id,part),await shrinkTo(f,1200));
-        if(part==="cover"){const c=clone(S.records.get(b.id));c.coverSource="you";await save(c);}
-        openBook(b.id);toast(part==="cover"?"Cover saved.":"Back cover saved.");};}
-      const ds=$("#dropSpine",body);if(ds)ds.onclick=async()=>{await imgDel(picKey(b.id,"spine"));openBook(b.id);toast("Back to a drawn spine.");};
-      const snap=$("#tpSnap",body);if(snap)snap.onchange=async()=>{const f=snap.files[0];if(!f)return;
-        snap.closest("label").firstChild.textContent="Reading…";
-        try{const t=await readTitlePage(b.id,f);openBook(b.id);toast(t?`Translator: ${t}.`:"No translator name found in that photo. Try the title page or copyright page.");}
-        catch(e){openBook(b.id);toast(sampleMsg(e)||"That didn’t work. Try again.");}};
       const rm=$("#remove",body);
-      rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});for(const p of["cover","back","spine"])if(pic(b.id,p))imgDel(picKey(b.id,p));toast(`Removed “${b.title}”.`);return;}
+      rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);return;}
         rm.dataset.armed="1";rm.textContent="Tap again to remove";};
     });
 }
@@ -1212,18 +1350,16 @@ function openMenu(){
     <div class="actions" style="margin-top:8px">${key?`<button class="btn small" id="testKey">Test key</button><button class="btn small quiet danger-text" id="clearKey">Remove key</button>`:""}</div>
     <label class="switch" style="margin-top:14px"><input type="checkbox" id="eco" ${LS.get("study-economy","0")==="1"?"checked":""}> Economy mode: use the cheaper model (less accurate on fancy spines)</label>
     <p class="muted">Spent so far: $${(sp.cost||0).toFixed(2)} across ${plural(sp.calls||0,"request")}.</p>
-    <h3 class="sub">Covers and spines</h3>
-    <p class="muted" style="margin-top:0">${(()=>{const all=live("book"),cv=all.filter(b=>coverSrc(b)).length,sp=all.filter(b=>pic(b.id,"spine")).length;
-      return `${cv} of ${plural(all.length,"book")} have a cover, and ${sp} show their real spine. To get real spines for books already here, photograph each shelf again with Add books: nothing gets added twice, the spines just get saved.`;})()}</p>
-    <button class="btn wide" id="findCovers" ${navigator.onLine===false?"disabled":""}>Find covers</button>
-    <label class="switch" style="margin-top:10px"><input type="checkbox" id="realSpines" ${LS.get("study-photo-spines","1")==="1"?"checked":""}> Show real spines from my photos</label>
+    <h3 class="sub">Series</h3>
+    <p class="muted" style="margin-top:0">Rechecks every book: splits box sets into their books, counts omnibus volumes as every book inside them, adds novellas and links sub-series to their wider series. Uses the more careful model, roughly 50 cents for a library your size.</p>
+    <button class="btn wide" id="rebuildSeries" ${canAsk()?"":"disabled"}>${canAsk()?"Rebuild series":"Rebuild series (needs internet and an API key)"}</button>
     <h3 class="sub">Translations</h3>
     <p class="muted" style="margin-top:0">${(()=>{const t=live("book").filter(isTranslated),u=t.filter(b=>!translatorKnown(b)).length,un=live("book").filter(b=>!b.translationChecked).length;
       return `${plural(t.length,"translated book")} so far${u?`, ${u} without a confirmed translator`:""}.${un?` ${plural(un,"book")} not checked yet.`:""}`;})()}</p>
     <button class="btn wide" id="findTr" ${canAsk()?"":"disabled"}>${canAsk()?"Find translators":"Find translators (needs internet and an API key)"}</button>
     <p class="muted">${plural(S.savedPhotos,"shelf photo")} saved on this phone, so Claude can look at them again for new features.${S.savedPhotos?` <button class="btn small quiet danger-text" id="delPhotos">Delete saved photos</button>`:""}</p>
     <h3 class="sub">Backup file</h3>
-    <p class="muted" style="margin-top:0">${esc(syncText())} Restoring merges a backup with what’s here; nothing gets deleted. Pictures aren’t included in backup files. Backups from the Claude version of The Study work too.</p>
+    <p class="muted" style="margin-top:0">${esc(syncText())} Restoring merges a backup with what’s here; nothing gets deleted. Backups from the Claude version of The Study work too.</p>
     <div class="list-pick">
       <button class="btn wide" id="exp">Save a backup file</button>
       <label class="btn wide" style="cursor:pointer">Restore from a backup file<input type="file" id="imp" class="vh" accept="application/json,.json"></label>
@@ -1241,10 +1377,10 @@ function openMenu(){
       const dp=$("#delPhotos",body);if(dp)dp.onclick=async()=>{if(!dp.dataset.armed){dp.dataset.armed="1";dp.textContent="Tap again to delete";return;}
         const ids=(await store.all("photos")).filter(p=>p.read).map(p=>p.id);await store.del(ids,"photos");S.savedPhotos=0;
         toast("Saved photos deleted.");openMenu();};
-      $("#findCovers",body).onclick=async e=>{const btn=e.currentTarget;btn.disabled=true;
-        const n=await fetchCovers(null,(d,t)=>{btn.textContent=`Finding covers: ${d} of ${t}`;},true);
-        btn.disabled=false;btn.textContent="Find covers";toast(n?`Found ${plural(n,"cover")}.`:"No new covers found.");};
-      $("#realSpines",body).onchange=e=>{LS.set("study-photo-spines",e.target.checked?"1":"0");scheduleRender();};
+      const rb=$("#rebuildSeries",body);if(rb)rb.onclick=async()=>{rb.disabled=true;
+        try{const r=await rebuildSeries(m=>{rb.textContent=m;});closeSheet();
+          toast(`Rebuilt ${plural(r.series,"series","series")}.${r.split?` Split ${plural(r.split,"box set")} into separate books.`:""}`);}
+        catch(e){rb.disabled=false;rb.textContent="Rebuild series";toast(sampleMsg(e)||"That didn’t finish. Try again.");}};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
       $("#exp",body).onclick=async()=>{
         const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=clone(r);delete c._synced;return c;});
@@ -1273,14 +1409,8 @@ function openMenu(){
 let rq=false;
 function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=false;render();});}
 function spine(b){
-  const h=hash(b.id+b.title);const{c,t}=colors(b);
-  const H=116+(h%32),W=24+((h>>5)%12)+Math.min(10,Math.floor((b.title||"").length/9));
-  const real=LS.get("study-photo-spines","1")==="1"&&pic(b.id,"spine");
-  if(real){const RW=Math.max(12,Math.min(72,Math.round(H*(b.spineAspect||0.16))));
-    return`<div class="slot"><button class="spine photo" style="--h:${H}px;--w:${RW}px;background-image:url('${real}')" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}"></button></div>`;}
-  const bound=lum(c)<.09&&(h>>9)%2===0;
-  const cls=bound?" bound":((h>>9)%4===1?" banded":"");
-  return`<div class="slot"><button class="spine${cls}${b.needsDetails?" pending":""}" style="--h:${H}px;--w:${W}px;--c:${c};--t:${t}" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}"><span>${esc(b.title)}</span></button></div>`;
+  const{W,H}=spineDims(b);
+  return`<div class="slot"><button class="spine drawn${b.needsDetails?" pending":""}" style="--h:${H}px;--w:${W}px" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}">${spineArt(b,W,H)}</button></div>`;
 }
 function bookcase(label,count,inner,opts={}){
   return`<section class="case">${CORNICE}<div class="plate-row">${SCROLL("")}<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>${SCROLL(" r")}</div>
@@ -1327,31 +1457,53 @@ function renderShelves(){
   return`<p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p>`+
     groups.map(([label,list])=>bookcase(label,list.length,list.map(spine).join(""))).join("");
 }
+function seriesEntryHTML(s,e,listed){
+  const num=e.number!=null&&!e.novella?e.number:"";const nov=e.novella?` <span class="tag novtag">novella</span>`:"";
+  if(e.book)return`<div class="entry${e.novella?" nov":""}"><span class="num">${num}</span><button class="link" data-book="${e.book.id}"><div class="et">${esc(e.via?e.title:e.book.title)}${nov}</div>${e.via?`<div class="ey">in ${esc(e.via)}</div>`:e.year?`<div class="ey">${esc(e.year)}</div>`:""}</button><span class="owned">on your shelf</span></div>`;
+  if(e.upcoming)return`<div class="entry missing${e.novella?" nov":""}"><span class="num">${num}</span><div><div class="et">${esc(e.title)}${nov}</div></div><span class="owned" style="color:var(--text-2)">not out yet</span></div>`;
+  const idx=s.missing.indexOf(e);const on=listed.get(norm(e.title));
+  return`<div class="entry missing${e.novella?" nov":""}"><span class="num">${num}</span><div><div class="et">${esc(e.title)}${nov}</div>${e.year?`<div class="ey">${esc(e.year)}</div>`:""}</div>
+    ${on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small" data-want="${s.sid}|${idx}">Add to ${WISHLIST}</button>`}</div>`;
+}
+function universeHTML(s){
+  const u=S.records.get("u_"+slug(s.universe));if(!u||u.deleted||!S.openUniverse.has(s.sid))return"";
+  const books=live("book");let html=`<div class="universe"><p class="uni-title">Every book in ${esc(u.name)}</p>`;
+  for(const g of u.groups){
+    const own=g.books.filter(x=>ownerOf(x.title,books)).length;
+    html+=`<p class="uni-group${norm(g.name)===norm(s.name)?" here":""}">${esc(g.name)} <small>${own} of ${g.books.length}</small></p>`;
+    for(const x of g.books){const o=ownerOf(x.title,books);
+      html+=`<div class="entry${o?"":" missing"}${x.novella?" nov":""}"><span class="num">${x.novella?"":x.number??""}</span><div><div class="et">${esc(x.title)}${x.novella?` <span class="tag novtag">novella</span>`:""}</div>${o&&o.via?`<div class="ey">in ${esc(o.via)}</div>`:x.year?`<div class="ey">${esc(x.year)}</div>`:""}</div><span class="owned"${o?"":` style="color:var(--text-2)"`}>${o?"on your shelf":x.upcoming?"not out yet":""}</span></div>`;}
+  }
+  return html+`</div>`;
+}
 function renderSeries(){
-  const all=seriesView();
+  let all=seriesView();
   if(!all.length)return`<p class="empty-note">Series show up here once you add books that belong to one. Claude spots them while looking up details.</p>`;
   const gaps=all.reduce((n,s)=>n+s.missing.length,0);
+  const q=norm(S.sq);
+  if(q)all=all.filter(s=>norm([s.name,s.author,s.universe,...s.entries.map(e=>e.title)].join(" ")).includes(q));
   const shown=S.gapsOnly?all.filter(s=>s.missing.length):all;
   const listed=listItemsIndex();
-  return`<div class="section-head"><p>${plural(all.length,"series","series")}, ${gaps?`${plural(gaps,"book")} missing`:"no gaps"}</p>
+  return`<div class="section-head"><p>${q?`${plural(all.length,"series","series")} match “${esc(S.sq)}”`:`${plural(seriesView().length,"series","series")}, ${gaps?`${plural(gaps,"book")} missing`:"no gaps"}`}</p>
     <button class="chip" data-act="gapsOnly" aria-pressed="${S.gapsOnly}">Only series with gaps</button></div>`+
-  (shown.length?"":`<p class="empty-note">Every series you own is complete.</p>`)+
+  (shown.length?"":`<p class="empty-note">${q?"No series match that search.":"Every series you own is complete."}</p>`)+
   shown.map(s=>{
-    const open=S.openSeries.has(s.sid);const owned=s.entries.filter(e=>e.book).length;
+    const open=S.openSeries.has(s.sid);
+    const counts=s.catalogued?[`you own ${s.ownedMain} of ${plural(s.main.length,"book")}`,s.nov.length?`${s.ownedNov} of ${plural(s.nov.length,"novella")}`:""].filter(Boolean).join(", "):"";
+    const sub=[s.author,counts,s.complete===false?"still being written":""].filter(Boolean).join(", ");
     const tag=!s.catalogued?`<span class="tag soft">List not loaded</span>`:s.missing.length?`<span class="tag gap">${s.missing.length} missing</span>`:`<span class="tag full">${s.complete===false?"Caught up":"Complete set"}</span>`;
-    const sub=[s.author,s.catalogued?`you own ${owned} of ${s.entries.length}`:"",s.complete===false?"still being written":""].filter(Boolean).join(", ");
+    const ubusy=S.busySeries.has("u:"+s.sid),uloaded=s.universe&&S.records.get("u_"+slug(s.universe));
     return`<div class="ledger leather" id="ser-${s.sid}">
       <button class="card-head" data-toggle-series="${s.sid}" aria-expanded="${open}">
         <p class="card-title">${esc(s.name)}</p>
+        ${s.universe?`<p class="card-sub">Part of ${esc(s.universe)}</p>`:""}
         <p class="card-sub">${esc(sub)}</p>
-        <div class="progress-row"><div class="pips" aria-hidden="true">${s.entries.slice(0,40).map(e=>e.book?`<span class="pip" style="background:${colors(e.book).c}"></span>`:`<span class="pip miss"></span>`).join("")}</div>${tag}</div>
+        <div class="progress-row"><div class="pips" aria-hidden="true">${s.entries.slice(0,60).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?"":" miss"}${e.upcoming?" up":""}"${e.book?` style="background:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
       </button>
-      ${open?`<div class="card-body">${s.entries.map(e=>{
-        if(e.book)return`<div class="entry"><span class="num">${e.number??""}</span><button class="link" data-book="${e.book.id}"><div class="et">${esc(e.book.title)}</div>${e.year?`<div class="ey">${esc(e.year)}</div>`:""}</button><span class="owned">on your shelf</span></div>`;
-        const idx=s.missing.indexOf(e);const on=listed.get(norm(e.title));
-        return`<div class="entry missing"><span class="num">${e.number??""}</span><div><div class="et">${esc(e.title)}</div>${e.year?`<div class="ey">${esc(e.year)}</div>`:""}</div>
-          ${on?`<span class="tag soft">On ${esc(on)}</span>`:`<button class="btn small" data-want="${s.sid}|${idx}">Add to ${WISHLIST}</button>`}</div>`;}).join("")}
-        <div class="card-foot"><button class="btn small" data-refresh-series="${s.sid}" ${S.busySeries.has(s.sid)?"disabled":""}>${S.busySeries.has(s.sid)?"Checking…":s.catalogued?"Check for newer books":"Load the full series"}</button></div>
+      ${open?`<div class="card-body">${s.entries.map(e=>seriesEntryHTML(s,e,listed)).join("")}
+        <div class="card-foot"><button class="btn small" data-refresh-series="${s.sid}" ${S.busySeries.has(s.sid)?"disabled":""}>${S.busySeries.has(s.sid)?"Checking…":s.catalogued?"Check for newer books":"Load the full series"}</button>
+        ${s.universe?`<button class="btn small" data-universe="${s.sid}" ${ubusy?"disabled":""}>${ubusy?"Loading…":S.openUniverse.has(s.sid)&&uloaded?`Hide the rest of ${esc(s.universe)}`:`Show the entire ${esc(s.universe)}`}</button>`:""}</div>
+        ${universeHTML(s)}
       </div>`:""}
     </div>`;}).join("");
 }
@@ -1388,7 +1540,10 @@ function renderLists(){
 function render(){
   if(!S.loaded)return;
   document.querySelectorAll(".nav [data-tab]").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab?"page":"false"));
-  $("#shelfTools").hidden=S.tab!=="shelves";
+  $("#shelfTools").hidden=!(S.tab==="shelves"||S.tab==="series");
+  $("#group").hidden=S.tab!=="shelves";
+  const qi=$("#q"),want=S.tab==="series"?S.sq:S.q;if(qi.value!==want)qi.value=want;
+  qi.placeholder=S.tab==="series"?"Search series or authors":"Search titles, authors, translators";
   $("#offline").hidden=navigator.onLine!==false;
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
@@ -1405,6 +1560,10 @@ $("#main").addEventListener("click",e=>{
   if(d.want){const[sid,idx]=d.want.split("|");const s=seriesView().find(x=>x.sid===sid);const m=s&&s.missing[+idx];
     if(m)addToList(WISHLIST,{title:m.title,author:s.author,note:`${s.name}${m.number!=null?`, book ${m.number}`:""}`});return;}
   if(d.refreshSeries)return refreshSeries(d.refreshSeries);
+  if(d.universe){const sid=d.universe,r=S.records.get(sid);const u=r&&r.universe&&S.records.get("u_"+slug(r.universe));
+    if(S.openUniverse.has(sid)&&u){S.openUniverse.delete(sid);return render();}
+    if(u&&!u.deleted){S.openUniverse.add(sid);return render();}
+    return loadUniverse(sid);}
   if(d.addItem)return openItemSheet(d.addItem);
   if(d.gotit)return gotIt(d.gotit);
   if(d.removeItem)return removeItem(d.removeItem);
@@ -1420,7 +1579,7 @@ $("#main").addEventListener("click",e=>{
 document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render();window.scrollTo(0,0);});
 $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
-$("#q").addEventListener("input",e=>{S.q=e.target.value;render();});
+$("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
 $("#group").addEventListener("change",e=>{S.group=e.target.value;try{localStorage.setItem("shelves-group",S.group);}catch(_){}render();});
 window.addEventListener("online",()=>{scheduleRender();if(S.queued.length&&AI.key())toast(`Back online. ${plural(S.queued.length,"photo")} ready to read.`);});
 window.addEventListener("offline",scheduleRender);
@@ -1432,8 +1591,9 @@ window.addEventListener("offline",scheduleRender);
   const photos=(await store.all("photos")).filter(p=>p&&p.blob);
   S.queued=photos.filter(p=>!p.read).sort((a,b)=>a.addedAt-b.addedAt);
   S.savedPhotos=photos.filter(p=>p.read).length;
-  for(const im of await store.all("images"))if(im&&im.blob)S.imgs.set(im.key,URL.createObjectURL(im.blob));
+  try{const old=await store.all("images");if(old.length)await store.del(old.map(x=>x.key),"images");}catch(_){}
   S.loaded=true;render();
+  try{document.fonts.ready.then(()=>{_fit.clear();scheduleRender();});}catch(_){}
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
