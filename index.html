@@ -246,6 +246,30 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+/* collapsing bookcases */
+button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;gap:0;font:inherit;font-family:var(--display);font-size:18px}
+.plate .caret{margin-left:8px;align-self:center;transition:transform .4s cubic-bezier(.4,0,.2,1);opacity:.75}
+.case.closed .plate .caret{transform:rotate(-90deg)}
+.shelf-wrap,.doors-wrap{display:grid;transition:grid-template-rows .5s cubic-bezier(.4,0,.2,1)}
+.shelf-wrap{grid-template-rows:1fr}.case.closed .shelf-wrap{grid-template-rows:0fr}
+.doors-wrap{grid-template-rows:0fr}.case.closed .doors-wrap{grid-template-rows:1fr}
+.shelf-inner,.doors{min-height:0;overflow:hidden}
+.shelf-inner .shelf{transition:opacity .35s ease,transform .5s cubic-bezier(.4,0,.2,1);transform-origin:top center}
+.case.closed .shelf-inner .shelf{opacity:0;transform:scaleY(.92)}
+.doors-in{display:grid;grid-template-columns:1fr 1fr;gap:3px;height:74px;padding:2px 0 10px;perspective:600px}
+.door{position:relative;display:block;border-radius:2px;transition:transform .55s cubic-bezier(.3,.7,.2,1) .05s,opacity .3s ease .05s;
+  background:var(--grain-v),linear-gradient(90deg,var(--walnut-dark),var(--walnut-mid) 50%,var(--walnut-dark));
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.6),inset 0 0 0 3px var(--walnut-edge),inset 0 0 0 5px var(--walnut-dark),0 2px 4px rgba(0,0,0,.5)}
+.door::before{content:"";position:absolute;inset:11px 12px;border-radius:2px;
+  background:var(--grain-v),linear-gradient(180deg,var(--walnut-hi),var(--walnut-mid) 40%,var(--walnut) 100%);
+  box-shadow:inset 1px 1px 0 rgba(255,225,180,.25),inset -1px -1px 0 rgba(0,0,0,.55),0 0 0 2px var(--walnut-dark),0 0 0 3px rgba(255,225,180,.12)}
+.door::after{content:"";position:absolute;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,var(--brass-hi),var(--brass) 45%,var(--brass-lo));box-shadow:0 1px 2px rgba(0,0,0,.7)}
+.door.l::after{right:4px}.door.r::after{left:4px}
+.door.l{transform-origin:left center;transform:rotateY(-70deg);opacity:0}
+.door.r{transform-origin:right center;transform:rotateY(70deg);opacity:0}
+.case.closed .door{transform:none;opacity:1}
+@media (prefers-reduced-motion: reduce){.shelf-wrap,.doors-wrap,.door,.shelf-inner .shelf,.plate .caret{transition:none}}
 .count-row{display:flex;align-items:center;justify-content:space-between;margin:12px 16px 0}
 .count-row .count{margin:0}
 .spine.picked{outline:3px solid var(--brass-hi);outline-offset:1px;transform:translateY(-8px);box-shadow:0 8px 10px rgba(0,0,0,.5)}
@@ -1924,9 +1948,24 @@ function spine(b){
   const{W,H}=spineDims(b);
   return`<div class="slot"><button class="spine drawn${b.needsDetails?" pending":""}${S.selecting&&S.selected.has(b.id)?" picked":""}" style="--h:${H}px;--w:${W}px" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}">${spineArt(b,W,H)}</button></div>`;
 }
+// Tapping a nameplate closes that bookcase: the shelves fold away and two panelled doors close over it.
+const collapsedSet=()=>{try{return new Set(JSON.parse(LS.get("study-collapsed","[]")));}catch(e){return new Set();}};
+const CARET=`<svg class="caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5L5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 function bookcase(label,count,inner,opts={}){
-  return`<section class="case">${CORNICE}<div class="plate-row">${SCROLL("")}<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>${SCROLL(" r")}</div>
-    <div class="shelf${opts.blank?" blank":""}">${inner}</div><div class="plinth" aria-hidden="true"></div>${opts.extra||""}</section>`;
+  const can=!opts.blank,closed=can&&collapsedSet().has(label);
+  const plate=can?`<button class="plate" data-shelf="${esc(label)}" aria-expanded="${!closed}" aria-label="${esc(label)}, ${count} books. Tap to ${closed?"open":"close"} this shelf">${esc(label)}${count!=null?`<small>${count}</small>`:""}${CARET}</button>`
+    :`<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>`;
+  return`<section class="case${closed?" closed":""}">${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
+    <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div></div>
+    ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div></div>`:""}
+    <div class="plinth" aria-hidden="true"></div>${opts.extra||""}</section>`;
+}
+function toggleShelf(btn){
+  const label=btn.dataset.shelf,set=collapsedSet(),caseEl=btn.closest(".case");
+  const closing=!set.has(label);closing?set.add(label):set.delete(label);
+  LS.set("study-collapsed",JSON.stringify([...set]));
+  caseEl.classList.toggle("closed",closing);   // animate in place, no redraw
+  btn.setAttribute("aria-expanded",String(!closing));
 }
 function banners(){
   if(S.tab!=="shelves")return"";
@@ -2131,6 +2170,7 @@ function render(){
 /* ---------- events ---------- */
 $("#main").addEventListener("click",e=>{
   const t=e.target.closest("button,[data-book]");if(!t)return;const d=t.dataset;
+  if(d.shelf!==undefined)return toggleShelf(t);
   if(d.book){if(S.selecting&&S.tab==="shelves"){S.selected.has(d.book)?S.selected.delete(d.book):S.selected.add(d.book);return render();}return openBook(d.book);}
   if(d.act==="selectMode"){S.selecting=!S.selecting;S.selected.clear();return render();}
   if(d.toggleSeries){S.openSeries.has(d.toggleSeries)?S.openSeries.delete(d.toggleSeries):S.openSeries.add(d.toggleSeries);return render();}
