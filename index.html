@@ -242,6 +242,29 @@ main{max-width:1100px;margin:0 auto;padding:2px 0 104px}
 
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:10px 16px;font-size:16px;max-width:calc(100% - 32px)}
 .toast[hidden]{display:none}
+.spine.photo{padding:0;background-size:100% 100%;background-color:#1a120c;box-shadow:inset 2px 0 0 rgba(255,235,200,.1),inset -3px 0 0 rgba(0,0,0,.35),1px 0 0 rgba(0,0,0,.55)}
+.stage{height:300px;display:flex;align-items:center;justify-content:center;perspective:1000px;touch-action:none;cursor:grab;margin:6px 0 0;user-select:none;-webkit-user-select:none}
+.book3d{--bw:150px;--bh:225px;position:relative;width:var(--bw);height:var(--bh);transform-style:preserve-3d;transform:rotateX(var(--rx,-8deg)) rotateY(var(--ry,28deg));transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+.book3d.dragging{transition:none}
+@media (prefers-reduced-motion: reduce){.book3d{transition:none}}
+.face{position:absolute;top:0;left:0;width:var(--bw);height:var(--bh);overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.face img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.face.front{transform:translateZ(calc(var(--bt) / 2));border-radius:1px 4px 4px 1px;box-shadow:inset 3px 0 6px rgba(0,0,0,.25)}
+.face.back{transform:rotateY(180deg) translateZ(calc(var(--bt) / 2));border-radius:4px 1px 1px 4px}
+.face.spine3{width:var(--bt);left:calc((var(--bw) - var(--bt)) / 2);transform:rotateY(-90deg) translateZ(calc(var(--bw) / 2))}
+.face.edge.right{width:var(--bt);left:calc((var(--bw) - var(--bt)) / 2);transform:rotateY(90deg) translateZ(calc(var(--bw) / 2 - 3px));background:repeating-linear-gradient(90deg,#efe5cb 0 1px,#d6c7a2 1px 2px)}
+.face.edge.top,.face.edge.bottom{height:var(--bt);top:calc((var(--bh) - var(--bt)) / 2);background:repeating-linear-gradient(0deg,#efe5cb 0 1px,#d6c7a2 1px 2px)}
+.face.edge.top{transform:rotateX(90deg) translateZ(calc(var(--bh) / 2 - 3px))}
+.face.edge.bottom{transform:rotateX(-90deg) translateZ(calc(var(--bh) / 2 - 3px))}
+.drawn-cover,.drawn-back,.drawn-spine{position:absolute;inset:0;color:var(--t);background:linear-gradient(90deg,rgba(0,0,0,.4) 0 6px,rgba(255,235,200,.09) 6px 8px,transparent 30%),var(--c)}
+.drawn-cover{padding:20px 14px 16px 20px;display:flex;flex-direction:column;justify-content:space-between}
+.drawn-cover .dt{font-family:var(--display);font-size:20px;line-height:1.15}
+.drawn-cover .da,.drawn-back .da{font-style:italic;font-size:13px}
+.drawn-back{padding:16px 16px 14px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(270deg,rgba(0,0,0,.4) 0 6px,transparent 30%),var(--c)}
+.drawn-back p{margin:0;font-size:11.5px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:12;-webkit-box-orient:vertical}
+.drawn-spine{background:linear-gradient(90deg,rgba(0,0,0,.45),rgba(255,235,200,.11) 28%,rgba(255,235,200,.03) 56%,rgba(0,0,0,.48)),var(--c);writing-mode:vertical-rl;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;overflow:hidden;padding:8px 0}
+.drawn-spine span{max-height:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn-hint{text-align:center;color:var(--text-2);font-style:italic;font-size:14px;margin:2px 0 6px}
 .list-section{margin:14px 0 2px;font-family:var(--display);font-size:19px;color:var(--rule)}
 .index-card .tag.kindtag{color:var(--parch-ink-2);border:1px solid rgba(43,30,18,.3);font-weight:500;font-size:12px;vertical-align:2px}
 .index-card .tag.ownedtag{color:#2F5A35;border:1px solid currentColor;font-weight:600;align-self:center}
@@ -305,7 +328,7 @@ const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><d
 const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
-  persist:true,persisted:false,savedPhotos:0,translating:false,
+  persist:true,persisted:false,savedPhotos:0,translating:false,imgs:new Map(),
   queue:new Set(),jobRunning:false,jobDone:0,jobTotal:0,suggesting:false,busySeries:new Set(),confirmDel:null,loaded:false,photoCtl:null};
 
 /* ---------- helpers ---------- */
@@ -340,8 +363,8 @@ const toDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=
 /* ---------- on-device storage (IndexedDB) ---------- */
 const store={
   db:null,
-  async open(){try{this.db=await new Promise((res,rej)=>{const r=indexedDB.open("shelves-library",2);
-    r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("records"))d.createObjectStore("records",{keyPath:"id"});if(!d.objectStoreNames.contains("photos"))d.createObjectStore("photos",{keyPath:"id"});};
+  async open(){try{this.db=await new Promise((res,rej)=>{const r=indexedDB.open("shelves-library",3);
+    r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("records"))d.createObjectStore("records",{keyPath:"id"});if(!d.objectStoreNames.contains("photos"))d.createObjectStore("photos",{keyPath:"id"});if(!d.objectStoreNames.contains("images"))d.createObjectStore("images",{keyPath:"key"});};
     r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}catch(e){this.db=null;S.persist=false;}},
   async all(name="records"){if(!this.db)return[];try{return await new Promise((res,rej)=>{const q=this.db.transaction(name).objectStore(name).getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error);});}catch(e){return[];}},
   async put(recs,name="records"){if(!this.db||!recs.length)return true;try{await new Promise((res,rej)=>{const tx=this.db.transaction(name,"readwrite");const os=tx.objectStore(name);for(const r of recs)os.put(r);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error);});return true;}catch(e){return false;}},
@@ -414,12 +437,14 @@ function sampleMsg(e){
     invalid_json:"Claude’s answer came back garbled. Try again.",prompt_too_large:"That photo was too large to send. Try a closer, smaller shot."})[c]??`Claude returned an error${e&&e.msg?`: ${e.msg}`:""}.`;
 }
 const stopsRun=e=>STOPS.includes(e&&e.code);
-function identifyPrompt(parts){
+function identifyPrompt(parts,split){
   return `You are cataloguing a person's home library from a photo of their books.
 ${parts>1?"The images are overlapping sections of ONE photo (left/right or top/bottom). A book visible in both sections counts once.":"The image is one photo of a shelf or a stack of books."}
 List every book whose title you can actually read on its spine or cover. Use your knowledge to complete a partly visible title or an author's full name, but never invent books you cannot see. Ignore objects that aren't books. A boxed set counts as one entry.
 Reply with only JSON in this shape:
-{"books":[{"title":"Full Title","author":"Author Name","translator":null,"publisher":null,"color":"#RRGGBB","textColor":"#RRGGBB","sure":true}]}
+{"books":[{"title":"Full Title","author":"Author Name","translator":null,"publisher":null,"color":"#RRGGBB","textColor":"#RRGGBB","sure":true,"box":[0.10,0.05,0.14,0.95],"look":"upright"}]}
+"box" is where this book's spine (or its cover, if the cover faces the camera) sits in the WHOLE original photo, as [left, top, right, bottom], each a fraction from 0 to 1 of the photo's width or height. Be as tight and exact as you can; it is used to cut the spine out of the photo.${split==="h"?" The first image is the left part of the photo (x from 0 to 0.56) and the second is the right part (x from 0.44 to 1); give boxes in whole-photo coordinates.":split==="v"?" The first image is the top part of the photo (y from 0 to 0.56) and the second is the bottom part (y from 0.44 to 1); give boxes in whole-photo coordinates.":""}
+"look" is "upright" for a standing book showing its spine, "flat" for a book lying on its side showing its spine, "face" for a book whose front cover faces the camera.
 "translator" is the translator's name only when it is printed and readable on the spine or cover (for example "Pevear and Volokhonsky, translators" or "A new translation by Oliver Ready"); otherwise null. "publisher" is the imprint name or logo you can read on the spine (for example "Penguin Classics", "Vintage", "Tor"); otherwise null.
 "color" is the spine's main background color as it looks in the photo; "textColor" is the color of the spine lettering. Set "sure" to false when you are guessing at hard-to-read text. Order books as they sit on the shelf.`;
 }
@@ -439,12 +464,12 @@ function newBook(it){
     publisher:cleanStr(it.publisher,80)||null,translator:cleanStr(it.translator,160)||null,translatorSource:cleanStr(it.translator)?(it.translatorSource||"spine"):null,
     originalLanguage:null,photoId:it.photoId||null};
 }
-async function addBooks(items){
+async function addBooks(items,opts={}){
   const recs=items.filter(i=>cleanStr(i.title)).map(newBook);
-  if(!recs.length)return 0;
+  if(!recs.length)return opts.returnRecs?[]:0;
   await save(recs);
   fillDetails(recs.map(r=>r.id));
-  return recs.length;
+  return opts.returnRecs?recs:recs.length;
 }
 function cleanSeriesBooks(list){
   if(!Array.isArray(list))return[];
@@ -507,7 +532,7 @@ async function runJob(){
           const cur=S.records.get(b.id);if(!cur||cur.deleted)continue;
           const copy=clone(cur);applyDetails(copy,d,seriesMap);out.push(copy);
         }
-        if(out.length)await save([...out,...seriesMap.values()]);
+        if(out.length){await save([...out,...seriesMap.values()]);fetchCovers(out.map(b=>b.id));}
       }catch(e){const m=sampleMsg(e);if(m)toast(m);if(stopsRun(e))break;}
       S.jobDone+=books.length;scheduleRender();
     }
@@ -678,9 +703,9 @@ async function prepImages(blob){
       const ov=.12;let x,y;
       if(w>=h){const pw=Math.round(w*(.5+ov/2));x=await cut(0,0,pw,h);y=await cut(w-pw,0,pw,h);}
       else{const ph=Math.round(h*(.5+ov/2));x=await cut(0,0,w,ph);y=await cut(0,h-ph,w,ph);}
-      if(x&&y)return[x,y];
+      if(x&&y){const out=[x,y];out.split=w>=h?"h":"v";return out;}
     }
-    const one=await cut(0,0,w,h);if(!one)throw{code:"image_rejected"};return[one];
+    const one=await cut(0,0,w,h);if(!one)throw{code:"image_rejected"};const out=[one];out.split=null;return out;
   }finally{if(bmp.close)bmp.close();}
 }
 async function queuePhotos(blobs){
@@ -729,11 +754,11 @@ async function readPhotos(entries){
     $("#stopRead").onclick=()=>ctl.abort();
     try{
       const imgs=await prepImages(entries[i].blob);
-      const res=await AI.json(identifyPrompt(imgs.length),{images:imgs,signal:ctl.signal});
+      const res=await AI.json(identifyPrompt(imgs.length,imgs.split),{images:imgs,signal:ctl.signal});
       const arr=Array.isArray(res&&res.books)?res.books:(Array.isArray(res)?res:[]);
       for(const r of arr){const title=cleanStr(r&&r.title,200);if(!title)continue;
         found.push({title,author:cleanStr(r.author,120),translator:cleanStr(r.translator,160),publisher:cleanStr(r.publisher,80),
-          color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false,entry:entries[i]});}
+          color:hex(r.color),textColor:hex(r.textColor),sure:r.sure!==false,entry:entries[i],box:validBox(r.box),look:["upright","flat","face"].includes(r.look)?r.look:"upright"});}
       ok.push(entries[i]);
     }catch(e){
       if(e&&e.code==="cancelled")break;
@@ -777,18 +802,29 @@ function review(cands,errors,ok,savedCount,n){
       </div>`;}).join("")}</div>
     <div class="sticky-foot"><button class="btn brass wide" id="addFound"></button></div>`;
   const btn=$("#addFound");
-  const upd=()=>{const k=body.querySelectorAll("#cands input[type=checkbox]:checked").length;btn.textContent=k?`Add ${plural(k,"book")}`:"Nothing selected";btn.disabled=!k;};
+  const ownedPics=cands.filter(c=>c.owned&&c.box).length;
+  const upd=()=>{const k=body.querySelectorAll("#cands input[type=checkbox]:checked").length;
+    btn.textContent=k?`Add ${plural(k,"book")}${ownedPics?` and save ${ownedPics} spines`:""}`:ownedPics?`Save ${plural(ownedPics,"spine")} for books already here`:"Nothing selected";btn.disabled=!k&&!ownedPics;};
   body.querySelectorAll("#cands input[type=checkbox]").forEach(cb=>cb.onchange=upd);upd();
   btn.onclick=async()=>{
     const items=[];
     body.querySelectorAll("#cands input[type=checkbox]:checked").forEach(cb=>{const i=+cb.dataset.i;const c=cands[i];
       items.push({title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value,color:c.color,textColor:c.textColor,
-        translator:c.translator,publisher:c.publisher,entry:c.entry});});
+        translator:c.translator,publisher:c.publisher,entry:c.entry,box:c.box,look:c.look});});
     closeSheet();
     const photoIds=await keepPhotos(ok);
-    items.forEach(it=>{it.photoId=photoIds.get(it.entry)||null;delete it.entry;});
-    await addBooks(items);
-    toast(canAsk()?`Added ${plural(items.length,"book")}. Looking up details…`:`Added ${plural(items.length,"book")}.`);
+    const pics=items.map(it=>({entry:it.entry,box:it.box,look:it.look}));
+    items.forEach(it=>{it.photoId=photoIds.get(it.entry)||null;delete it.entry;delete it.box;delete it.look;});
+    const recs=await addBooks(items,{returnRecs:true});
+    (async()=>{
+      for(let k=0;k<recs.length;k++){const p=pics[k];if(p&&p.box)await savePictureFromShelf(recs[k].id,p.entry,p.box,p.look);}
+      for(const c of cands.filter(c=>c.owned&&c.box)){
+        const b=live("book").find(x=>titleMatch(x.title,c.title)&&(!c.author||!x.author||lastName(x.author)===lastName(c.author)));
+        if(!b)continue;await savePictureFromShelf(b.id,c.entry,c.box,c.look);
+        if(!b.photoId&&photoIds.get(c.entry)){const x=clone(S.records.get(b.id));x.photoId=photoIds.get(c.entry);await save(x);}
+      }
+    })();
+    toast(items.length?(canAsk()?`Added ${plural(items.length,"book")}. Looking up details…`:`Added ${plural(items.length,"book")}.`):`Saving ${plural(ownedPics,"spine")} from your photo.`);
   };
 }
 async function openTypeFromPhoto(idx){
@@ -812,6 +848,103 @@ async function openTypeFromPhoto(idx){
       del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.textContent="Tap again to delete";return;}
         await removeQueued([p.id]);if(S.queued.length)openTypeFromPhoto(Math.min(idx,S.queued.length-1));else{closeSheet();toast("Photo deleted.");}};
     });
+}
+
+/* ---------- pictures: covers, spines, 3D book ---------- */
+const picKey=(id,part)=>`${id}:${part}`;
+const pic=(id,part)=>S.imgs.get(picKey(id,part));
+async function imgPut(key,blob){
+  if(!blob)return;await store.put([{key,blob,at:Date.now()}],"images");
+  const old=S.imgs.get(key);if(old)URL.revokeObjectURL(old);S.imgs.set(key,URL.createObjectURL(blob));scheduleRender();
+}
+async function imgDel(key){await store.del([key],"images");const old=S.imgs.get(key);if(old)URL.revokeObjectURL(old);S.imgs.delete(key);scheduleRender();}
+function validBox(b){
+  if(!Array.isArray(b)||b.length!==4)return null;const v=b.map(Number);
+  if(v.some(x=>!Number.isFinite(x)||x<-0.02||x>1.02))return null;
+  const[l,t,r,bt]=v;if(r-l<0.003||bt-t<0.02)return null;return v;
+}
+async function shrinkTo(blob,max){
+  const bmp=await decode(blob);if(!bmp)return blob;
+  try{const sc=Math.min(1,max/Math.max(bmp.width,bmp.height));const c=document.createElement("canvas");c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);
+    c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,"image/jpeg",.86))||blob;}
+  finally{if(bmp.close)bmp.close();}
+}
+// Cut one book out of a shelf photo. Flat books are turned so their spine stands up like the rest.
+async function cropFromPhoto(blob,box,look){
+  const bmp=await decode(blob);if(!bmp)return null;
+  try{
+    const W=bmp.width,H=bmp.height;let[l,t,r,b]=box;
+    const px=look==="upright"?0.004:0.012,py=look==="flat"?0.004:0.012;
+    l=Math.max(0,l-px);r=Math.min(1,r+px);t=Math.max(0,t-py);b=Math.min(1,b+py);
+    const sx=l*W,sy=t*H,sw=(r-l)*W,sh=(b-t)*H;if(sw<4||sh<4)return null;
+    const rot=look==="flat",outW=rot?sh:sw,outH=rot?sw:sh;
+    const sc=Math.min(1,(look==="face"?1000:560)/Math.max(outW,outH));
+    const c=document.createElement("canvas");c.width=Math.max(1,Math.round(outW*sc));c.height=Math.max(1,Math.round(outH*sc));
+    const g=c.getContext("2d");
+    if(rot){g.translate(c.width,0);g.rotate(Math.PI/2);g.drawImage(bmp,sx,sy,sw,sh,0,0,c.height,c.width);}
+    else g.drawImage(bmp,sx,sy,sw,sh,0,0,c.width,c.height);
+    const out=await new Promise(res=>c.toBlob(res,"image/jpeg",.85));
+    return out?{blob:out,w:c.width,h:c.height}:null;
+  }finally{if(bmp.close)bmp.close();}
+}
+// Save what a shelf photo shows of one book: its real spine, or its cover if it faces out.
+async function savePictureFromShelf(bookId,entry,box,look,{replace=true}={}){
+  if(!box||!entry||!entry.blob)return false;
+  const part=look==="face"?"cover":"spine";
+  if(!replace&&pic(bookId,part))return false;
+  const cut=await cropFromPhoto(entry.blob,box,look);if(!cut)return false;
+  await imgPut(picKey(bookId,part),cut.blob);
+  const cur=S.records.get(bookId);if(!cur)return true;const c=clone(cur);
+  if(part==="spine")c.spineAspect=+(cut.w/cut.h).toFixed(4);else c.coverSource="shelf";
+  await save(c);return true;
+}
+async function lookupCover(b){
+  try{
+    const q=new URLSearchParams({title:b.title,limit:"1",fields:"cover_i"});if(b.author)q.set("author",b.author);
+    const r=await fetch("https://openlibrary.org/search.json?"+q);
+    if(r.ok){const j=await r.json();const id=j&&j.docs&&j.docs[0]&&j.docs[0].cover_i;if(id)return`https://covers.openlibrary.org/b/id/${id}-L.jpg`;}
+  }catch(e){}
+  try{
+    const q=`intitle:${b.title}`+(b.author?` inauthor:${b.author}`:"");
+    const r=await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=1&q="+encodeURIComponent(q));
+    if(r.ok){const j=await r.json();const l=j&&j.items&&j.items[0]&&j.items[0].volumeInfo&&j.items[0].volumeInfo.imageLinks;
+      const u=l&&(l.large||l.medium||l.thumbnail);if(u)return u.replace(/^http:/,"https:").replace(/&edge=curl/,"");}
+  }catch(e){}
+  return null;
+}
+// Covers come from Open Library (then Google Books). The app saves each picture so it shows offline.
+async function fetchCovers(ids,onStep,force){
+  if(navigator.onLine===false)return 0;
+  const books=(ids?ids.map(i=>S.records.get(i)):live("book")).filter(b=>b&&!b.deleted&&!b.coverUrl&&!pic(b.id,"cover")&&(force||!b.coverChecked));
+  const total=books.length;let found=0,done=0;const out=[];
+  const worker=async()=>{while(books.length){const b=books.shift();const url=await lookupCover(b);
+    const cur=S.records.get(b.id);if(cur&&!cur.deleted){const c=clone(cur);c.coverChecked=true;if(url){c.coverUrl=url;found++;fetch(url,{mode:"no-cors"}).catch(()=>{});}out.push(c);}
+    done++;if(onStep)onStep(done,total);if(out.length>=20)await save(out.splice(0));}};
+  await Promise.all([worker(),worker(),worker()]);
+  if(out.length)await save(out);
+  return found;
+}
+function coverSrc(b){return pic(b.id,"cover")||b.coverUrl||null;}
+function book3dHTML(b){
+  const{c,t}=colors(b);const cover=coverSrc(b),back=pic(b.id,"back"),sp=pic(b.id,"spine");
+  const T=Math.round(Math.max(18,Math.min(64,225*(b.spineAspect||0.15))));
+  return`<div class="stage" id="stage" role="img" aria-label="${esc(b.title)}: drag to turn the book, tap to flip it">
+    <div class="book3d" id="b3d" style="--bt:${T}px;--c:${c};--t:${t}">
+      <div class="face front"><div class="drawn-cover"><span class="dt">${esc(b.title)}</span><span class="da">${esc(b.author||"")}</span></div>${cover?`<img src="${cover}" alt="" onerror="this.remove()">`:""}</div>
+      <div class="face back"><div class="drawn-back"><p>${esc(b.blurb||b.title)}</p><span class="da">${esc(b.publisher||"")}</span></div>${back?`<img src="${back}" alt="" onerror="this.remove()">`:""}</div>
+      <div class="face spine3"><div class="drawn-spine"><span>${esc(b.title)}</span></div>${sp?`<img src="${sp}" alt="" onerror="this.remove()">`:""}</div>
+      <div class="face edge right"></div><div class="face edge top"></div><div class="face edge bottom"></div>
+    </div></div>
+    <p class="turn-hint">Drag to turn the book. Tap to flip it.</p>`;
+}
+function mountTurner(stage,el){
+  let rx=-8,ry=28,sx=0,sy=0,drag=false,moved=0;
+  const set=()=>{el.style.setProperty("--rx",rx+"deg");el.style.setProperty("--ry",ry+"deg");};
+  stage.addEventListener("pointerdown",e=>{drag=true;moved=0;sx=e.clientX;sy=e.clientY;el.classList.add("dragging");try{stage.setPointerCapture(e.pointerId);}catch(_){}});
+  stage.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=e.clientX;sy=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+    ry+=dx*0.6;rx=Math.max(-35,Math.min(35,rx-dy*0.4));set();});
+  const end=()=>{if(!drag)return;drag=false;el.classList.remove("dragging");if(moved<6){ry+=180;set();}};
+  stage.addEventListener("pointerup",end);stage.addEventListener("pointercancel",end);set();
 }
 
 /* ---------- translations ---------- */
@@ -982,8 +1115,7 @@ function openAdd(){
 function openBook(id){
   const b=S.records.get(id);if(!b||b.deleted)return;
   const{c,t}=colors(b);
-  openSheet(`<div class="bookhead">
-      <div class="cover" style="--c:${c};--t:${t}" aria-hidden="true">${esc(b.title)}</div>
+  openSheet(`${book3dHTML(b)}<div class="bookhead">
       <div><h2 class="b-title">${esc(b.title)}</h2>
         <p class="b-author">${esc(b.author||"Author unknown")}</p>
         <p class="b-meta">${b.genre?`<span class="tag soft">${esc(b.genre)}</span>`:""}${b.year?`<span class="tag soft">${esc(b.year)}</span>`:""}${b.publisher?`<span class="tag soft">${esc(b.publisher)}</span>`:""}</p></div>
@@ -995,18 +1127,27 @@ function openBook(id){
       ${canAsk()?`<button class="btn" id="refresh">${b.needsDetails?"Look up details":"Refresh details"}</button>`:""}
       ${canAsk()&&isTranslated(b)&&!translatorKnown(b)?`<label class="btn" style="cursor:pointer">Snap the title page<input type="file" id="tpSnap" class="vh" accept="image/*"></label>`:""}
       <button class="btn" id="edit">Edit</button>
+      <label class="btn" style="cursor:pointer">Snap my cover<input type="file" id="snapCover" class="vh" accept="image/*"></label>
+      <label class="btn" style="cursor:pointer">Snap the back<input type="file" id="snapBack" class="vh" accept="image/*"></label>
+      ${pic(b.id,"spine")?`<button class="btn quiet" id="dropSpine">Use a drawn spine</button>`:""}
       <button class="btn quiet danger-text" id="remove">Remove</button>
     </div>`,body=>{
       const ts=$("#toSeries",body);if(ts)ts.onclick=()=>{closeSheet();S.tab="series";S.openSeries.add(b.seriesId);render();
         const el=document.getElementById("ser-"+b.seriesId);if(el)el.scrollIntoView({block:"start"});};
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
+      mountTurner($("#stage",body),$("#b3d",body));
+      for(const[sel,part]of[["#snapCover","cover"],["#snapBack","back"]]){const inp=$(sel,body);inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
+        await imgPut(picKey(b.id,part),await shrinkTo(f,1200));
+        if(part==="cover"){const c=clone(S.records.get(b.id));c.coverSource="you";await save(c);}
+        openBook(b.id);toast(part==="cover"?"Cover saved.":"Back cover saved.");};}
+      const ds=$("#dropSpine",body);if(ds)ds.onclick=async()=>{await imgDel(picKey(b.id,"spine"));openBook(b.id);toast("Back to a drawn spine.");};
       const snap=$("#tpSnap",body);if(snap)snap.onchange=async()=>{const f=snap.files[0];if(!f)return;
         snap.closest("label").firstChild.textContent="Reading…";
         try{const t=await readTitlePage(b.id,f);openBook(b.id);toast(t?`Translator: ${t}.`:"No translator name found in that photo. Try the title page or copyright page.");}
         catch(e){openBook(b.id);toast(sampleMsg(e)||"That didn’t work. Try again.");}};
       const rm=$("#remove",body);
-      rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);return;}
+      rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});for(const p of["cover","back","spine"])if(pic(b.id,p))imgDel(picKey(b.id,p));toast(`Removed “${b.title}”.`);return;}
         rm.dataset.armed="1";rm.textContent="Tap again to remove";};
     });
 }
@@ -1071,13 +1212,18 @@ function openMenu(){
     <div class="actions" style="margin-top:8px">${key?`<button class="btn small" id="testKey">Test key</button><button class="btn small quiet danger-text" id="clearKey">Remove key</button>`:""}</div>
     <label class="switch" style="margin-top:14px"><input type="checkbox" id="eco" ${LS.get("study-economy","0")==="1"?"checked":""}> Economy mode: use the cheaper model (less accurate on fancy spines)</label>
     <p class="muted">Spent so far: $${(sp.cost||0).toFixed(2)} across ${plural(sp.calls||0,"request")}.</p>
+    <h3 class="sub">Covers and spines</h3>
+    <p class="muted" style="margin-top:0">${(()=>{const all=live("book"),cv=all.filter(b=>coverSrc(b)).length,sp=all.filter(b=>pic(b.id,"spine")).length;
+      return `${cv} of ${plural(all.length,"book")} have a cover, and ${sp} show their real spine. To get real spines for books already here, photograph each shelf again with Add books: nothing gets added twice, the spines just get saved.`;})()}</p>
+    <button class="btn wide" id="findCovers" ${navigator.onLine===false?"disabled":""}>Find covers</button>
+    <label class="switch" style="margin-top:10px"><input type="checkbox" id="realSpines" ${LS.get("study-photo-spines","1")==="1"?"checked":""}> Show real spines from my photos</label>
     <h3 class="sub">Translations</h3>
     <p class="muted" style="margin-top:0">${(()=>{const t=live("book").filter(isTranslated),u=t.filter(b=>!translatorKnown(b)).length,un=live("book").filter(b=>!b.translationChecked).length;
       return `${plural(t.length,"translated book")} so far${u?`, ${u} without a confirmed translator`:""}.${un?` ${plural(un,"book")} not checked yet.`:""}`;})()}</p>
     <button class="btn wide" id="findTr" ${canAsk()?"":"disabled"}>${canAsk()?"Find translators":"Find translators (needs internet and an API key)"}</button>
     <p class="muted">${plural(S.savedPhotos,"shelf photo")} saved on this phone, so Claude can look at them again for new features.${S.savedPhotos?` <button class="btn small quiet danger-text" id="delPhotos">Delete saved photos</button>`:""}</p>
     <h3 class="sub">Backup file</h3>
-    <p class="muted" style="margin-top:0">${esc(syncText())} Restoring merges a backup with what’s here; nothing gets deleted. Backups from the Claude version of The Study work too.</p>
+    <p class="muted" style="margin-top:0">${esc(syncText())} Restoring merges a backup with what’s here; nothing gets deleted. Pictures aren’t included in backup files. Backups from the Claude version of The Study work too.</p>
     <div class="list-pick">
       <button class="btn wide" id="exp">Save a backup file</button>
       <label class="btn wide" style="cursor:pointer">Restore from a backup file<input type="file" id="imp" class="vh" accept="application/json,.json"></label>
@@ -1095,6 +1241,10 @@ function openMenu(){
       const dp=$("#delPhotos",body);if(dp)dp.onclick=async()=>{if(!dp.dataset.armed){dp.dataset.armed="1";dp.textContent="Tap again to delete";return;}
         const ids=(await store.all("photos")).filter(p=>p.read).map(p=>p.id);await store.del(ids,"photos");S.savedPhotos=0;
         toast("Saved photos deleted.");openMenu();};
+      $("#findCovers",body).onclick=async e=>{const btn=e.currentTarget;btn.disabled=true;
+        const n=await fetchCovers(null,(d,t)=>{btn.textContent=`Finding covers: ${d} of ${t}`;},true);
+        btn.disabled=false;btn.textContent="Find covers";toast(n?`Found ${plural(n,"cover")}.`:"No new covers found.");};
+      $("#realSpines",body).onchange=e=>{LS.set("study-photo-spines",e.target.checked?"1":"0");scheduleRender();};
       $("#eco",body).onchange=e=>{LS.set("study-economy",e.target.checked?"1":"0");toast(e.target.checked?"Economy mode on.":"Economy mode off.");};
       $("#exp",body).onclick=async()=>{
         const recs=[...S.records.values()].filter(r=>!r.deleted).map(r=>{const c=clone(r);delete c._synced;return c;});
@@ -1125,6 +1275,9 @@ function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=fal
 function spine(b){
   const h=hash(b.id+b.title);const{c,t}=colors(b);
   const H=116+(h%32),W=24+((h>>5)%12)+Math.min(10,Math.floor((b.title||"").length/9));
+  const real=LS.get("study-photo-spines","1")==="1"&&pic(b.id,"spine");
+  if(real){const RW=Math.max(12,Math.min(72,Math.round(H*(b.spineAspect||0.16))));
+    return`<div class="slot"><button class="spine photo" style="--h:${H}px;--w:${RW}px;background-image:url('${real}')" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}"></button></div>`;}
   const bound=lum(c)<.09&&(h>>9)%2===0;
   const cls=bound?" bound":((h>>9)%4===1?" banded":"");
   return`<div class="slot"><button class="spine${cls}${b.needsDetails?" pending":""}" style="--h:${H}px;--w:${W}px;--c:${c};--t:${t}" data-book="${b.id}" aria-label="${esc(b.title)}${b.author?`, by ${esc(b.author)}`:""}"><span>${esc(b.title)}</span></button></div>`;
@@ -1279,6 +1432,7 @@ window.addEventListener("offline",scheduleRender);
   const photos=(await store.all("photos")).filter(p=>p&&p.blob);
   S.queued=photos.filter(p=>!p.read).sort((a,b)=>a.addedAt-b.addedAt);
   S.savedPhotos=photos.filter(p=>p.read).length;
+  for(const im of await store.all("images"))if(im&&im.blob)S.imgs.set(im.key,URL.createObjectURL(im.blob));
   S.loaded=true;render();
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
