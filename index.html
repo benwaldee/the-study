@@ -494,7 +494,7 @@ html[data-look="pixel"] *{border-radius:0!important}
 html[data-look="pixel"] .top{background:url(look/p-head.png) 0 0/100% 100% no-repeat,#17120e;image-rendering:pixelated;box-shadow:0 6px 0 rgba(0,0,0,.5)}
 html[data-look="pixel"] .top::after{height:10px;border-top:0;background:url(look/p-rail.png) 0 0/100% 100% no-repeat;image-rendering:pixelated}
 html[data-look="pixel"] .brand{align-items:center}
-html[data-look="pixel"] .brand::before{content:"";width:40px;height:40px;flex:none;background:url(look/p-gem-big.png) center/40px 40px no-repeat;image-rendering:pixelated;margin-right:-2px}
+html[data-look="pixel"] .brand::before{content:"";width:48px;height:48px;flex:none;background:url(look/p-dragon.png) center/48px 48px no-repeat;image-rendering:pixelated;margin:-6px -4px -6px -6px}
 html[data-look="pixel"] .top h1{font-family:"VT323",monospace;font-weight:400;font-size:30px;letter-spacing:.06em;text-transform:uppercase;color:#D8C8A0;text-shadow:2px 2px 0 #0C0907}
 html[data-look="pixel"] .btn,html[data-look="pixel"] .icon-btn,html[data-look="pixel"] .chip,html[data-look="pixel"] .card-edit{font-family:"VT323",monospace;font-weight:400;font-size:20px;letter-spacing:.02em;color:#E8E0CC;text-shadow:1px 1px 0 #0C0907;
   border:1px solid transparent;border-image:url(look/p-btn.png) 5/5px stretch;background:url(look/tx-pixel.png) 0 0/64px,#2A2420;background-blend-mode:multiply;box-shadow:0 3px 0 rgba(0,0,0,.5);image-rendering:pixelated;text-transform:uppercase}
@@ -513,7 +513,7 @@ html[data-look="pixel"] .case::after{right:0;border-image-source:url(look/p-pil-
 html[data-look="pixel"] .cornice{height:58px;margin:0 -22px;background:url(look/p-cornice.png) center/100% 100% no-repeat;image-rendering:pixelated}
 html[data-look="pixel"] .cornice>*{display:none}
 html[data-look="pixel"] .plate-row{margin:-44px 0 14px}
-html[data-look="pixel"] .scroll{width:30px;height:30px;margin:0 3px;background:url(look/p-gem-on.png) center/30px 30px no-repeat;image-rendering:pixelated}
+html[data-look="pixel"] .scroll{width:36px;height:36px;margin:0;background:url(look/p-dragon-s.png) center/36px 36px no-repeat;image-rendering:pixelated}
 html[data-look="pixel"] .scroll *{display:none}
 html[data-look="pixel"] .plate{height:30px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-image:url(look/p-plate.png) 6 fill/6px stretch;background:none;box-shadow:none;image-rendering:pixelated;
   font-family:"VT323",monospace;font-size:21px;letter-spacing:.06em;text-transform:uppercase;color:#E8E0CC;text-shadow:1px 1px 0 #0C0907}
@@ -527,9 +527,9 @@ html[data-look="pixel"] .door::after{background:#22A866;box-shadow:0 0 0 2px #0C
 html[data-look="pixel"] .nav{border-top:0;background:url(look/p-nav.png) 0 0/100% 100% no-repeat,#17120e;image-rendering:pixelated}
 html[data-look="pixel"] .nav button{font-family:"VT323",monospace;font-size:19px;font-weight:400;color:#9C9480;text-shadow:1px 1px 0 #0C0907}
 html[data-look="pixel"] .nav button svg{display:none}
-html[data-look="pixel"] .nav button::after{content:"";order:-1;width:30px;height:30px;background:url(look/p-gem-off.png) center/30px 30px no-repeat;image-rendering:pixelated}
+html[data-look="pixel"] .nav button::after{content:"";order:-1;width:36px;height:36px;margin:-4px 0 -2px;background:url(look/p-dragon-off.png) center/36px 36px no-repeat;image-rendering:pixelated}
 html[data-look="pixel"] .nav button[aria-current="page"]{color:#E2C478}
-html[data-look="pixel"] .nav button[aria-current="page"]::after{background-image:url(look/p-gem-on.png)}
+html[data-look="pixel"] .nav button[aria-current="page"]::after{background-image:url(look/p-dragon-s.png)}
 html[data-look="pixel"] .nav button[aria-current="page"]::before{display:none}
 html[data-look="pixel"] .badge{font-family:"VT323",monospace;font-size:17px;background:#B23A2A;color:#E8E0CC;left:calc(50% + 12px)}
 html[data-look="pixel"] .leather,html[data-look="pixel"] .sheet{background:url(look/tx-pixel.png) 0 0/64px,#1E1813;background-blend-mode:multiply;border:1px solid transparent;border-image:url(look/p-field.png) 5/6px stretch;box-shadow:0 8px 0 rgba(0,0,0,.45);image-rendering:pixelated}
@@ -670,7 +670,7 @@ html[data-look="pixel"] .ledger:nth-child(3n){transform:rotate(-.3deg)}
 /* doors of a closed case */
 html[data-look="pixel"] .door{background:linear-gradient(rgba(8,6,4,.42),rgba(8,6,4,.42)),url(look/p-rail.png) 0 24%/100% 7px no-repeat,url(look/p-rail.png) 0 72%/100% 7px no-repeat,url(look/p-back.png) 0 0/auto,#1a130e;image-rendering:pixelated;box-shadow:inset 0 0 0 2px #0C0907,inset 0 0 12px rgba(0,0,0,.7)}
 html[data-look="pixel"] .door::before{display:none}
-html[data-look="pixel"] .door::after{width:10px;height:12px;margin-top:-6px;border-radius:0;background:url(look/p-gem-off.png) center/12px 12px;box-shadow:none;image-rendering:pixelated}
+html[data-look="pixel"] .door::after{width:10px;height:12px;margin-top:-6px;border-radius:0;background:transparent;box-shadow:inset 0 0 0 2px #6E6A60,0 0 0 2px #0C0907;image-rendering:pixelated}
 html[data-look="pixel"] .door.r{clip-path:polygon(0 0,100% 0,100% 100%,30% 100%,30% calc(100% - 3px),0 calc(100% - 3px))}
 /* notes: parchment, not lined paper */
 html[data-look="pixel"] .index-card{color:#1E1810;background:url(look/tx-pixel.png) 0 0/64px,#C9B588;background-blend-mode:multiply;image-rendering:pixelated;
@@ -689,7 +689,7 @@ html[data-look="classic"] .door.r{background-image:url(look/c-door-r.webp)}
 html[data-look="classic"] .door::before,html[data-look="classic"] .door::after{display:none}
 html[data-look="classic"] .index-card{color:#2C1608;background:url(look/tx-paper.webp) 0 0/120px,radial-gradient(ellipse at 50% 40%,#F0DFB4 38%,#D2B47E 85%,#B08A52);background-blend-mode:multiply;
   box-shadow:inset 0 0 26px rgba(110,60,20,.5),inset 0 0 3px rgba(70,30,8,.6),0 10px 20px rgba(0,0,0,.6);
-  clip-path:polygon(0 2%,3% 0,22% 1%,41% 0,63% 1.2%,82% 0,97% .6%,100% 3%,99.4% 28%,100% 54%,99.2% 79%,100% 97%,96% 100%,74% 99%,52% 100%,29% 99.2%,8% 100%,.5% 98%,0 74%,.8% 49%,0 24%)}
+  clip-path:polygon(0 6px,3% 1px,9% 4px,16% 0,24% 3px,31% 1px,40% 5px,47% 0,55% 3px,63% 1px,71% 4px,78% 0,86% 3px,93% 1px,100% 5px,calc(100% - 3px) 120px,100% 260px,calc(100% - 2px) 420px,100% calc(100% - 5px),94% 100%,86% calc(100% - 3px),77% calc(100% - 1px),68% 100%,59% calc(100% - 4px),50% calc(100% - 1px),41% 100%,32% calc(100% - 3px),22% calc(100% - 1px),13% 100%,5% calc(100% - 4px),0 calc(100% - 1px),2px 380px,0 210px,3px 90px)}
 html[data-look="classic"] .index-card .card-head{border-bottom:1px solid rgba(138,26,18,.55)}
 html[data-look="classic"] .index-card .card-title{color:#8A1A12;font-family:var(--display)}
 html[data-look="classic"] .index-card .item{border-bottom:1px dotted rgba(90,50,20,.35)}
@@ -705,6 +705,29 @@ html[data-look="pixel"] .lsp .ttl,html[data-look="pixel"] .lsp.v-cl .ttl,html[da
 html[data-look="pixel"] .lsp.m-paper .ttl{color:var(--ink);text-shadow:none}
 html[data-look="pixel"] .lsp .au{color:#B49C6A}
 html[data-look="pixel"] .m-leather .bd{background:linear-gradient(to bottom,#0C0907 0 2px,var(--d) 2px 5px,#8A7444 5px 7px,var(--d) 7px calc(100% - 2px),#0C0907 calc(100% - 2px))}
+
+/* lists: readable buttons on parchment in the realistic room */
+html[data-look="real"] .index-card .btn:not(.quiet){border-image:none;border:1px solid rgba(80,56,30,.55);background:rgba(255,248,232,.55);color:#2B1E12;box-shadow:none;text-shadow:none}
+/* dark look: alternate parchment shades so entries read as separate */
+html[data-look="pixel"] .index-card .item{margin:0 -20px;padding:10px 20px;border-bottom:0;background:rgba(255,246,214,.10)}
+html[data-look="pixel"] .index-card .item:nth-of-type(even){background:rgba(60,40,10,.16)}
+
+/* ===== classic: series as rolled scrolls, lists with faint pen-and-ink vignettes ===== */
+html[data-look="classic"] .ledger.leather{margin:24px 24px 26px;border-radius:0;color:#2C1608;
+  background:linear-gradient(90deg,rgba(90,50,16,.42),transparent 7%,transparent 93%,rgba(90,50,16,.42)),
+    linear-gradient(rgba(70,36,10,.34),transparent 14px,transparent calc(100% - 14px),rgba(70,36,10,.34)),
+    url(look/c-parch.webp) 0 0/320px;
+  box-shadow:0 10px 18px rgba(0,0,0,.55),inset 0 0 22px rgba(110,60,20,.38)}
+html[data-look="classic"] .ledger.leather::before,html[data-look="classic"] .ledger.leather::after{content:"";position:absolute;left:-22px;right:-22px;height:26px;pointer-events:none;z-index:2;box-sizing:border-box;
+  border-style:solid;border-width:0 22px;border-color:transparent;border-image:url(look/c-roll.webp) 0 101 fill/0 22px stretch;background:none;filter:drop-shadow(0 4px 4px rgba(0,0,0,.55))}
+html[data-look="classic"] .ledger.leather::before{top:-15px}
+html[data-look="classic"] .ledger.leather::after{bottom:-15px}
+html[data-look="classic"] .ledger .card-head{padding-top:18px}
+html[data-look="classic"] .ledger .card-title{color:#7A1A10;font-family:var(--display)}
+html[data-look="classic"] .ledger .card-body{border-top:1px solid rgba(122,26,16,.35);padding-bottom:22px}
+html[data-look="classic"] .ledger.editing{box-shadow:0 10px 18px rgba(0,0,0,.55),inset 0 0 0 2px rgba(122,26,16,.6),inset 0 0 22px rgba(110,60,20,.38)}
+html[data-look="classic"] .index-card{background:url(look/c-art.webp) 100% 0/100% auto repeat-y,url(look/tx-paper.webp) 0 0/120px,radial-gradient(ellipse at 50% 40%,#F0DFB4 38%,#D2B47E 85%,#B08A52);background-blend-mode:normal,multiply,normal}
+html[data-look="classic"] .index-card .card-head{padding-top:22px}
 </style>
 <script>try{var l=localStorage.getItem("study-look");document.documentElement.dataset.look=(l==="pixel"||l==="classic")?l:"real";}catch(e){document.documentElement.dataset.look="real";}</script>
 </head>
@@ -1185,7 +1208,10 @@ function tidyGroups(groups){
   for(const g of [...gs].sort((a,b)=>(a.books||[]).length-(b.books||[]).length))for(const k of keys(g))if(!home.has(k))home.set(k,g);
   return gs.map(g=>g.pending?g:{...g,books:g.books.filter(e=>home.get(K(e))===g)}).filter(g=>g.pending||g.books.length||groups.length===1);
 }
-function topsView(){
+// The series view only depends on what's stored, so it's worked out once per change, not once per call.
+let _tv=null,_tvAt=null;
+function topsView(){const key=S.version+"|"+S.records.size;if(_tv&&_tvAt===key)return _tv.slice();_tv=computeTops();_tvAt=key;return _tv.slice();}
+function computeTops(){
   const books=live("book");const owner=ownerIndex(books);const tops=new Map();
   const ensure=(id,base)=>{if(!tops.has(id))tops.set(id,{id,subs:[],...base});return tops.get(id);};
   const keyed=new Map();for(const b of books){const k=seriesKeyOf(b);if(k){if(!keyed.has(k))keyed.set(k,[]);keyed.get(k).push(b);}}
@@ -2561,9 +2587,11 @@ async function listToSeries(listId){
   const rec=await createCustomSeries({name:l.name,items:l.items||[]});
   S.openSeries.add(rec.id);S.tab="series";render();toast(`${l.name} is now a series. The list is still here too.`);
 }
+let _own=null,_ownAt=null;
+const ownedLookup=()=>{const key=S.version+"|"+S.records.size;if(!_own||_ownAt!==key){_own=ownerIndex(live("book"));_ownAt=key;}return _own;};
 function listItemHTML(l,it){
   const kind=it.kind||"book";let status="";
-  if(kind==="book"&&live("book").some(b=>titleMatch(b.title,it.title)&&(norm(b.title)===norm(it.title)||sameAuthor(b.author,it.author))))status=`<span class="tag ownedtag">On your shelves</span>`;
+  if(kind==="book"&&ownedLookup()(it.title,it.author))status=`<span class="tag ownedtag">On your shelves</span>`;
   if(kind==="series"){const tv=topsView();let hit=null;
     for(const t of tv){if(titleMatch(t.name,it.title)){hit={own:t.ownedMain,tot:t.main.length};break;}
       const g=t.groups.find(g=>titleMatch(g.name,it.title));if(g){hit={own:g.entries.filter(e=>e.book).length,tot:g.entries.length};break;}}
@@ -2630,7 +2658,8 @@ function renderInner(){
   const qi=$("#q"),want=S.tab==="series"?S.sq:S.q;if(qi.value!==want)qi.value=want;
   qi.placeholder=S.tab==="series"?"Search series or authors":"Search titles, authors, translators";
   $("#offline").hidden=navigator.onLine!==false;
-  assignStyles(shelfLayout().groups.map(g=>g[1]));
+  // Spine styles only matter where spines are drawn; skip the shelf pass on other tabs (and when nothing changed).
+  if(S.tab==="shelves"||!S.styleMap){const k=[S.version,S.records.size,S.group,S.q].join("|");if(k!==S._stylesAt){assignStyles(shelfLayout().groups.map(g=>g[1]));S._stylesAt=k;}}
   const anchorEl=S.anchor&&document.getElementById(S.anchor),anchorTop=anchorEl?anchorEl.getBoundingClientRect().top:null;
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
