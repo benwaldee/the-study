@@ -119,7 +119,7 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
   background:var(--grain-h),linear-gradient(var(--walnut-dark) 0 2px,var(--walnut-hi) 2px 5px,var(--walnut-mid) 5px 9px,var(--walnut) 9px 17px,var(--walnut-edge) 17px 18px,var(--walnut-dark) 18px)}
 .slot{height:166px;padding-bottom:16px;display:flex;align-items:flex-end}
 /* each book is skipped while it's off screen; 4px of room on the right keeps its shadow on its neighbour */
-.shelf .slot{content-visibility:auto;contain-intrinsic-size:auto calc(var(--sw) + 4px) 166px;padding-right:4px;margin-right:-4px}
+.shelf .slot{content-visibility:auto;contain-intrinsic-size:calc(var(--sw) + 1px) 150px;padding-right:4px;margin-right:-4px}   /* exact size (spine + its 1px margin), so skipped books never change how rows wrap */
 .spine{position:relative;height:var(--h);width:var(--w);color:var(--t);border:0;border-radius:2px 2px 1px 1px;padding:10px 0;margin-right:1px;
   background:linear-gradient(90deg,rgba(0,0,0,.45),rgba(255,235,200,.11) 28%,rgba(255,235,200,.03) 56%,rgba(0,0,0,.48)),var(--c);
   writing-mode:vertical-rl;display:flex;align-items:center;justify-content:flex-start;overflow:hidden;cursor:pointer;
@@ -275,7 +275,7 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 /* bookcases: open, half open, closed */
 button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;gap:0;font:inherit;font-family:var(--display);font-size:18px}
 .plate .caret{margin-left:8px;align-self:center;opacity:.75}
-.shelf-wrap{overflow:hidden;contain:paint;content-visibility:auto;contain-intrinsic-size:auto 340px}   /* off-screen shelves skip layout and paint */
+.shelf-wrap{overflow:hidden;contain:paint}
 .shelf-inner .shelf{transition:opacity .38s ease,transform .48s cubic-bezier(.22,.9,.25,1)}
 .case.st-peek .shelf-wrap{height:332px}
 .case.st-peek .shelf-inner{height:332px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
