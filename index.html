@@ -86,12 +86,16 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .count{margin:16px 18px 0;color:var(--text-2);font-style:italic;font-size:16px}
 
 /* ---- the bookcase ---- */
-.case{position:relative;margin:30px 12px 34px;padding:0 18px 0;border-radius:2px;
+/* The bookcase's body (.case-bg, with the pillars) and its drop shadow (.case-sh) are their own layers, so opening and closing
+   can stretch the body and slide the shadow without repainting anything. */
+.case{position:relative;isolation:isolate;margin:30px 12px 34px;padding:0 18px 0;border-radius:2px;--drop:0 22px 30px -10px rgba(0,0,0,.75)}
+.case-bg{position:absolute;inset:0;z-index:-1;border-radius:inherit;transform-origin:50% 0;pointer-events:none;
   background:var(--grain-v),linear-gradient(90deg,var(--walnut-dark),var(--walnut) 7%,var(--walnut-mid) 50%,var(--walnut) 93%,var(--walnut-dark));
-  box-shadow:0 22px 30px -10px rgba(0,0,0,.75),0 0 0 1px rgba(0,0,0,.6)}
-.case::before,.case::after{content:"";position:absolute;top:62px;bottom:20px;width:11px;border-radius:2px;
+  box-shadow:var(--drop-side,0 0 30px -10px rgba(0,0,0,.75)),0 0 0 1px rgba(0,0,0,.6);clip-path:inset(-1px -80px -1px -80px)}
+.case-sh{position:absolute;left:0;right:0;bottom:0;height:90px;z-index:-2;border-radius:inherit;pointer-events:none;box-shadow:var(--drop);clip-path:inset(100% -90px -120px -90px)}
+.case-bg::before,.case-bg::after{content:"";position:absolute;top:62px;bottom:20px;width:11px;border-radius:2px;
   background:repeating-linear-gradient(90deg,rgba(0,0,0,.5) 0 1px,rgba(255,220,170,.13) 1px 2px,transparent 2px 4px)}
-.case::before{left:3px}.case::after{right:3px}
+.case-bg::before{left:3px}.case-bg::after{right:3px}
 .cornice{margin:0 -22px;position:relative}
 .cornice .cap{height:9px;border-radius:3px 3px 0 0;background:var(--grain-h),linear-gradient(var(--walnut-edge),var(--walnut-hi) 45%,var(--walnut));box-shadow:0 1px 0 rgba(0,0,0,.65)}
 .cornice .cove{height:14px;margin:0 4px;background:var(--grain-h),linear-gradient(var(--walnut-dark),var(--walnut-mid) 70%,var(--walnut-hi))}
@@ -99,7 +103,8 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
   background:repeating-linear-gradient(90deg,var(--walnut-hi) 0 9px,var(--walnut-dark) 9px 10px,var(--back) 10px 14px,var(--walnut-dark) 14px 15px)}
 .cornice .bead{height:6px;margin:0 12px;border-radius:0 0 3px 3px;background:linear-gradient(var(--walnut-edge),var(--walnut) 60%,var(--walnut-dark))}
 .plate-row{display:flex;justify-content:center;align-items:center;margin:8px 0 10px;position:relative;z-index:1}
-.scroll{width:38px;height:24px;color:var(--brass);flex:none;filter:drop-shadow(0 1px 0 rgba(0,0,0,.7))}
+.scroll{display:block;width:38px;height:24px;color:var(--brass);flex:none;filter:drop-shadow(0 1px 0 rgba(0,0,0,.7))}
+.scroll svg{display:block;width:100%;height:100%}.scroll .fl{display:none}
 .scroll.r{transform:scaleX(-1)}
 .plate{position:relative;background:linear-gradient(180deg,var(--brass-hi),var(--brass) 45%,var(--brass-lo));color:var(--brass-ink);font-family:var(--display);font-size:18px;line-height:1.2;
   padding:4px 22px 5px;border-radius:2px;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 0 rgba(255,240,200,.5);
@@ -276,6 +281,7 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;gap:0;font:inherit;font-family:var(--display);font-size:18px}
 .plate .caret{margin-left:8px;align-self:center;opacity:.75}
 .shelf-wrap{overflow:hidden;contain:paint}
+.case.cv-on .shelf .slot{content-visibility:visible}
 .shelf-inner .shelf{transition:opacity .38s ease,transform .48s cubic-bezier(.22,.9,.25,1)}
 .case.st-peek .shelf-wrap{height:332px}
 .case.st-peek .shelf-inner{height:332px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
@@ -404,16 +410,17 @@ html[data-look="real"] input,html[data-look="real"] select,html[data-look="real"
 html[data-look="real"] select{-webkit-appearance:none;appearance:none;padding-right:30px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M0 0h10L5 7z' fill='%23D9B864'/%3E%3C/svg%3E") right 12px center/10px 7px no-repeat,linear-gradient(#1b120c,#140d08)}
 html[data-look="real"] .btn:not(.brass):not(.quiet){border:1px solid transparent;border-image:url(look/r-field.webp) 18/8px stretch;background:linear-gradient(#2a1a12,#1a100b);box-shadow:0 1px 3px rgba(0,0,0,.6)}
 html[data-look="real"] .count-row{background:linear-gradient(#0a110d 0,#0a110d 65%,rgba(10,17,13,0))}
-html[data-look="real"] .case{margin:28px 9px 30px;padding:0 20px;background:linear-gradient(90deg,#120a06,#1e120b 50%,#120a06);border-radius:0;box-shadow:0 26px 34px -12px rgba(0,0,0,.85)}
+html[data-look="real"] .case{margin:28px 9px 30px;padding:0 20px;border-radius:0;--drop:0 26px 34px -12px rgba(0,0,0,.85)}
+html[data-look="real"] .case-bg{background:linear-gradient(90deg,#120a06,#1e120b 50%,#120a06);box-shadow:0 0 34px -12px rgba(0,0,0,.85)}
 html[data-look="real"] .case+.case::marker{content:none}
 /* a wall lamp between cases: damask shows only where its light falls */
 html[data-look="real"] .prop.arm{display:block;position:absolute;left:4%;right:4%;bottom:-62px;height:66px;pointer-events:none;z-index:0;
   background:radial-gradient(ellipse 46% 60% at 72% 50%,rgba(255,150,70,.20),transparent 75%),url(look/r-wall.webp) 0 0/220px 330px;
   -webkit-mask-image:radial-gradient(ellipse 42% 62% at 72% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);mask-image:radial-gradient(ellipse 42% 62% at 72% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);filter:brightness(1.9) sepia(.35)}
 html[data-look="real"] .case:nth-of-type(even) .prop.arm{background-position:center,40px 0;-webkit-mask-image:radial-gradient(ellipse 42% 62% at 26% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);mask-image:radial-gradient(ellipse 42% 62% at 26% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%)}
-html[data-look="real"] .case::before,html[data-look="real"] .case::after{top:61px;bottom:21px;width:21px;border-radius:0;background:none;border-style:solid;border-width:7px 0 11px;border-image:url(look/r-pil-l.webp) 14 0 21 fill/7px 0 11px stretch}
-html[data-look="real"] .case::before{left:0}
-html[data-look="real"] .case::after{right:0;border-image-source:url(look/r-pil-r.webp)}
+html[data-look="real"] .case-bg::before,html[data-look="real"] .case-bg::after{top:61px;bottom:21px;width:21px;border-radius:0;background:none;border-style:solid;border-width:7px 0 11px;border-image:url(look/r-pil-l.webp) 14 0 21 fill/7px 0 11px stretch}
+html[data-look="real"] .case-bg::before{left:0}
+html[data-look="real"] .case-bg::after{right:0;border-image-source:url(look/r-pil-r.webp)}
 html[data-look="real"] .cornice{height:61px;margin:0 -24px;background:url(look/r-cornice.webp) center/100% 100% no-repeat}
 html[data-look="real"] .cornice>*{display:none}
 html[data-look="real"] .plate-row{margin:-40px 0 11px}
@@ -485,10 +492,11 @@ html[data-look="pixel"] input::placeholder{font-style:normal;color:#8A826E}
 html[data-look="pixel"] select{-webkit-appearance:none;appearance:none;padding-right:28px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h10v2H8v2H6v2H4V4H2V2H0z' fill='%23E2C478'/%3E%3C/svg%3E") right 10px center/10px 6px no-repeat,#0E0B09}
 html[data-look="pixel"] .count,html[data-look="pixel"] .muted,html[data-look="pixel"] .card-sub,html[data-look="pixel"] .section-head p,html[data-look="pixel"] .empty-note,html[data-look="pixel"] .edit-hint{font-style:normal}
 html[data-look="pixel"] .count-row{background:linear-gradient(#120e0c 0,#120e0c 70%,rgba(18,14,12,0))}
-html[data-look="pixel"] .case{margin:26px 9px 28px;padding:0 18px;background:#1a130e;box-shadow:0 10px 0 rgba(0,0,0,.45)}
-html[data-look="pixel"] .case::before,html[data-look="pixel"] .case::after{top:58px;bottom:21px;width:18px;background:none;border-style:solid;border-width:9px 0 9px;border-image:url(look/p-pil-l.webp) 9 0 9 fill/9px 0 9px stretch;image-rendering:pixelated}
-html[data-look="pixel"] .case::before{left:0}
-html[data-look="pixel"] .case::after{right:0;border-image-source:url(look/p-pil-r.webp)}
+html[data-look="pixel"] .case{margin:26px 9px 28px;padding:0 18px;--drop:0 10px 0 rgba(0,0,0,.45)}
+html[data-look="pixel"] .case-bg{background:#1a130e;box-shadow:none}
+html[data-look="pixel"] .case-bg::before,html[data-look="pixel"] .case-bg::after{top:58px;bottom:21px;width:18px;background:none;border-style:solid;border-width:9px 0 9px;border-image:url(look/p-pil-l.webp) 9 0 9 fill/9px 0 9px stretch;image-rendering:pixelated}
+html[data-look="pixel"] .case-bg::before{left:0}
+html[data-look="pixel"] .case-bg::after{right:0;border-image-source:url(look/p-pil-r.webp)}
 html[data-look="pixel"] .cornice{height:58px;margin:0 -22px;background:url(look/p-cornice.webp) center/100% 100% no-repeat;image-rendering:pixelated}
 html[data-look="pixel"] .cornice>*{display:none}
 html[data-look="pixel"] .plate-row{margin:-44px 0 14px}
@@ -566,20 +574,31 @@ html[data-look="classic"] .btn.brass,html[data-look="classic"] .chip[aria-presse
 html[data-look="classic"] .btn.quiet{border-image:none;border-color:transparent;box-shadow:none;background:none;color:inherit}
 html[data-look="classic"] .count{font-style:italic;color:#D9BF8E}
 html[data-look="classic"] .count-row{background:linear-gradient(rgba(20,10,4,.9) 0,rgba(20,10,4,.75) 70%,rgba(20,10,4,0))}
-html[data-look="classic"] .case{margin:30px 7px 30px;padding:0 22px;background:#140a05;border-radius:0;box-shadow:0 20px 30px -10px rgba(0,0,0,.85)}
-html[data-look="classic"] .case::before,html[data-look="classic"] .case::after{top:84px;bottom:20px;width:22px;border-radius:0;background:url(look/c-pier-l.webp) center/100% 100% no-repeat}
-html[data-look="classic"] .case::before{left:0}
-html[data-look="classic"] .case::after{right:0;background-image:url(look/c-pier-r.webp)}
-html[data-look="classic"] .cornice{height:86px;margin:0 -26px;background:url(look/c-banner.webp) 21% 100%/22px 46px no-repeat,url(look/c-banner.webp) 79% 100%/22px 46px no-repeat,url(look/c-arch.webp) center/100% 100% no-repeat}
+html[data-look="classic"] .case{margin:30px 7px 30px;padding:0 22px;border-radius:0;--drop:0 20px 30px -10px rgba(0,0,0,.85)}
+html[data-look="classic"] .case-bg{background:#140a05;box-shadow:0 0 30px -10px rgba(0,0,0,.85)}
+html[data-look="classic"] .case-bg::before,html[data-look="classic"] .case-bg::after{top:84px;bottom:20px;width:22px;border-radius:0;background:url(look/c-pier-l.webp) center/100% 100% no-repeat}
+html[data-look="classic"] .case-bg::before{left:0}
+html[data-look="classic"] .case-bg::after{right:0;background-image:url(look/c-pier-r.webp)}
+html[data-look="classic"] .cornice{height:86px;margin:0 -26px;background:url(look/c-banner.webp) 10% 100%/22px 46px no-repeat,url(look/c-banner.webp) 90% 100%/22px 46px no-repeat,url(look/c-arch.webp) center/100% 100% no-repeat}
 html[data-look="classic"] .cornice>*{display:none}
 html[data-look="classic"] .plate-row{margin:-34px 0 10px}
-html[data-look="classic"] .scroll{width:16px;height:34px;margin:0 8px;background:url(look/c-torch.webp) center top/16px auto no-repeat;position:relative}
-html[data-look="classic"] .scroll::before{content:"";position:absolute;left:-10px;right:-10px;top:-8px;height:40px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,160,60,.55),rgba(255,140,50,0));animation:torch 2.6s ease-in-out infinite;will-change:opacity}
-html[data-look="classic"] .scroll::after{content:"";position:absolute;left:5px;right:5px;top:22px;bottom:0;background:linear-gradient(90deg,#2a1c12,#5a4030 50%,#2a1c12)}
-html[data-look="classic"] .scroll.r{animation-delay:-1.3s;transform:none}
+/* Wall torches: an iron sconce with a wrapped head, a looping flame drawn frame by frame, and its light flickering on the stone.
+   Everything moves by transform and opacity only, so the graphics chip runs it without redrawing the page. */
+html[data-look="classic"] .scroll{width:20px;height:34px;margin:0 9px;position:relative;filter:none}
+html[data-look="classic"] .scroll.r{transform:scaleX(-1)}
 html[data-look="classic"] .scroll svg{display:none}
-@keyframes torch{0%,100%{opacity:.75}40%{opacity:1}70%{opacity:.6}}
-@media (prefers-reduced-motion: reduce){html[data-look="classic"] .scroll::before{animation:none}}
+html[data-look="classic"] .scroll::before{content:"";position:absolute;left:-46px;right:-46px;top:-78px;height:124px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,176,80,.62),rgba(255,124,40,.3) 40%,rgba(255,100,30,.09) 72%,rgba(255,100,30,0));animation:torchglow 2.9s linear infinite;will-change:opacity,transform}
+html[data-look="classic"] .scroll::after{content:"";position:absolute;left:0;top:-12px;width:20px;height:50px;background:url(look/c-torch.webp) center/100% 100% no-repeat;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+html[data-look="classic"] .scroll .fl{display:block;position:absolute;left:-3px;top:-43px;width:26px;height:38px;overflow:hidden;pointer-events:none;z-index:1}
+html[data-look="classic"] .scroll .fl b{display:block;width:1600%;height:100%;background:url(look/c-flame.webp) 0 0/100% 100% no-repeat;animation:flame 1.15s steps(16) infinite}
+html[data-look="classic"] .scroll.r .fl b{animation-duration:1.3s;animation-delay:-.6s}
+html[data-look="classic"] .scroll.r::before{animation-delay:-1.7s}
+@keyframes flame{to{transform:translateX(-100%)}}
+@keyframes torchglow{0%{opacity:.85;transform:scale(1)}6%{opacity:1;transform:scale(1.05)}11%{opacity:.72;transform:scale(.97)}19%{opacity:.92;transform:scale(1.02)}27%{opacity:.8;transform:scale(1)}
+  34%{opacity:.98;transform:scale(1.04)}41%{opacity:.66;transform:scale(.96)}47%{opacity:.88;transform:scale(1.01)}58%{opacity:.76;transform:scale(.99)}66%{opacity:1;transform:scale(1.06)}
+  72%{opacity:.7;transform:scale(.97)}81%{opacity:.9;transform:scale(1.02)}90%{opacity:.78;transform:scale(.99)}100%{opacity:.85;transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){html[data-look="classic"] .scroll::before,html[data-look="classic"] .scroll .fl b{animation:none}}
 html[data-look="classic"] .plate{height:31px;display:inline-flex;align-items:center;padding:0 18px;border:0;border-image:url(look/c-sign.webp) 16 fill/8px stretch;background:none;border-radius:0;overflow:visible;
   font-family:"Cinzel",var(--display);font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#F4E2B8;text-shadow:0 1px 2px rgba(0,0,0,.85);box-shadow:0 4px 6px rgba(0,0,0,.6)}
 html[data-look="classic"] .plate small{font-family:var(--display);font-size:16px;opacity:.9;margin-left:8px}
@@ -625,10 +644,10 @@ html[data-look="classic"] .lcov .frame{border:2px solid rgba(214,170,90,.8);box-
 .prop{display:none}
 html[data-look="pixel"] .prop{display:block;position:absolute;pointer-events:none;z-index:3;image-rendering:pixelated;background-repeat:no-repeat}
 html[data-look="pixel"] .prop.arm{background-size:100% 100%}
-html[data-look="pixel"] .case:nth-of-type(5n+1) .prop.arm{left:-10px;top:-40px;width:80px;height:80px;background-image:url(look/p-w-shield.webp);transform:rotate(-7deg)}
+html[data-look="pixel"] .case:nth-of-type(5n+1) .prop.arm{--pin:top;left:-10px;top:-40px;width:80px;height:80px;background-image:url(look/p-w-shield.webp);transform:rotate(-7deg)}
 html[data-look="pixel"] .case:nth-of-type(5n+2) .prop.arm{right:-12px;bottom:-2px;width:60px;height:110px;background-image:url(look/p-w-axe.webp);transform:rotate(-12deg);transform-origin:50% 100%}
 html[data-look="pixel"] .case:nth-of-type(5n+3) .prop.arm{left:-6px;bottom:-4px;width:22px;height:170px;background-image:url(look/p-w-spear.webp);transform:rotate(6deg);transform-origin:50% 100%}
-html[data-look="pixel"] .case:nth-of-type(5n+4) .prop.arm{right:48px;top:-84px;width:30px;height:126px;background-image:url(look/p-w-sword.webp);transform:rotate(90deg)}
+html[data-look="pixel"] .case:nth-of-type(5n+4) .prop.arm{--pin:top;right:48px;top:-84px;width:30px;height:126px;background-image:url(look/p-w-sword.webp);transform:rotate(90deg)}
 html[data-look="pixel"] .case:nth-of-type(5n) .prop.arm{right:-6px;bottom:-4px;width:30px;height:126px;background-image:url(look/p-w-sword.webp);transform:rotate(-9deg);transform-origin:50% 100%}
 html[data-look="pixel"] .cornice{clip-path:polygon(0 5px,3px 5px,3px 1px,9px 1px,9px 0,38% 0,38% 3px,calc(38% + 5px) 3px,calc(38% + 5px) 0,calc(100% - 14px) 0,calc(100% - 14px) 2px,calc(100% - 4px) 2px,calc(100% - 4px) 7px,100% 7px,100% 100%,0 100%)}
 html[data-look="pixel"] .case:nth-of-type(2n) .cornice{clip-path:polygon(0 0,22% 0,22% 2px,calc(22% + 8px) 2px,calc(22% + 8px) 0,calc(100% - 6px) 0,calc(100% - 6px) 4px,100% 4px,100% 100%,0 100%)}
@@ -761,7 +780,7 @@ const GENRES=["Fantasy","Science fiction","Mystery & thriller","Horror","Romance
 const PALETTE=["#6E2420","#243E5C","#2F4B2D","#8E6A2C","#4A3157","#2A221C","#7D4422","#2D5752","#B9AE92","#5A1A2C","#1C3148","#6D6A2C"];
 const WISHLIST="Wishlist",PICKS="Suggested by Claude";
 const CORNICE=`<div class="cornice" aria-hidden="true"><div class="cap"></div><div class="cove"></div><div class="dentil"></div><div class="bead"></div></div>`;
-const SCROLL=c=>`<svg class="scroll${c}" viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg>`;
+const SCROLL=c=>`<span class="scroll${c}" aria-hidden="true"><svg viewBox="0 0 40 24" aria-hidden="true"><path d="M39 12H25C19 12 15 4 9 5 4 6 3 12 7 14c3 1.5 5-1.5 3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M25 12c-4 0-6 7-12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".7"/><circle cx="31" cy="12" r="1.6" fill="currentColor"/></svg><i class="fl"><b></b></i></span>`;
 
 const S={records:new Map(),queued:[],tab:"shelves",group:"genre",q:"",gapsOnly:false,openSeries:new Set(),openLists:new Set(),
   persist:true,persisted:false,seriesSort:"gaps",revealed:new Set(),editing:new Set(),showHidden:false,selecting:false,selected:new Set(),savedPhotos:0,translating:false,imgs:new Map(),sq:"",editSeries:false,uniTried:new Set(),
@@ -2347,30 +2366,64 @@ function bookcase(label,count,inner,opts={}){
   const can=!opts.blank,st=can?stateOf(label):"open";
   const plate=can?`<button class="plate" data-shelf="${esc(label)}" aria-label="${esc(label)}, ${count} books, ${STATE_WORD[st]}. Tap to change.">${esc(label)}${count!=null?`<small>${count}</small>`:""}${stateIcon(st)}</button>`
     :`<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>`;
-  return`<section class="case st-${st}">${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
+  return`<section class="case st-${st}"><div class="case-bg" aria-hidden="true"></div><div class="case-sh" aria-hidden="true"></div>${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
     <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div></div>
-    ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div>`:""}
+    ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors-mv"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div></div>`:""}
     <div class="plinth" aria-hidden="true"></div><i class="prop arm" aria-hidden="true"></i>${opts.extra||""}</section>`;
 }
 const EASE="cubic-bezier(.22,.9,.25,1)";
+// Opening and closing a bookcase. Nothing is laid out again while it moves: the page is laid out once for the move, then the
+// shelf's edge, the doors, the bottom of the case and everything below it slide on their own layers, which the phone's graphics
+// chip moves without repainting a single book. A tap mid-motion carries on from exactly where things are.
+const tyOf=el=>{const v=getComputedStyle(el).translate;return v&&v!=="none"?parseFloat(v.split(" ")[1]||0)||0:0;};
+function endShelfMotion(caseEl){
+  const m=caseEl._m;if(!m)return;caseEl._m=null;
+  m.anims.forEach(a=>a.cancel());m.cvOn.forEach(c=>c.classList.remove("cv-on"));
+  for(const el of[m.wrap,m.inner,m.doors])if(el){el.style.height="";el.style.overflowY="";el.style.pointerEvents="";}
+}
 function toggleShelf(btn){
   const label=btn.dataset.shelf,caseEl=btn.closest(".case"),wrap=caseEl.querySelector(".shelf-wrap"),inner=caseEl.querySelector(".shelf-inner"),doors=caseEl.querySelector(".doors-wrap");
   const cur=stateOf(label),full=inner.querySelector(".shelf").offsetHeight;
   let next=cur==="open"?"peek":cur==="peek"?"closed":"open";
   if(next==="peek"&&full<=PEEK_H+8)next="closed";      // short shelves skip the half-open step
   const o=shelfStates();o[label]=next;LS.set("study-shelfstate",JSON.stringify(o));
-  const from=wrap.getBoundingClientRect().height,to=next==="open"?full:next==="peek"?PEEK_H:0;
-  const doorFrom=doors.getBoundingClientRect().height,doorTo=next==="closed"?(doors.querySelector(".doors-in").offsetHeight||74):0;
-  caseEl.classList.remove("st-open","st-peek","st-closed");caseEl.classList.add("st-"+next,"moving");
+  // where the shelf's edge and the doors are on screen right now, and whether the inside currently scrolls
+  const m=caseEl._m;
+  const w=m?m.Hw+tyOf(wrap):wrap.offsetHeight,d=m?tyOf(doors)+m.Hw+m.Hd-w:doors.offsetHeight;
+  const scrolls=getComputedStyle(inner).overflowY==="auto";
+  endShelfMotion(caseEl);
+  caseEl.classList.remove("st-open","st-peek","st-closed");caseEl.classList.add("st-"+next);
   btn.querySelector(".caret").outerHTML=stateIcon(next);
   btn.setAttribute("aria-label",`${label}, ${STATE_WORD[next]}. Tap to change.`);
-  if(next!=="peek")inner.scrollTop=0;
-  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches,dur=reduce?0:480;
-  // Only the wrapper's height changes; the books ride on their own layer, so the motion stays smooth.
-  wrap.getAnimations().forEach(x=>x.cancel());doors.getAnimations().forEach(x=>x.cancel());   // a tap mid-motion starts from where it is
-  const a=wrap.animate([{height:from+"px"},{height:to+"px"}],{duration:dur,easing:EASE});
-  doors.animate([{height:doorFrom+"px"},{height:doorTo+"px"}],{duration:dur,easing:EASE});
-  a.onfinish=()=>caseEl.classList.remove("moving");
+  const to=wrap.offsetHeight,dTo=doors.offsetHeight;          // where they end up
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce||(Math.abs(w-to)<1&&Math.abs(d-dTo)<1)){if(next!=="peek")inner.scrollTop=0;return;}
+  // Lay the page out once at the larger size, and keep the inside as it looks now while it moves:
+  // a half-open shelf keeps scrolling as it closes, and an open one only becomes a half-open scroller once it gets there.
+  const Hw=Math.max(w,to),Hd=Math.max(d,dTo);
+  wrap.style.height=Hw+"px";doors.style.height=Hd+"px";wrap.style.pointerEvents=doors.style.pointerEvents="none";
+  if(next==="open"){inner.scrollTop=0;}
+  else if(scrolls){inner.style.height=PEEK_H+"px";inner.style.overflowY="auto";}
+  else{inner.style.height="auto";inner.style.overflowY="visible";}
+  const off0=w+d-Hw-Hd,off1=to+dTo-Hw-Hd,caseH=caseEl.offsetHeight;
+  const below=[...caseEl.children].filter(el=>(el.compareDocumentPosition(doors)&Node.DOCUMENT_POSITION_PRECEDING)&&getComputedStyle(el).getPropertyValue("--pin").trim()!=="top");
+  below.push(caseEl.querySelector(".case-sh"));
+  const cvOn=[],lo=Math.min(off0,off1),hi=Math.max(off0,off1);
+  for(let el=caseEl.nextElementSibling;el;el=el.nextElementSibling){
+    const r=el.getBoundingClientRect();
+    if(r.top+lo>innerHeight+40)break;                       // never on screen during the move: leave it be
+    below.push(el);
+    if(el.classList.contains("case")&&r.bottom+hi>-40){el.classList.add("cv-on");cvOn.push(el);}   // draw its books while it slides past
+  }
+  const opt={duration:480,easing:EASE,fill:"both"},ty=v=>({translate:`0 ${v}px`}),anims=[];
+  const go=(el,k)=>{if(el&&JSON.stringify(k[0])!==JSON.stringify(k[1]))anims.push(el.animate(k,opt));};   // a move that goes nowhere would keep the page redrawing
+  go(wrap,[ty(w-Hw),ty(to-Hw)]);go(inner,[ty(Hw-w),ty(Hw-to)]);          // the shelf's edge moves; the books stay put
+  go(doors,[ty(off0),ty(off1)]);go(doors.firstElementChild,[ty(Hd-d),ty(Hd-dTo)]);   // (a plain wrapper: the doors' own 3D setting can't be slid on the graphics chip)
+  below.forEach(el=>go(el,[ty(off0),ty(off1)]));
+  go(caseEl.querySelector(".case-bg"),[{scale:`1 ${(caseH+off0)/caseH}`},{scale:`1 ${(caseH+off1)/caseH}`}]);
+  const mm={wrap,inner,doors,Hw,Hd,anims,cvOn};caseEl._m=mm;
+  if(!anims.length){endShelfMotion(caseEl);return;}
+  Promise.all(anims.map(x=>x.finished)).then(()=>{if(caseEl._m!==mm)return;endShelfMotion(caseEl);if(next!=="peek")inner.scrollTop=0;}).catch(()=>{});
 }
 function banners(){
   if(S.tab!=="shelves")return"";
@@ -2705,7 +2758,11 @@ function renderInner(){
   else if(view){const el=$("#main").querySelector(view.sel);if(el){const d=el.getBoundingClientRect().top-view.top;if(Math.abs(d)>1)window.scrollBy(0,d);}}
   selectBar();syncHeadHeight();
   if(S.tab==="series"){mountStars($("#main"),(k,v)=>setRating(k,v));const ss=$("#seriesSort");if(ss)ss.onchange=e=>{S.seriesSort=e.target.value;LS.set("study-series-sort",S.seriesSort);render();};}
-  const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
+  // The Series badge counts books you're missing that you haven't seen yet: visiting Series clears it, and only newly missing books bring it back.
+  const keys=[];for(const t of topsView())if(!t.hiddenTop)for(const e of t.missing)keys.push(norm(e.author||t.author||"")+"|"+norm(e.orig||e.title));
+  if(S.tab==="series"){const old=S.missSeen,now=new Set(keys);if(!old||old.size!==now.size||keys.some(k=>!old.has(k))){S.missSeen=now;LS.set("study-missing-seen",JSON.stringify([...now]));}}
+  else if(!S.missSeen){let v=null;try{v=JSON.parse(LS.get("study-missing-seen","null"));}catch(e){}S.missSeen=Array.isArray(v)?new Set(v):null;}
+  const miss=S.missSeen?keys.filter(k=>!S.missSeen.has(k)).length:keys.length;
   const bd=$("#seriesBadge");bd.textContent=miss>99?"99+":String(miss);bd.hidden=!miss;
 }
 

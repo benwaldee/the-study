@@ -2,7 +2,7 @@
 // The page itself: newest version first when online (so updates show on the next open), saved copy otherwise.
 // Everything else (look images, fonts, icons) is saved on the phone at install and served from there:
 // each release has a new VERSION, which re-downloads them once, so they're never fetched on a normal open.
-const VERSION = "study-v29";
+const VERSION = "study-v30";
 const COVERS = "study-covers"; // cover pictures from Open Library / Google Books, kept across updates
 const COVER_URL = /^https:\/\/(covers\.openlibrary\.org\/b\/|books\.google\.com\/books\/content|books\.googleusercontent\.com\/)/;
 const FILES = [
@@ -26,6 +26,7 @@ const FILES = [
   "./look/c-sign.webp",
   "./look/c-strip.webp",
   "./look/c-torch.webp",
+  "./look/c-flame.webp",
   "./look/c-wall.webp",
   "./look/f-Cinzel.woff2",
   "./look/f-EBGaramond-400.woff2",
