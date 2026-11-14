@@ -1,7 +1,8 @@
-// The Study: keeps the app on the phone so it opens with no signal.
-// Online: always fetches the newest version first (so updates show on the next open).
-// Offline or slow signal: opens instantly from the copy saved on the phone.
-const VERSION = "study-v26";
+// The Study: keeps the whole app on the phone so it opens with no signal.
+// The page itself: newest version first when online (so updates show on the next open), saved copy otherwise.
+// Everything else (look images, fonts, icons) is saved on the phone at install and served from there:
+// each release has a new VERSION, which re-downloads them once, so they're never fetched on a normal open.
+const VERSION = "study-v27";
 const COVERS = "study-covers"; // cover pictures from Open Library / Google Books, kept across updates
 const COVER_URL = /^https:\/\/(covers\.openlibrary\.org\/b\/|books\.google\.com\/books\/content|books\.googleusercontent\.com\/)/;
 const FILES = [
@@ -27,28 +28,33 @@ const FILES = [
   "./look/c-torch.webp",
   "./look/c-wall.webp",
   "./look/f-Cinzel.woff2",
-  "./look/f-Pixelify.woff2",
+  "./look/f-EBGaramond-400.woff2",
+  "./look/f-EBGaramond-400i.woff2",
+  "./look/f-EBGaramond-500.woff2",
+  "./look/f-EBGaramond-600.woff2",
+  "./look/f-IMFellEnglish-400.woff2",
+  "./look/f-IMFellEnglish-400i.woff2",
   "./look/f-VT323.woff2",
-  "./look/p-back.png",
-  "./look/p-btn.png",
-  "./look/p-cornice.png",
-  "./look/p-dragon-off.png",
-  "./look/p-dragon-s.png",
-  "./look/p-dragon.png",
-  "./look/p-field.png",
-  "./look/p-head.png",
-  "./look/p-nav.png",
-  "./look/p-pil-l.png",
-  "./look/p-pil-r.png",
-  "./look/p-plate.png",
-  "./look/p-plinth.png",
-  "./look/p-rail.png",
-  "./look/p-row.png",
-  "./look/p-w-axe.png",
-  "./look/p-w-shield.png",
-  "./look/p-w-spear.png",
-  "./look/p-w-sword.png",
-  "./look/p-wall.png",
+  "./look/p-back.webp",
+  "./look/p-btn.webp",
+  "./look/p-cornice.webp",
+  "./look/p-dragon-off.webp",
+  "./look/p-dragon-s.webp",
+  "./look/p-dragon.webp",
+  "./look/p-field.webp",
+  "./look/p-head.webp",
+  "./look/p-nav.webp",
+  "./look/p-pil-l.webp",
+  "./look/p-pil-r.webp",
+  "./look/p-plate.webp",
+  "./look/p-plinth.webp",
+  "./look/p-rail.webp",
+  "./look/p-row.webp",
+  "./look/p-w-axe.webp",
+  "./look/p-w-shield.webp",
+  "./look/p-w-spear.webp",
+  "./look/p-w-sword.webp",
+  "./look/p-wall.webp",
   "./look/r-back.webp",
   "./look/r-btn-brass.webp",
   "./look/r-btn-more.webp",
@@ -68,10 +74,10 @@ const FILES = [
   "./look/tx-leather.webp",
   "./look/tx-paint.webp",
   "./look/tx-paper.webp",
-  "./look/tx-pixel.png"
+  "./look/tx-pixel.webp"
 ];
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys()
@@ -94,6 +100,18 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (req.method !== "GET" || url.origin !== location.origin) return;
+  const isPage = req.mode === "navigate" || /\/(index\.html)?$/.test(url.pathname);
+  if (!isPage && !url.pathname.endsWith("/sw.js")) {
+    // saved on the phone: answer from the cache, and only go to the network for something never saved
+    e.respondWith(caches.open(VERSION).then(async cache => {
+      const hit = await cache.match(req, { ignoreSearch: true });
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res && res.ok) cache.put(req, res.clone());
+      return res;
+    }).catch(() => Response.error()));
+    return;
+  }
   e.respondWith(caches.open(VERSION).then(async cache => {
     const network = fetch(req, { cache: "no-store" }).then(res => {
       if (res && res.ok) cache.put(req, res.clone());
@@ -105,7 +123,7 @@ self.addEventListener("fetch", e => {
       e.waitUntil(network.catch(() => null));
       const hit = await cache.match(req, { ignoreSearch: true });
       if (hit) return hit;
-      if (req.mode === "navigate") { const home = await cache.match("./index.html"); if (home) return home; }
+      const home = await cache.match("./index.html"); if (home) return home;
       return Response.error();
     }
   }));
