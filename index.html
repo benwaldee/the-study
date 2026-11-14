@@ -410,7 +410,7 @@ button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;ga
 .v-ls{background-color:var(--dd)}
 
 /* ===== realistic study ===== */
-html[data-look="real"] body{background-color:#0a110d;background-image:radial-gradient(ellipse 120% 70% at 50% 0%,rgba(255,170,90,.09),transparent 70%),radial-gradient(ellipse at 50% 40%,transparent 40%,rgba(0,0,0,.55)),url(look/r-wall.webp);background-size:auto,auto,220px 330px;background-repeat:no-repeat,no-repeat,repeat;background-attachment:scroll,fixed,scroll}
+html[data-look="real"] body{background-color:#050706;background-image:linear-gradient(rgba(2,3,2,.62),rgba(2,3,2,.62)),radial-gradient(ellipse at 50% 40%,transparent 30%,rgba(0,0,0,.6)),url(look/r-wall.webp);background-size:auto,auto,220px 330px;background-repeat:no-repeat,no-repeat,repeat;background-attachment:scroll,fixed,scroll}
 html[data-look="real"] body::before{background:#1a0f08}
 html[data-look="real"] .top{background:url(look/r-head.webp) center/100% 100% no-repeat,#1c110a}
 html[data-look="real"] .top::after{height:15px;border-top:0;background:url(look/r-rail.webp) center/100% 100% no-repeat}
@@ -424,6 +424,12 @@ html[data-look="real"] select{-webkit-appearance:none;appearance:none;padding-ri
 html[data-look="real"] .btn:not(.brass):not(.quiet){border:1px solid transparent;border-image:url(look/r-field.webp) 18/8px stretch;background:linear-gradient(#2a1a12,#1a100b);box-shadow:0 1px 3px rgba(0,0,0,.6)}
 html[data-look="real"] .count-row{background:linear-gradient(#0a110d 0,#0a110d 65%,rgba(10,17,13,0))}
 html[data-look="real"] .case{margin:28px 9px 30px;padding:0 20px;background:linear-gradient(90deg,#120a06,#1e120b 50%,#120a06);border-radius:0;box-shadow:0 26px 34px -12px rgba(0,0,0,.85)}
+html[data-look="real"] .case+.case::marker{content:none}
+/* a wall lamp between cases: damask shows only where its light falls */
+html[data-look="real"] .prop.arm{display:block;position:absolute;left:4%;right:4%;bottom:-62px;height:66px;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 46% 60% at 72% 50%,rgba(255,150,70,.20),transparent 75%),url(look/r-wall.webp) 0 0/220px 330px;
+  -webkit-mask-image:radial-gradient(ellipse 42% 62% at 72% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);mask-image:radial-gradient(ellipse 42% 62% at 72% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);filter:brightness(1.9) sepia(.35)}
+html[data-look="real"] .case:nth-of-type(even) .prop.arm{background-position:center,40px 0;-webkit-mask-image:radial-gradient(ellipse 42% 62% at 26% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);mask-image:radial-gradient(ellipse 42% 62% at 26% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%)}
 html[data-look="real"] .case::before,html[data-look="real"] .case::after{top:61px;bottom:21px;width:21px;border-radius:0;background:none;border-style:solid;border-width:7px 0 11px;border-image:url(look/r-pil-l.webp) 14 0 21 fill/7px 0 11px stretch}
 html[data-look="real"] .case::before{left:0}
 html[data-look="real"] .case::after{right:0;border-image-source:url(look/r-pil-r.webp)}
@@ -437,8 +443,21 @@ html[data-look="real"] .plate{height:29px;display:inline-flex;align-items:center
 html[data-look="real"] .plate::before,html[data-look="real"] .plate::after{display:none}
 html[data-look="real"] .shelf{position:relative;border-radius:0;box-shadow:inset 0 0 26px rgba(0,0,0,.8);
   background:url(look/r-row.webp) 0 0/100% 166px repeat-y,linear-gradient(rgba(8,4,2,.42),rgba(8,4,2,.42)),url(look/r-back.webp) 0 0/200px auto repeat,#170d07}
-html[data-look="real"] .shelf::after{content:"";position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(ellipse 75% 120px at 50% 0,rgba(255,176,96,.20),rgba(255,176,96,.05) 55%,transparent 75%) 0 0/100% 166px repeat-y;mix-blend-mode:screen}
+/* the case light: falls from under the cornice onto the book tops, fades toward the shelf and the sides */
+html[data-look="real"] .shelf::before,html[data-look="real"] .shelf::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:2}
+html[data-look="real"] .shelf::before{mix-blend-mode:multiply;background-blend-mode:multiply;
+  background:linear-gradient(to bottom,#F2E2CE 0,#FFF6EA 24px,#EAD2B6 62px,#C4A487 100px,#9C7E66 130px,#806650 147px,#fff 148px,#fff 166px) 0 0/100% 166px repeat-y,
+    linear-gradient(90deg,#A08672 0,#F2E6D8 16%,#fff 40%,#fff 60%,#F2E6D8 84%,#A08672 100%)}
+html[data-look="real"] .shelf::after{mix-blend-mode:screen;
+  background:radial-gradient(ellipse 58% 64px at 50% 46px,rgba(255,160,86,.22),rgba(255,150,80,.06) 60%,transparent 80%) 0 0/100% 166px repeat-y,
+    linear-gradient(to bottom,rgba(255,190,120,.16) 0,rgba(255,190,120,0) 36px) 0 0/100% 166px repeat-y}
+html[data-look="real"] .shelf .spine.drawn{box-shadow:3px 0 5px rgba(0,0,0,.55),1px 0 0 rgba(0,0,0,.6)}
+html[data-look="real"] .lsp{filter:saturate(.82)}
+html[data-look="real"] .lsp.art::after{background:linear-gradient(90deg,rgba(0,0,0,.6),rgba(255,226,190,.18) 16%,rgba(255,226,190,.05) 34%,transparent 55%,rgba(0,0,0,.22) 80%,rgba(0,0,0,.62))}
+/* dark leather title labels with gold, as in the render (no pale paper labels in this room) */
+html[data-look="real"] .lsp.v-cl .lab{left:10%;right:10%;background:#130c08 url(look/tx-leather.webp) 0 0/90px;background-blend-mode:multiply;box-shadow:inset 0 0 0 1px rgba(214,178,100,.6)}
+html[data-look="real"] .lsp.v-cl .ttl,html[data-look="real"] .lsp.lsp:not(.gold) .ttl{background:linear-gradient(90deg,#F7E2A4,#C0913A 50%,#F1D58C);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 .6px 0 rgba(0,0,0,.75))}
+html[data-look="real"] .lsp.m-paper .ttl,html[data-look="real"] .lsp.m-paper .au{background:none;-webkit-background-clip:border-box;background-clip:border-box;color:var(--ink);filter:none}
 html[data-look="real"] .plinth{height:21px;margin:0 -24px;border-radius:0;background:url(look/r-plinth.webp) center/100% 100% no-repeat}
 html[data-look="real"] .door{background:url(look/r-back.webp) 0 0/160px auto,#1c110a}
 html[data-look="real"] .nav{border-top:0;background:url(look/r-nav.webp) center/100% 100% no-repeat,#1a0f08}
@@ -625,6 +644,62 @@ html[data-look="classic"] .v-cl .bd.t{top:7%;height:2px;background:#C99A48}html[
 html[data-look="classic"] .v-pg .bd.t{top:0;height:14%;background:var(--a)}html[data-look="classic"] .v-pg .bd.b{bottom:0;height:3.5%;background:var(--a)}
 html[data-look="classic"] .v-pt .bd.t{top:0;height:31%;background:var(--dd)}
 html[data-look="classic"] .lcov .frame{border:2px solid rgba(214,170,90,.8);box-shadow:inset 0 0 0 3px rgba(20,8,3,.4),inset 0 0 0 4px rgba(214,170,90,.45)}
+
+/* ===== dark pixel: grit, props, uneven edges ===== */
+.prop{display:none}
+html[data-look="pixel"] .prop{display:block;position:absolute;pointer-events:none;z-index:3;image-rendering:pixelated;background-repeat:no-repeat}
+html[data-look="pixel"] .prop.arm{background-size:100% 100%}
+html[data-look="pixel"] .case:nth-of-type(5n+1) .prop.arm{left:-10px;top:-30px;width:72px;height:72px;background-image:url(look/p-w-shield.png);transform:rotate(-8deg)}
+html[data-look="pixel"] .case:nth-of-type(5n+2) .prop.arm{right:-12px;bottom:-4px;width:56px;height:96px;background-image:url(look/p-w-axe.png);transform:rotate(-12deg);transform-origin:50% 100%}
+html[data-look="pixel"] .case:nth-of-type(5n+3) .prop.arm{left:-8px;bottom:-6px;width:22px;height:176px;background-image:url(look/p-w-spear.png);transform:rotate(6deg);transform-origin:50% 100%}
+html[data-look="pixel"] .case:nth-of-type(5n+4) .prop.arm{right:34px;top:-60px;width:28px;height:116px;background-image:url(look/p-w-sword.png);transform:rotate(90deg)}
+html[data-look="pixel"] .case:nth-of-type(5n) .prop.arm{left:24%;top:-30px;width:20px;height:56px;background-image:url(look/p-w-dagger.png);transform:rotate(172deg)}
+html[data-look="pixel"] .prop.cobweb{display:none;right:18px;top:58px;width:48px;height:48px;background:url(look/p-w-web.png) 0 0/100% 100% no-repeat;transform:scaleX(-1)}
+html[data-look="pixel"] .case:nth-of-type(3n+2) .prop.cobweb{display:block;right:auto;left:18px;transform:none}
+html[data-look="pixel"] .case:nth-of-type(4n+3) .prop.cobweb{display:block}
+html[data-look="pixel"] .cornice{clip-path:polygon(0 5px,3px 5px,3px 1px,9px 1px,9px 0,38% 0,38% 3px,calc(38% + 5px) 3px,calc(38% + 5px) 0,calc(100% - 14px) 0,calc(100% - 14px) 2px,calc(100% - 4px) 2px,calc(100% - 4px) 7px,100% 7px,100% 100%,0 100%)}
+html[data-look="pixel"] .case:nth-of-type(2n) .cornice{clip-path:polygon(0 0,22% 0,22% 2px,calc(22% + 8px) 2px,calc(22% + 8px) 0,calc(100% - 6px) 0,calc(100% - 6px) 4px,100% 4px,100% 100%,0 100%)}
+html[data-look="pixel"] .case:nth-of-type(3n) .cornice{clip-path:polygon(0 3px,6px 3px,6px 0,61% 0,61% 4px,calc(61% + 3px) 4px,calc(61% + 3px) 1px,100% 1px,100% 100%,0 100%)}
+html[data-look="pixel"] .plinth{clip-path:polygon(0 0,100% 0,100% calc(100% - 3px),calc(100% - 8px) calc(100% - 3px),calc(100% - 8px) 100%,30% 100%,30% calc(100% - 2px),calc(30% - 6px) calc(100% - 2px),calc(30% - 6px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px))}
+html[data-look="pixel"] .case:nth-of-type(odd) .plate-row{transform:translateX(-6px) rotate(-1.4deg)}
+html[data-look="pixel"] .case:nth-of-type(even) .plate-row{transform:translateX(5px) rotate(.9deg)}
+html[data-look="pixel"] .case:nth-of-type(3n+2){transform:rotate(-.25deg)}
+html[data-look="pixel"] .slot:nth-child(9n+5){margin-left:5px}
+html[data-look="pixel"] .slot:nth-child(9n+5) .spine{transform:rotate(-4.5deg);transform-origin:100% 100%}
+html[data-look="pixel"] .slot:nth-child(13n+9) .spine{transform:translateY(2px)}
+html[data-look="pixel"] .leather:not(.sheet){clip-path:polygon(0 4px,4px 4px,4px 0,calc(100% - 10px) 0,calc(100% - 10px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 6px,100% 6px,100% calc(100% - 5px),calc(100% - 3px) calc(100% - 5px),calc(100% - 3px) 100%,12px 100%,12px calc(100% - 2px),0 calc(100% - 2px))}
+html[data-look="pixel"] .ledger:nth-child(even){transform:rotate(.35deg)}
+html[data-look="pixel"] .ledger:nth-child(3n){transform:rotate(-.3deg)}
+/* doors of a closed case */
+html[data-look="pixel"] .door{background:linear-gradient(transparent 20%,#0C0907 20% 22%,#5C605E 22% 30%,#0C0907 30% 32%,transparent 32% 66%,#0C0907 66% 68%,#5C605E 68% 76%,#0C0907 76% 78%,transparent 78%),
+  repeating-linear-gradient(90deg,#0C0907 0 2px,transparent 2px 14px),url(look/tx-pixel.png) 0 0/64px,#4E3420;background-blend-mode:normal,normal,multiply,normal;box-shadow:inset 0 0 0 2px #0C0907,inset 2px 2px 0 rgba(255,220,170,.15)}
+html[data-look="pixel"] .door::before{inset:0;background:linear-gradient(90deg,transparent 0 4px,#8E9490 4px 6px,transparent 6px) 0 23%/14px 4px repeat-x,linear-gradient(90deg,transparent 0 4px,#8E9490 4px 6px,transparent 6px) 0 71%/14px 4px repeat-x;box-shadow:none}
+html[data-look="pixel"] .door::after{width:10px;height:10px;margin-top:-5px;border-radius:0;background:transparent;box-shadow:inset 0 0 0 2px #8E9490,0 0 0 2px #0C0907}
+html[data-look="pixel"] .door.r{clip-path:polygon(0 0,100% 0,100% 100%,30% 100%,30% calc(100% - 3px),0 calc(100% - 3px))}
+/* notes: parchment, not lined paper */
+html[data-look="pixel"] .index-card{color:#1E1810;background:url(look/tx-pixel.png) 0 0/64px,#C9B588;background-blend-mode:multiply;image-rendering:pixelated;
+  box-shadow:inset 0 0 0 2px #0C0907,inset 0 0 0 4px #8E7A52,0 6px 0 rgba(0,0,0,.5);
+  clip-path:polygon(0 3px,6px 3px,6px 0,calc(100% - 18px) 0,calc(100% - 18px) 2px,100% 2px,100% calc(100% - 4px),calc(100% - 7px) calc(100% - 4px),calc(100% - 7px) 100%,0 100%)}
+html[data-look="pixel"] .index-card .card-head{border-bottom:2px solid #6E2A1E}
+html[data-look="pixel"] .index-card .card-title{color:#3A1408;text-shadow:none}
+html[data-look="pixel"] .index-card .card-sub,html[data-look="pixel"] .index-card .ia{color:#4A3A22}
+html[data-look="pixel"] .index-card .btn{color:#1E1810;text-shadow:none;background:url(look/tx-pixel.png) 0 0/64px,#B6A070;background-blend-mode:multiply}
+
+/* ===== classic: dungeon doors and parchment notes ===== */
+html[data-look="classic"] .doors-in{gap:4px}
+html[data-look="classic"] .door{background:linear-gradient(transparent 18%,#1E1814 18% 27%,transparent 27% 70%,#1E1814 70% 79%,transparent 79%),
+  repeating-linear-gradient(90deg,rgba(20,8,2,.55) 0 2px,transparent 2px 19px),url(look/tx-paint.webp) 0 0/140px,linear-gradient(#4E3218,#2C1A0C);
+  background-blend-mode:normal,normal,multiply,normal;box-shadow:inset 0 0 0 2px #140A04,inset 0 0 16px rgba(0,0,0,.65),0 3px 6px rgba(0,0,0,.6)}
+html[data-look="classic"] .door::before{inset:0;background:radial-gradient(circle,#B4A48E 0 1.3px,#2A2018 1.6px,transparent 2.2px) 8px 22.5%/19px 7px repeat-x,radial-gradient(circle,#B4A48E 0 1.3px,#2A2018 1.6px,transparent 2.2px) 8px 74.5%/19px 7px repeat-x;box-shadow:none}
+html[data-look="classic"] .door::after{width:14px;height:16px;margin-top:-6px;border-radius:50%;background:transparent;border:2px solid #6A5A48;box-shadow:0 1px 2px rgba(0,0,0,.8),inset 0 1px 1px rgba(0,0,0,.6)}
+html[data-look="classic"] .door.l::after{right:6px}html[data-look="classic"] .door.r::after{left:6px}
+html[data-look="classic"] .index-card{color:#2C1608;background:url(look/tx-paper.webp) 0 0/120px,radial-gradient(ellipse at 50% 40%,#F0DFB4 38%,#D2B47E 85%,#B08A52);background-blend-mode:multiply;
+  box-shadow:inset 0 0 26px rgba(110,60,20,.5),inset 0 0 3px rgba(70,30,8,.6),0 10px 20px rgba(0,0,0,.6);
+  clip-path:polygon(0 2%,3% 0,22% 1%,41% 0,63% 1.2%,82% 0,97% .6%,100% 3%,99.4% 28%,100% 54%,99.2% 79%,100% 97%,96% 100%,74% 99%,52% 100%,29% 99.2%,8% 100%,.5% 98%,0 74%,.8% 49%,0 24%)}
+html[data-look="classic"] .index-card .card-head{border-bottom:1px solid rgba(138,26,18,.55)}
+html[data-look="classic"] .index-card .card-title{color:#8A1A12;font-family:var(--display)}
+html[data-look="classic"] .index-card .item{border-bottom:1px dotted rgba(90,50,20,.35)}
+html[data-look="classic"] .index-card .btn{color:#2C1608}
 </style>
 <script>try{var l=localStorage.getItem("study-look");document.documentElement.dataset.look=(l==="pixel"||l==="classic")?l:"real";}catch(e){document.documentElement.dataset.look="real";}</script>
 </head>
@@ -1744,7 +1819,8 @@ function lookVars(b,v){const p=palette(b),paper=PAPERS.includes(v);
   return{p,cls:`lsp v-${v} ${material(v)}${ink?"":" gold"}`,style:`--c:${p.c};--d:${p.dark};--dd:${p.deep};--a:${p.acc}${ink?`;--ink:${ink}`:""}`};}
 function lookSpine(b,W,H){
   const v=variantOf(b),{cls,style}=lookVars(b,v),lk=lookNow(),f=LOOK_FONT[lk],t=b.title||"",au=surname(b.author)||"";
-  const[a0,a1]=TITLE_BAND[v],top=Math.round(H*a0),len=Math.round(H*a1);
+  // In the realistic room every label runs long, like real leather title-pieces.
+  const[a0,a1]=lk==="real"&&v==="cl"?[.18,.62]:TITLE_BAND[v],top=Math.round(H*a0),len=Math.round(H*a1);
   const r=t?fitVertical(t,f,len*.94,W*(v==="cl"?.6:.68),lk==="pixel"?18:15):null;
   const afs=Math.min(lk==="pixel"?11:8,W*.2),showAu=au&&W>=17&&afs>=5;
   return`<span class="art ${cls}" style="${style}"><i class="tex"></i><i class="bd t"></i><i class="bd b"></i>`+
@@ -2222,7 +2298,7 @@ function bookcase(label,count,inner,opts={}){
   return`<section class="case st-${st}">${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
     <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div></div>
     ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div>`:""}
-    <div class="plinth" aria-hidden="true"></div>${opts.extra||""}</section>`;
+    <div class="plinth" aria-hidden="true"></div><i class="prop arm" aria-hidden="true"></i><i class="prop cobweb" aria-hidden="true"></i>${opts.extra||""}</section>`;
 }
 const EASE="cubic-bezier(.22,.9,.25,1)";
 function toggleShelf(btn){
