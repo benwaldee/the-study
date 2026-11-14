@@ -772,7 +772,9 @@ const $=(s,el=document)=>el.querySelector(s);
 const txt=v=>typeof v==="string"?v:typeof v==="number"&&Number.isFinite(v)?String(v):"";
 const esc=s=>txt(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-const clone=o=>JSON.parse(JSON.stringify(o));
+const clone=o=>o===undefined?undefined:JSON.parse(JSON.stringify(o));
+// A fresh copy of a record to update after waiting on something, or nothing if it was removed in the meantime.
+const liveCopy=id=>{const r=S.records.get(id);return r&&!r.deleted?clone(r):null;};
 // Titles and names are normalised constantly (matching, sorting, series), so each distinct string is done once.
 const _norm=new Map();
 const norm=s=>{const t=txt(s);let r=_norm.get(t);if(r!==undefined)return r;
@@ -1084,7 +1086,7 @@ async function stockUp(){
     const langs=live("book").filter(b=>!b.translationChecked&&!b.needsDetails);
     for(let i=0;i<langs.length&&canAsk();i+=40){const batch=langs.slice(i,i+40);
       try{const arr=await Claude.json(translationPrompt(batch.map((b,k)=>{const o={key:"k"+k,title:b.title,author:b.author||""};if(b.publisher)o.publisher=b.publisher;if(b.edition)o.edition=b.edition;if(b.translator)o.translator=b.translator;return o;})),{model:MODELS.smart});
-        const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=clone(S.records.get(b.id));applyTranslation(c,d);c.translationChecked=true;out.push(c);}
+        const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=liveCopy(b.id);if(!c)continue;applyTranslation(c,d);c.translationChecked=true;out.push(c);}
         if(out.length)await save(out);}catch(e){break;}}
     // every translation of every translated book, for picking yours offline
     const tr=live("book").filter(b=>isTranslated(b)&&!(b.translations&&b.translations.length)&&!b.translationsChecked);
@@ -1093,7 +1095,7 @@ async function stockUp(){
 Books: ${JSON.stringify(batch.map((b,k)=>({key:"k"+k,title:b.title,author:b.author||""})))}
 Reply with only a JSON array: [{"key":"k0","translations":[{"translator":"","publisher":"","year":2003,"note":"what that edition looks like or is known for"}]}]
 List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:6000});
-        const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=clone(S.records.get(b.id));
+        const out=[];for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;const c=liveCopy(b.id);if(!c)continue;
           c.translations=cleanTranslations(d.translations);c.translationsChecked=true;out.push(c);}
         if(out.length)await save(out);}catch(e){break;}}
     // books listed twice under different titles
@@ -1362,13 +1364,13 @@ async function fillCustomGroups(id){
     await save(cur);S.busySeries.delete(id);scheduleRender();
   }
 }
-async function createCustomSeries({name,text,author,items}){
+async function createCustomSeries({name,text,author,items,fromList}){
   let groups=[];
   if(items)groups=groupsFromItems(items,name);
   if(text&&text.trim()){const r=await parseListText(text);groups=groups.concat(groupsFromItems(r.items,name));}
   if(author){const works=canAsk()?await authorWorks(author).catch(()=>[]):[];
     groups.push(works&&works.length?{name:`Novels by ${author}`,books:works}:{name:`Novels by ${author}`,books:[],pending:{name:`every novel by ${author}`,author}});}
-  const rec={kind:"custom",id:"c_"+uid("x").slice(2),name,author:author||"",groups,createdAt:Date.now()};
+  const rec={kind:"custom",id:"c_"+uid("x").slice(2),name,author:author||"",groups,createdAt:Date.now()};if(fromList)rec.fromList=fromList;
   await save(rec);fillCustomGroups(rec.id);return rec;
 }
 async function addToCustom(id,text){
@@ -1488,9 +1490,18 @@ async function gotIt(key){
   await addBooks([{title:item.title,author:item.author,translator:item.translator}]);
   toast(`“${item.title}” is on your shelves now.`);
 }
+// Two-tap confirmation. The first tap arms; a second tap at least half a second later confirms, so an accidental double tap never does it.
+const ARM_GAP=450;
+function confirmTap(k,ms=4000){const now=Date.now();
+  if(S.confirmDel===k){if(now-S.confirmAt<ARM_GAP)return false;S.confirmDel=null;return true;}
+  S.confirmDel=k;S.confirmAt=now;render();setTimeout(()=>{if(S.confirmDel===k&&S.confirmAt===now){S.confirmDel=null;scheduleRender();}},ms);return false;}
+function confirmBtn(el,label,ms=5000){const now=Date.now(),a=+el.dataset.armed||0;
+  if(a){if(now-a<ARM_GAP)return false;delete el.dataset.armed;return true;}
+  const old=el.textContent;el.dataset.armed=String(now);el.textContent=label;el.classList.add("armed");
+  setTimeout(()=>{if(el.isConnected&&el.dataset.armed===String(now)){delete el.dataset.armed;el.textContent=old;el.classList.remove("armed");}},ms);return false;}
 async function delList(id){
-  if(S.confirmDel!==id){S.confirmDel=id;scheduleRender();setTimeout(()=>{if(S.confirmDel===id){S.confirmDel=null;scheduleRender();}},4000);return;}
-  S.confirmDel=null;const l=S.records.get(id);if(!l)return;
+  if(!confirmTap(id))return;
+  const l=S.records.get(id);if(!l)return;
   await save({kind:"list",id,deleted:true,name:l.name,items:[]});toast(`Deleted ${l.name}.`);
 }
 async function suggest(){
@@ -1647,7 +1658,7 @@ function openPending(){
       $("#pAdd",body).onclick=async()=>{const add=[];body.querySelectorAll("#cands input[type=checkbox]:checked").forEach(cb=>{const i=+cb.dataset.i,c=items[i];
           add.push({...c,title:body.querySelector(`.ct[data-i="${i}"]`).value,author:body.querySelector(`.ca[data-i="${i}"]`).value});});
         closeSheet();await save(recs.map(r=>({kind:"pending",id:r.id,deleted:true})));if(add.length)await addBooks(add.map(({rid,sure,...x})=>x));toast(`Added ${plural(add.length,"book")}.`);};
-      const dr=$("#pDrop",body);dr.onclick=async()=>{if(!dr.dataset.armed){dr.dataset.armed="1";dr.textContent="Tap again to discard";return;}
+      const dr=$("#pDrop",body);dr.onclick=async()=>{if(!confirmBtn(dr,"Tap again to discard"))return;
         closeSheet();await save(recs.map(r=>({kind:"pending",id:r.id,deleted:true})));toast("Discarded.");};
     });
 }
@@ -1669,7 +1680,7 @@ async function openTypeFromPhoto(idx){
         await addBooks(items);$("#tp",body).value="";toast(`Added ${plural(items.length,"book")}. Delete the photo once you’ve got them all.`);};
       const nx=$("#tpNext",body);if(nx)nx.onclick=()=>openTypeFromPhoto((idx+1)%S.queued.length);
       const del=$("#tpDel",body);
-      del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.textContent="Tap again to delete";return;}
+      del.onclick=async()=>{if(!confirmBtn(del,"Tap again to delete"))return;
         await removeQueued([p.id]);if(S.queued.length)openTypeFromPhoto(Math.min(idx,S.queued.length-1));else{closeSheet();toast("Photo deleted.");}};
     });
 }
@@ -1942,7 +1953,7 @@ async function findTranslators(onStep){
       const arr=await Claude.json(rescanPrompt(imgs.length,list.map(b=>b.title)),{images:imgs,model:MODELS.smart});
       const out=[];
       for(const d of Array.isArray(arr)?arr:[]){const b=list.find(x=>titleMatch(x.title,d&&d.title));if(!b)continue;
-        const c=clone(S.records.get(b.id));const t=cleanStr(d.translator,160);
+        const c=liveCopy(b.id);if(!c)continue;const t=cleanStr(d.translator,160);
         if(t){c.translator=t;c.translatorSource="spine";res.fromPhotos++;}
         if(cleanStr(d.publisher))c.publisher=cleanStr(d.publisher,80);
         if(cleanStr(d.edition))c.edition=cleanStr(d.edition,120);
@@ -1960,7 +1971,7 @@ async function findTranslators(onStep){
     const out=[];
     for(const d of Array.isArray(arr)?arr:[]){const b=batch[parseInt(String(d&&d.key||"").slice(1),10)];if(!b)continue;
       const t=cleanStr(d&&d.translator,160);if(!t||d.confidence==="low")continue;
-      const c=clone(S.records.get(b.id));c.translator=t;c.translatorSource="likely";c.translatorConfidence=d.confidence;out.push(c);res.inferred++;}
+      const c=liveCopy(b.id);if(!c)continue;c.translator=t;c.translatorSource="likely";c.translatorConfidence=d.confidence;out.push(c);res.inferred++;}
     if(out.length)await save(out);
   }
   res.translated=live("book").filter(isTranslated).length;
@@ -1974,7 +1985,7 @@ async function translationsOf(b){
 Reply with only JSON: {"translations":[{"translator":"","publisher":"","year":2003,"note":"what the edition looks like or is known for"}]}
 List only translations you are confident exist.`,{model:MODELS.smart,maxTokens:1500});
   const list=cleanTranslations(res&&res.translations);
-  if(list.length){const c=clone(S.records.get(b.id));c.translations=list;await save(c);}
+  if(list.length){const c=liveCopy(b.id);if(c){c.translations=list;await save(c);}}
   return list;
 }
 async function openPickTranslation(id){
@@ -1987,7 +1998,7 @@ async function openPickTranslation(id){
     <p class="muted" style="margin-top:-6px">Check the title page or the back cover if you’re not sure.</p>
     <div class="list-pick">${list.map((x,i)=>`<button class="btn wide pick" data-i="${i}"><span class="pk-t">${esc(x.translator)}</span><span class="pk-s">${esc([x.publisher,x.year].filter(Boolean).join(", "))}${x.note?` · ${esc(x.note)}`:""}</span></button>`).join("")||`<p class="muted">No translations found. Use Edit to type it in.</p>`}</div>
     <button class="btn quiet wide" id="pkBack" style="margin-top:8px">Back</button>`;
-  body.querySelectorAll(".pick").forEach(btn=>btn.onclick=async()=>{const x=list[+btn.dataset.i];const c=clone(S.records.get(id));
+  body.querySelectorAll(".pick").forEach(btn=>btn.onclick=async()=>{const x=list[+btn.dataset.i];const c=liveCopy(id);if(!c)return closeSheet();
     c.translator=x.translator;c.translatorSource="you";if(x.publisher&&!c.publisher)c.publisher=x.publisher;await save(c);openBook(id);toast(`Translator: ${x.translator}.`);});
   $("#pkBack",body).onclick=()=>openBook(id);
 }
@@ -2049,16 +2060,22 @@ function openPaste(){
 /* ---------- sheets ---------- */
 function openSheet(html,mount){
   closeSheet(true);
-  const bd=document.createElement("div");bd.className="backdrop";bd.id="backdrop";bd.onclick=()=>closeSheet();
+  const opened=performance.now();
+  const bd=document.createElement("div");bd.className="backdrop";bd.id="backdrop";bd.onclick=()=>{if(performance.now()-opened>400)closeSheet();};
   const sh=document.createElement("div");sh.className="sheet leather";sh.id="sheet";sh.setAttribute("role","dialog");sh.setAttribute("aria-modal","true");
   sh.innerHTML=`<div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="x" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div><div class="sheet-body">${html}</div>`;
   sh.querySelector(".x").onclick=()=>closeSheet();
   if(!S.lastFocus||!document.contains(S.lastFocus))S.lastFocus=document.activeElement;
   document.body.append(bd,sh);document.body.classList.add("locked");
   if(mount)mount(sh.querySelector(".sheet-body"));
+  guardButtons(sh);
   requestAnimationFrame(()=>sh.classList.add("in"));
   sh.querySelector(".x").focus({preventScroll:true});
 }
+// While a button's async action runs, further taps on it are ignored.
+function guardButtons(root){root.querySelectorAll("button").forEach(b=>{const f=b.onclick;if(!f||f._g)return;
+  const g=function(ev){if(b._busy)return;const r=f.call(this,ev);if(r&&typeof r.then==="function"){b._busy=true;r.catch(()=>{}).finally(()=>{b._busy=false;});}return r;};
+  g._g=true;b.onclick=g;});}
 function closeSheet(instant){
   if(S.photoCtl){S.photoCtl.abort();S.photoCtl=null;}
   const sh=$("#sheet"),bd=$("#backdrop");
@@ -2110,13 +2127,14 @@ function starsHTML(key,v,label){
 // Drag or tap across the stars; values snap to quarters.
 function mountStars(root,onSet){
   root.querySelectorAll(".stars").forEach(el=>{
-    const key=el.dataset.rate;let v=+el.getAttribute("aria-valuenow")||0,down=false;
+    const key=el.dataset.rate;let v=+el.getAttribute("aria-valuenow")||0,down=false,was=v;
     const show=x=>{el.querySelector(".fill").style.width=x/5*100+"%";const lab=el.parentNode.querySelector(".st-val");if(lab)lab.textContent=x?fmtRating(x):"Not rated";};
     const at=e=>{const r=el.getBoundingClientRect();return Math.max(0,Math.min(5,Math.round((e.clientX-r.left)/r.width*20)/4));};
-    el.addEventListener("pointerdown",e=>{down=true;try{el.setPointerCapture(e.pointerId);}catch(_){}v=at(e);show(v);e.preventDefault();});
+    el.addEventListener("pointerdown",e=>{down=true;was=v;try{el.setPointerCapture(e.pointerId);}catch(_){}v=at(e);show(v);e.preventDefault();});
     el.addEventListener("pointermove",e=>{if(!down)return;v=at(e);show(v);});
     const up=()=>{if(!down)return;down=false;if(v<.25)v=.25;show(v);onSet(key,v);};
-    el.addEventListener("pointerup",up);el.addEventListener("pointercancel",up);
+    el.addEventListener("pointerup",up);
+    el.addEventListener("pointercancel",()=>{if(!down)return;down=false;v=was;show(v);});   // an interrupted touch (a system gesture, a call) changes nothing
     el.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowUp"){v=Math.min(5,v+.25);}else if(e.key==="ArrowLeft"||e.key==="ArrowDown"){v=Math.max(0,v-.25);}else return;
       e.preventDefault();show(v);onSet(key,v);});
   });
@@ -2162,8 +2180,7 @@ function openBook(id){
       const pt=$("#pickTr",body);if(pt)pt.onclick=()=>openPickTranslation(b.id);
       mountTurner($("#stage",body),$("#b3d",body));
       const rm=$("#remove",body);
-      rm.onclick=async()=>{if(rm.dataset.armed){closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);return;}
-        rm.dataset.armed="1";rm.textContent="Tap again to remove";};
+      rm.onclick=async()=>{if(!confirmBtn(rm,"Tap again to remove"))return;closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);};
     });
 }
 function editBook(id){
@@ -2187,19 +2204,28 @@ function editBook(id){
     <div class="field"><label for="eB">Description</label><textarea id="eB">${esc(b.blurb||"")}</textarea></div>
     <div class="actions"><button class="btn brass" id="eSave">Save changes</button><button class="btn" id="eCancel">Cancel</button></div>`;
   $("#eCancel").onclick=()=>openBook(id);
+  // Only what you actually changed is written, so details that arrive in the background while you edit aren't overwritten.
+  const start=Object.fromEntries([...body.querySelectorAll("input,select,textarea")].map(e=>[e.id,e.value]));
+  const ch=k=>$("#"+k).value!==start[k];
   $("#eSave").onclick=async()=>{
-    const c=clone(S.records.get(id));
-    c.title=cleanStr($("#eT").value,200)||c.title;c.author=cleanStr($("#eA").value,120);c.genre=$("#eG").value;
-    const sn=cleanStr($("#eS").value,150);
-    if(sn){c.seriesName=sn;c.seriesId="s_"+slug(sn);c.seriesNumber=num($("#eN").value);}else{c.seriesName=null;c.seriesId=null;c.seriesNumber=null;}
-    c.blurb=cleanStr($("#eB").value,1200);
-    const lang=cleanStr($("#eL").value,40);c.originalLanguage=lang&&norm(lang)!=="english"?lang:null;c.translationChecked=true;
-    c.publisher=cleanStr($("#eP").value,80)||null;
-    c.wordCount=num($("#eW").value.replace(/[^0-9.]/g,""))||null;c.pages=num($("#ePg").value.replace(/[^0-9]/g,""))||null;c.format=$("#eF").value||null;c.sizeChecked=true;
-    const tr=cleanStr($("#eTr").value,160);
-    if(tr!==(b.translator||"")){c.translator=tr||null;c.translatorSource=tr?"you":null;}
+    const cur=S.records.get(id);if(!cur||cur.deleted){closeSheet();return toast("That book is no longer on your shelves.");}
+    const c=clone(cur);
+    if(ch("eT"))c.title=cleanStr($("#eT").value,200)||c.title;
+    if(ch("eA"))c.author=cleanStr($("#eA").value,120);
+    if(ch("eG"))c.genre=$("#eG").value;
+    if(ch("eS")||ch("eN")){const sn=cleanStr($("#eS").value,150);
+      if(sn){c.seriesName=sn;c.seriesId="s_"+slug(sn);c.seriesNumber=num($("#eN").value);}else{c.seriesName=null;c.seriesId=null;c.seriesNumber=null;}}
+    if(ch("eB"))c.blurb=cleanStr($("#eB").value,1200);
+    if(ch("eL")){const lang=cleanStr($("#eL").value,40);c.originalLanguage=lang&&norm(lang)!=="english"?lang:null;c.translationChecked=true;}
+    if(ch("eP"))c.publisher=cleanStr($("#eP").value,80)||null;
+    if(ch("eW"))c.wordCount=num($("#eW").value.replace(/[^0-9.]/g,""))||null;
+    if(ch("ePg"))c.pages=num($("#ePg").value.replace(/[^0-9]/g,""))||null;
+    if(ch("eF"))c.format=$("#eF").value||null;
+    if(ch("eW")||ch("ePg")||ch("eF"))c.sizeChecked=true;
+    if(ch("eTr")){const tr=cleanStr($("#eTr").value,160);c.translator=tr||null;c.translatorSource=tr?"you":null;}
     await save(c);openBook(id);toast("Saved.");
   };
+  guardButtons(body);
 }
 function listSheet({listId,title,needName}){
   openSheet(`<h2 class="sheet-title">${esc(title)}</h2>
@@ -2257,13 +2283,13 @@ function openMenu(){
       const tk=$("#testKey",body);if(tk)tk.onclick=async()=>{tk.disabled=true;tk.textContent="Testing…";
         try{await Claude.json(`Reply with {"ok":true}`,{model:MODELS.cheap,maxTokens:20});toast("Your key works.");}catch(e){toast(sampleMsg(e)||"Test cancelled.");}
         tk.disabled=false;tk.textContent="Test key";};
-      const ck=$("#clearKey",body);if(ck)ck.onclick=()=>{if(!ck.dataset.armed){ck.dataset.armed="1";ck.textContent="Tap again to remove";return;}LS.del("study-api-key");toast("API key removed.");scheduleRender();openMenu();};
+      const ck=$("#clearKey",body);if(ck)ck.onclick=()=>{if(!confirmBtn(ck,"Tap again to remove"))return;LS.del("study-api-key");toast("API key removed.");scheduleRender();openMenu();};
       const ft=$("#findTr",body);if(ft)ft.onclick=async()=>{
         ft.disabled=true;
         try{const r=await findTranslators(m=>{ft.textContent=m;});
           closeSheet();toast(`${plural(r.translated,"translated book")}. ${r.fromPhotos?`${plural(r.fromPhotos,"translator")} read from your photos. `:""}${r.inferred?`${r.inferred} worked out from the edition. `:""}${r.unknown?`${r.unknown} still unconfirmed: open one and tap Pick the translation.`:"All translators found."}`);}
         catch(e){ft.disabled=false;ft.textContent="Find translators";toast(sampleMsg(e)||"That didn’t finish. Try again.");}};
-      const dp=$("#delPhotos",body);if(dp)dp.onclick=async()=>{if(!dp.dataset.armed){dp.dataset.armed="1";dp.textContent="Tap again to delete";return;}
+      const dp=$("#delPhotos",body);if(dp)dp.onclick=async()=>{if(!confirmBtn(dp,"Tap again to delete"))return;
         const ids=(await store.all("photos")).filter(p=>p.read).map(p=>p.id);await store.del(ids,"photos");S.savedPhotos=0;
         toast("Saved photos deleted.");openMenu();};
       const rb=$("#rebuildSeries",body);if(rb)rb.onclick=async()=>{rb.disabled=true;
@@ -2271,8 +2297,7 @@ function openMenu(){
           toast(`Rebuilt ${plural(r.series,"series","series")}.${r.split?` Split ${plural(r.split,"box set")} into separate books.`:""}`);}
         catch(e){rb.disabled=false;rb.textContent="Rebuild series";toast(sampleMsg(e)||"That didn’t finish. Try again.");}};
       const ca=$("#clearAll",body);ca.onclick=async()=>{
-        if(!ca.dataset.armed){ca.dataset.armed="1";ca.textContent="Tap again to erase everything";ca.classList.add("armed");
-          setTimeout(()=>{if(ca.isConnected&&ca.dataset.armed){delete ca.dataset.armed;ca.textContent="Clear everything";ca.classList.remove("armed");}},5000);return;}
+        if(!confirmBtn(ca,"Tap again to erase everything"))return;
         for(const t of["records","photos","images"])await store.clear(t);
         S.records.clear();S.version=(S.version||0)+1;S.shape=(S.shape||0)+1;S.queued=[];S.reading=null;S.readFail=new Set();S.savedPhotos=0;S.queue.clear();S.openSeries.clear();S.openLists.clear();S.uniTried.clear();
         S.q="";S.sq="";S.gapsOnly=false;S.tab="shelves";_fit.clear();
@@ -2342,6 +2367,7 @@ function toggleShelf(btn){
   if(next!=="peek")inner.scrollTop=0;
   const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches,dur=reduce?0:480;
   // Only the wrapper's height changes; the books ride on their own layer, so the motion stays smooth.
+  wrap.getAnimations().forEach(x=>x.cancel());doors.getAnimations().forEach(x=>x.cancel());   // a tap mid-motion starts from where it is
   const a=wrap.animate([{height:from+"px"},{height:to+"px"}],{duration:dur,easing:EASE});
   doors.animate([{height:doorFrom+"px"},{height:doorTo+"px"}],{duration:dur,easing:EASE});
   a.onfinish=()=>caseEl.classList.remove("moving");
@@ -2580,7 +2606,9 @@ function openNewSeries(){
 }
 async function listToSeries(listId){
   const l=S.records.get(listId);if(!l)return;
-  const rec=await createCustomSeries({name:l.name,items:l.items||[]});
+  const made=[...S.records.values()].find(r=>r.kind==="custom"&&!r.deleted&&r.fromList===listId);
+  if(made){S.openSeries.add(made.id);S.tab="series";render();return toast(`${l.name} is already a series.`);}
+  const rec=await createCustomSeries({name:l.name,items:l.items||[],fromList:listId});
   S.openSeries.add(rec.id);S.tab="series";render();toast(`${l.name} is now a series. The list is still here too.`);
 }
 let _own=null,_ownAt=null;
@@ -2622,6 +2650,7 @@ function selectBar(){
   if(!(S.selecting&&S.tab==="shelves")){if(bar)bar.remove();return;}
   if(!bar){bar=document.createElement("div");bar.id="selectBar";bar.className="select-bar";document.body.append(bar);
     bar.addEventListener("click",e=>{const a=e.target.closest("button");if(!a)return;
+      const now=performance.now();if(now-(bar._t||0)<350)return;bar._t=now;   // Select all and Clear swap in place, so a double tap would undo itself
       if(a.dataset.sa==="all"){shelfLayout().books.forEach(b=>S.selected.add(b.id));render();}
       if(a.dataset.sa==="none"){S.selected.clear();render();}
       if(a.dataset.sa==="move")openMoveTo();});}
@@ -2634,9 +2663,19 @@ function openMoveTo(){
   openSheet(`<h2 class="sheet-title">Move ${plural(ids.length,"book")} to…</h2>
     <div class="genre-grid">${GENRES.map(g=>`<button class="btn" data-g="${esc(g)}">${esc(g)}</button>`).join("")}</div>`,body=>{
       body.querySelectorAll("[data-g]").forEach(btn=>btn.onclick=async()=>{const g=btn.dataset.g;
-        await save(ids.map(id=>S.records.get(id)).filter(b=>b&&!b.deleted).map(b=>({...clone(b),genre:g,genreLocked:true})));
-        closeSheet();S.selected.clear();S.selecting=false;render();toast(`Moved ${plural(ids.length,"book")} to ${g}.`);});
+        const move=ids.map(id=>S.records.get(id)).filter(b=>b&&!b.deleted).map(b=>({...clone(b),genre:g,genreLocked:true}));
+        await save(move);closeSheet();S.selected.clear();S.selecting=false;render();toast(`Moved ${plural(move.length,"book")} to ${g}.`);});
     });
+}
+// Whatever you're looking at: the first book, bookcase, series or list just under the header.
+function viewAnchor(){
+  const t=$(".top"),top=t?Math.max(0,t.getBoundingClientRect().bottom):0;
+  for(const y of[top+40,top+160,innerHeight*.55])for(const f of[.5,.25,.75]){
+    const e=document.elementFromPoint(innerWidth*f,y);let k=e&&e.closest("#main [data-book],#main .ledger[id],#main [data-toggle-list],#main [data-shelf],#main .index-card");
+    if(k&&k.classList.contains("index-card"))k=k.querySelector("[data-toggle-list]");if(!k)continue;
+    const d=k.dataset,sel=d.book?`[data-book="${CSS.escape(d.book)}"]`:d.toggleList?`[data-toggle-list="${CSS.escape(d.toggleList)}"]`:d.shelf!==undefined?`[data-shelf="${CSS.escape(d.shelf)}"]`:"#"+CSS.escape(k.id);
+    return{sel,top:k.getBoundingClientRect().top};}
+  return null;
 }
 function syncHeadHeight(){const t=$(".top");if(t)document.documentElement.style.setProperty("--head-h",t.offsetHeight+"px");}
 window.addEventListener("resize",syncHeadHeight);
@@ -2656,11 +2695,14 @@ function renderInner(){
   $("#offline").hidden=navigator.onLine!==false;
   // Spine styles only matter where spines are drawn; skip the shelf pass on other tabs (and when nothing changed).
   if(S.tab==="shelves"||!S.styleMap){const k=[S.group==="rating"||S.group==="status"?S.version:S.shape,S.records.size,S.group,S.q].join("|");if(k!==S._stylesAt){assignStyles(shelfLayout().groups.map(g=>g[1]));S._stylesAt=k;}}
-  const anchorEl=S.anchor&&document.getElementById(S.anchor),anchorTop=anchorEl?anchorEl.getBoundingClientRect().top:null;
+  // Keep the card you last touched still, but only while it's on screen; once you've scrolled away, the browser's own anchoring keeps what you're looking at still.
+  const anchorEl=S.anchor&&document.getElementById(S.anchor),ar=anchorEl&&anchorEl.getBoundingClientRect(),anchorTop=ar&&ar.bottom>0&&ar.top<innerHeight?ar.top:null;
+  const view=anchorTop==null&&scrollY>0&&!$("#sheet")?viewAnchor():null;
   const body=S.tab==="shelves"?renderShelves():S.tab==="series"?renderSeries():renderLists();
   $("#main").innerHTML=banners()+body;
   if(anchorTop!=null&&S.anchor&&!document.getElementById(S.anchor)&&S.idAlias){const w=S.idAlias.get(S.anchor.replace(/^ser-/,""));if(w)S.anchor="ser-"+w;}
   if(anchorTop!=null){const el=document.getElementById(S.anchor);if(el){const d=el.getBoundingClientRect().top-anchorTop;if(Math.abs(d)>1)window.scrollBy(0,d);}}
+  else if(view){const el=$("#main").querySelector(view.sel);if(el){const d=el.getBoundingClientRect().top-view.top;if(Math.abs(d)>1)window.scrollBy(0,d);}}
   selectBar();syncHeadHeight();
   if(S.tab==="series"){mountStars($("#main"),(k,v)=>setRating(k,v));const ss=$("#seriesSort");if(ss)ss.onchange=e=>{S.seriesSort=e.target.value;LS.set("study-series-sort",S.seriesSort);render();};}
   const miss=topsView().filter(t=>!t.hiddenTop).reduce((n,t)=>n+t.missing.length,0);
@@ -2668,7 +2710,16 @@ function renderInner(){
 }
 
 /* ---------- events ---------- */
+// A button whose action is still running ignores further taps, so a quick double tap never does a thing twice.
+const busyTaps=new Set();
 $("#main").addEventListener("click",e=>{
+  const t=!e.target.closest(".stars")&&e.target.closest("button,[data-book]");
+  const k=t&&Object.keys(t.dataset).length?JSON.stringify(t.dataset):null;
+  if(k&&busyTaps.has(k))return;
+  const r=mainClick(e);
+  if(k&&r&&typeof r.then==="function"){busyTaps.add(k);r.catch(()=>{}).finally(()=>busyTaps.delete(k));}
+});
+function mainClick(e){
   const card=e.target.closest(".ledger,.case");S.anchor=card&&card.id?card.id:null;
   if(e.target.closest(".stars"))return;
   const t=e.target.closest("button,[data-book]");if(!t)return;const d=t.dataset;
@@ -2679,21 +2730,21 @@ $("#main").addEventListener("click",e=>{
     if(ids.some(i=>S.openSeries.has(i)))ids.forEach(i=>S.openSeries.delete(i));else S.openSeries.add(id);return render();}
   if(d.toggleList){S.openLists.has(d.toggleList)?S.openLists.delete(d.toggleList):S.openLists.add(d.toggleList);return render();}
   if(d.want){const{t,g,e:m}=findEntry(d.want);
-    if(m)addToList(WISHLIST,{title:m.title,author:t.author,note:`${g.name}${m.number!=null&&!m.novella?`, book ${m.number}`:""}`});return;}
+    if(m)return addToList(WISHLIST,{title:m.title,author:t.author,note:`${g.name}${m.number!=null&&!m.novella?`, book ${m.number}`:""}`});return;}
   if(d.refreshTop){const tid=d.refreshTop;const t=topsView().find(x=>x.id===tid);if(!t)return;
     if(!canAsk()){toast("Checking a series needs a connection to Claude.");return;}
     (async()=>{S.busySeries.add(tid);render();for(const sb of t.subs||[])await refreshSeries(sb.sid,{quiet:true});
       if(t.universe){const u=S.records.get(t.id);if(u)await save({kind:"universe",id:t.id,deleted:true});S.uniTried.delete(t.id);await loadUniverse(t.name,t.author);}
       S.busySeries.delete(tid);render();toast(`${t.name} is up to date.`);})();return;}
-  if(d.offShelf){const id=d.offShelf,k="off:"+id;if(S.confirmDel!==k){S.confirmDel=k;render();setTimeout(()=>{if(S.confirmDel===k){S.confirmDel=null;scheduleRender();}},4000);return;}
-    S.confirmDel=null;const old=clone(S.records.get(id));if(!old)return;
-    return save({kind:"book",id,deleted:true}).then(()=>toast(`Took ${old.title} off your shelves.`,{undo:async()=>{old.deleted=false;await save(old);toast(`${old.title} is back.`);}}));}
+  if(d.offShelf){const id=d.offShelf,k="off:"+id;if(!confirmTap(k))return;
+    const old=clone(S.records.get(id));if(!old)return;
+    return save({kind:"book",id,deleted:true}).then(()=>toast(`Took ${old.title} off your shelves.`,{undo:async()=>{if(ownedLookup()(old.title,old.author))return toast(`${old.title} is already back on your shelves.`);old.deleted=false;await save(old);toast(`${old.title} is back.`);}}));}
   if(d.have)return haveBook(d.have);
   if(d.rename)return openRename(d.rename);
   if(d.addEntry)return openAddEntry(d.addEntry);
   if(d.relook)return relookSeries(d.relook);
-  if(d.haveAll){const id=d.haveAll,k="all:"+id;if(S.confirmDel!==k){S.confirmDel=k;render();setTimeout(()=>{if(S.confirmDel===k){S.confirmDel=null;scheduleRender();}},5000);return;}
-    S.confirmDel=null;return haveAll(id);}
+  if(d.haveAll){const id=d.haveAll,k="all:"+id;if(!confirmTap(k,5000))return;
+    return haveAll(id);}
   if(d.hideBook){const{e,tid}=findEntry(d.hideBook);if(!e)return;
     const k=norm(e.orig||e.title);return setPrefs(tid,p=>{p.hiddenBooks=p.hiddenBooks.includes(k)?p.hiddenBooks.filter(x=>x!==k):[...p.hiddenBooks,k];});}
   if(d.hideGroup){const[tid,gn]=d.hideGroup.split("|");const t=topsView().find(x=>x.id===tid);const g=t&&t.groups.find(x=>x.name===decodeURIComponent(gn));if(!g)return;
@@ -2703,8 +2754,8 @@ $("#main").addEventListener("click",e=>{
   if(d.addCustom){const id=d.addCustom;const r=S.records.get(id);if(!r)return;
     openSheet(`<h2 class="sheet-title">Add to ${esc(r.name)}</h2><div class="field"><label for="acT">Paste or type anything</label><textarea id="acT" placeholder="Child of God&#10;The Border Trilogy"></textarea></div><button class="btn brass wide" id="acGo">Add</button>`,body=>{
       $("#acGo",body).onclick=async()=>{const v=$("#acT",body).value;if(!v.trim())return;$("#acGo",body).disabled=true;const n=await addToCustom(id,v);closeSheet();toast(`Added ${plural(n,"item")}.`);};});return;}
-  if(d.delCustom){const id=d.delCustom;if(S.confirmDel!==id){S.confirmDel=id;render();setTimeout(()=>{if(S.confirmDel===id){S.confirmDel=null;scheduleRender();}},4000);return;}
-    S.confirmDel=null;const r=S.records.get(id);return save({kind:"custom",id,deleted:true,name:r&&r.name,groups:[]}).then(()=>toast("Series deleted."));}
+  if(d.delCustom){const id=d.delCustom;if(!confirmTap(id))return;
+    const r=S.records.get(id);return save({kind:"custom",id,deleted:true,name:r&&r.name,groups:[]}).then(()=>toast("Series deleted."));}
   if(d.listSeries)return listToSeries(d.listSeries);
   if(d.addItem)return openItemSheet(d.addItem);
   if(d.gotit)return gotIt(d.gotit);
@@ -2722,7 +2773,7 @@ $("#main").addEventListener("click",e=>{
   if(d.act==="noop"){}
   if(d.act==="showHidden"){S.showHidden=!S.showHidden;return render();}
   if(d.act==="newSeries")return openNewSeries();
-});
+}
 document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;S.anchor=null;S.seriesOrder=null;if(S.tab!=="shelves"){S.selecting=false;S.selected.clear();}render();window.scrollTo(0,0);});
 $("#addBtn").onclick=openAdd;
 $("#menuBtn").onclick=openMenu;
