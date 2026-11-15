@@ -183,7 +183,53 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .tag.soft{color:var(--text-2);border:1px solid var(--line);font-weight:500}
 .card-body{padding:2px 20px 18px}
 .ld-win,.ld-shade,.ld-foot{display:none}
-#main{overflow-x:clip}   /* the layers carrying side shadows reach past the screen edge; never let the page slide sideways */
+#main{overflow-x:clip}
+/* ---- Galef's game: the pieces that live on the shelves ---- */
+.bag-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin-left:-4px;align-self:center;flex:none;border:0;background:none;color:#C9A55A;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.8));vertical-align:middle;cursor:pointer}
+.bag-btn[hidden]{display:none}
+.bag-btn.pulse{animation:gbag .9s ease-out}
+@keyframes gbag{0%{transform:scale(1)}35%{transform:scale(1.35);filter:drop-shadow(0 0 10px #ffd27a)}100%{transform:scale(1)}}
+/* the clue: three gold bars pressed into the top of the third bookcase, one, two, one */
+.g-sigil{position:absolute;left:50%;top:7px;width:22px;margin-left:-11px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:3;pointer-events:none;opacity:.78}
+.g-sigil b{display:block;height:2px;width:7px;border-radius:1px;background:linear-gradient(#f3d58a,#a8782a);box-shadow:0 1px 0 rgba(0,0,0,.75),0 -1px 0 rgba(255,236,190,.25)}
+.g-sigil b:nth-child(2){width:18px;background:linear-gradient(90deg,#f3d58a 0 7px,transparent 7px 11px,#f3d58a 11px),linear-gradient(#f3d58a,#a8782a);background-blend-mode:multiply;
+  -webkit-mask:linear-gradient(90deg,#000 0 7px,transparent 7px 11px,#000 11px);mask:linear-gradient(90deg,#000 0 7px,transparent 7px 11px,#000 11px)}
+/* doors that can be pushed back a little, showing the dark behind them */
+.doors-in[data-gi]{background:linear-gradient(90deg,#030201 calc(50% - 1.5px),transparent 0 calc(50% + 1.5px),#030201 0) content-box}
+.doors-in[data-gi] .door{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.case.st-closed .door.l.cracked{transform:rotateY(24deg)}
+.case.st-closed .door.r.cracked{transform:rotateY(-24deg)}
+/* the left door's handle swung aside, and the hole behind it */
+.door.swung::after{opacity:0}
+.g-hole{position:absolute;right:-6px;top:50%;width:30px;height:30px;margin-top:-15px;border:0;padding:0;background:none;z-index:2;cursor:pointer}
+.g-hole::before{content:"";position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;
+  background:radial-gradient(circle at 50% 60%,#000 55%,#1a0f08 75%,#3a2614);box-shadow:inset 0 1px 2px #000,0 0 0 1px rgba(255,220,160,.12)}
+.g-knob{position:absolute;right:4px;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;z-index:3;pointer-events:none;
+  background:radial-gradient(circle at 35% 35%,var(--brass-hi),var(--brass) 45%,var(--brass-lo));box-shadow:0 1px 2px rgba(0,0,0,.7);
+  transform-origin:50% -9px;transform:rotate(-115deg)}
+.g-knob.swing{animation:gknob 1s .2s cubic-bezier(.3,1.4,.5,1) both}
+.g-knob.back{transition:transform .35s ease-in;transform:none}
+@keyframes gknob{from{transform:none}to{transform:rotate(-115deg)}}
+/* the keyhole on the back of the chosen book */
+.g-keyhole{position:absolute;left:50%;top:58%;width:30px;height:56px;margin:-28px 0 0 -15px;border:0;padding:0;cursor:pointer;
+  background:url(look/g-keyhole.webp) center/contain no-repeat;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+.g-keyhole.open{filter:drop-shadow(0 0 6px rgba(140,255,170,.7)) drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+/* the bookcase that rose, and the trapdoor beneath it */
+.case.g-lifted{animation:glift 5s ease-in-out infinite;z-index:1}
+@keyframes glift{0%,100%{transform:translateY(-12px)}50%{transform:translateY(-16px)}}
+.g-trap{position:relative;height:100px;margin:-14px 9px 22px;background:url(look/g-trap.webp) 0 0/100% 500% no-repeat;border-radius:2px;
+  box-shadow:inset 0 14px 18px rgba(0,0,0,.85),inset 0 -8px 14px rgba(0,0,0,.6)}
+.g-trap.open{background-position:0 100%}
+.g-trap.opening{animation:gtrap .9s steps(4,end) forwards}
+@keyframes gtrap{from{background-position:0 0}to{background-position:0 100%}}
+.g-eye,.g-pit{position:absolute;border:0;padding:0;background:none;cursor:pointer}
+.g-eye{left:calc(50% - 26px);top:18px;width:52px;height:52px;border-radius:50%}
+.g-eye::after{content:"";position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle,rgba(190,120,255,.55),rgba(150,80,255,0) 70%);animation:geye 3.2s ease-in-out infinite}
+@keyframes geye{0%,100%{opacity:.35;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+.g-pit{left:calc(50% - 50px);top:12px;width:100px;height:80px}
+.g-pit::after{content:"";position:absolute;inset:20px 18px;border-radius:40%;background:radial-gradient(circle,rgba(150,90,255,.35),transparent 70%);animation:geye 4s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.case.g-lifted{animation:none;transform:translateY(-12px)}.g-eye::after,.g-pit::after{animation:none}}   /* the layers carrying side shadows reach past the screen edge; never let the page slide sideways */
 .ledger .card-body{border-top:1px solid rgba(196,154,69,.35);margin:0 10px;padding:4px 10px 18px}
 .entry{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px dotted rgba(196,154,69,.4)}
 .entry:last-of-type{border-bottom:0}
@@ -743,7 +789,7 @@ html[data-look="classic"] .ledger.editing{box-shadow:none}
 html[data-look="classic"] .index-card{background:url(look/c-art.webp) 100% 0/100% auto repeat-y,url(look/tx-paper.webp) 0 0/120px,radial-gradient(ellipse at 50% 40%,#F0DFB4 38%,#D2B47E 85%,#B08A52);background-blend-mode:normal,multiply,normal}
 html[data-look="classic"] .index-card .card-head{padding-top:22px}
 </style>
-<script>try{var l=localStorage.getItem("study-look");document.documentElement.dataset.look=(l==="pixel"||l==="classic")?l:"real";}catch(e){document.documentElement.dataset.look="real";}</script>
+<script>try{var l=localStorage.getItem("study-look"),w=JSON.parse(localStorage.getItem("study-looks-won")||"[]");document.documentElement.dataset.look=(l==="pixel"||l==="classic")&&w.indexOf(l)>=0?l:"real";}catch(e){document.documentElement.dataset.look="real";}</script>
 <link rel="preload" href="look/f-EBGaramond-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="look/f-EBGaramond-600.woff2" as="font" type="font/woff2" crossorigin>
 </head>
@@ -751,7 +797,7 @@ html[data-look="classic"] .index-card .card-head{padding-top:22px}
 <header class="top">
   <div class="top-in">
     <div class="top-row">
-      <div class="brand"><h1><button class="brand-btn" id="lookBtn" type="button" aria-label="The Study. Tap to change the look.">The Study</button></h1><span class="offline" id="offline" hidden>offline</span></div>
+      <div class="brand"><h1><button class="brand-btn" id="lookBtn" type="button" aria-label="The Study. Tap to change the look.">The Study</button></h1><button class="bag-btn" id="bagBtn" type="button" hidden aria-label="Your satchel"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 8.2c0-.7.6-1.2 1.3-1.2h12.4c.7 0 1.3.5 1.3 1.2l-.8 10.6a2 2 0 0 1-2 1.8H7.3a2 2 0 0 1-2-1.8z" fill="currentColor" opacity=".9"/><path d="M4.8 10.5h14.4M12 10.5v3" stroke="#1a0f08" stroke-width="1.4"/><rect x="10.6" y="12.6" width="2.8" height="2.4" rx=".5" fill="#E0BC6C"/></svg></button><span class="offline" id="offline" hidden>offline</span></div>
       <div class="top-actions">
         <button class="icon-btn" id="menuBtn" aria-label="Settings and backup">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -875,7 +921,8 @@ async function save(recs){
   recs=[].concat(recs);const now=Date.now();S.version=(S.version||0)+1;
   // S.shape changes only when something other than a rating or reading status changed: series grouping,
   // matching and spine styles depend on titles, authors and series, so a rating leaves those caches intact.
-  if(recs.some(r=>{const o=S.records.get(r.id);if(!o||o.kind!=="book"||r.kind!=="book")return true;
+  if(recs.some(r=>{if(r.kind==="game")return false;   // the game's progress touches none of the library's caches
+    const o=S.records.get(r.id);if(!o||o.kind!=="book"||r.kind!=="book")return true;
     for(const k of new Set([...Object.keys(o),...Object.keys(r)]))if(!LIGHT_FIELDS.has(k)&&JSON.stringify(o[k])!==JSON.stringify(r[k]))return true;return false;}))S.shape=(S.shape||0)+1;
   for(const r of recs){r.updatedAt=Math.max(now,(r.updatedAt||0)+1);S.records.set(r.id,r);}
   await store.put(recs);scheduleRender();
@@ -995,7 +1042,7 @@ function physical(b){
   const f=FORMATS[b.format]||FORMATS["trade paperback"];
   return{h:f.h,w:f.w,t:(pages||320)*f.paper+f.boards,pages};
 }
-const BACKUP_KINDS=["book","list","series","universe","custom","seriesprefs"];
+const BACKUP_KINDS=["book","list","series","universe","custom","seriesprefs","game"];
 // Anything restored from a file is treated as untrusted: known text fields become plain strings, numbers become numbers,
 // lists must be lists, and unexpected nesting is dropped.
 const TEXT_FIELDS=new Set(["title","author","genre","blurb","publisher","translator","translatorSource","translatorConfidence","originalLanguage","seriesId","seriesName","color","textColor","edition","design","format","status","photoId","name","universe","note","section","complete"]);
@@ -1865,13 +1912,14 @@ function readable(pref,bgs){
 }
 const under=c=>[c,shade(c,.08),shade(c,-.06)];   // the spine's own shading moves the colour a little
 /* ---------- the three looks ---------- */
-// Realistic is the house look. Dark pixel and classic cover will be won in a puzzle inside the app;
-// until that puzzle ships, every look is open and tapping "The Study" cycles through them.
+// Realistic is the house look. The others are won in Galef's game hidden in the study (classic first, from the Dungeon Potion);
+// tapping "The Study" cycles through the looks you've won.
 const LOOKS=["real","pixel","classic"];
 const LOOK_NAME={real:"Realistic study",pixel:"Dark pixel",classic:"Classic cover"};
-const LOOKS_LOCKED=false;
-function openLooks(){if(!LOOKS_LOCKED)return LOOKS;let won=[];try{won=JSON.parse(LS.get("study-looks-won","[]"));}catch(e){won=[];}
-  return LOOKS.filter(l=>l==="real"||(Array.isArray(won)&&won.includes(l)));}
+const LOOKS_LOCKED=true;
+function wonLooks(){const g=S.records.get("game");let w=g&&Array.isArray(g.won)?g.won:(S.loaded||S.records.size?[]:null);
+  if(!w){try{w=JSON.parse(LS.get("study-looks-won","[]"));}catch(e){w=[];}}return Array.isArray(w)?w:[];}
+function openLooks(){if(!LOOKS_LOCKED)return LOOKS;const won=wonLooks();return LOOKS.filter(l=>l==="real"||won.includes(l));}
 function lookNow(){const l=document.documentElement.dataset.look;return openLooks().includes(l)?l:"real";}
 function setLook(l){if(!openLooks().includes(l))l="real";document.documentElement.dataset.look=l;LS.set("study-look",l);_fit.clear();render();}
 function nextLook(){const o=openLooks(),n=o[(o.indexOf(lookNow())+1)%o.length];setLook(n);toast(LOOK_NAME[n]);}
@@ -1925,7 +1973,7 @@ function book3dHTML(b){
   return`<div class="stage" id="stage" role="img" aria-label="${esc(b.title)}: drag to turn the book, tap to flip it">
     <div class="book3d" id="b3d" style="--bt:${T}px;--bw:${BW}px;--sx:${(BW/150).toFixed(3)}">
       <div class="face front">${lookCover(b)}</div>
-      <div class="face back">${lookBack(b)}</div>
+      <div class="face back">${lookBack(b)}${gKeyholeFor(b.id)?`<button class="g-keyhole${game().keyUsed?" open":""}" type="button" aria-label="A keyhole"></button>`:""}</div>
       <div class="face spine3">${lookSpine(b,T,225)}</div>
       <div class="face edge right"></div><div class="face edge top"></div><div class="face edge bottom"></div>
     </div></div>
@@ -1934,7 +1982,7 @@ function book3dHTML(b){
 function mountTurner(stage,el){
   let rx=-8,ry=28,sx=0,sy=0,drag=false,moved=0;
   const set=()=>{el.style.setProperty("--rx",rx+"deg");el.style.setProperty("--ry",ry+"deg");};
-  stage.addEventListener("pointerdown",e=>{drag=true;moved=0;sx=e.clientX;sy=e.clientY;el.classList.add("dragging");try{stage.setPointerCapture(e.pointerId);}catch(_){}});
+  stage.addEventListener("pointerdown",e=>{if(e.target.closest(".g-keyhole,.gask"))return;drag=true;moved=0;sx=e.clientX;sy=e.clientY;el.classList.add("dragging");try{stage.setPointerCapture(e.pointerId);}catch(_){}});
   stage.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=e.clientX;sy=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
     ry+=dx*0.6;rx=Math.max(-35,Math.min(35,rx-dy*0.4));set();});
   const end=()=>{if(!drag)return;drag=false;el.classList.remove("dragging");if(moved<6){ry+=180;set();}};
@@ -2180,7 +2228,7 @@ function mountStars(root,onSet){
 }
 async function setRating(key,v){
   const[kind,id]=key.split(":");
-  if(kind==="book"){const b=S.records.get(id);if(!b)return;const c=clone(b);c.rating=v||null;await save(c);}
+  if(kind==="book"){const b=S.records.get(id);if(!b)return;const c=clone(b);c.rating=v||null;await save(c);if(!game().keyUsed)gLinesSoon();}
   else await setPrefs(id,p=>{p.rating=v||null;});
 }
 const STATUS={want:"Want to read",reading:"Currently reading",read:"Read"};
@@ -2217,6 +2265,7 @@ function openBook(id){
       const sb=$("#spoilBtn",body);if(sb)sb.onclick=()=>{S.revealed.add(b.id);$("#spoiler",body).classList.add("revealed");};
       const pt=$("#pickTr",body);if(pt)pt.onclick=()=>openPickTranslation(b.id);
       mountTurner($("#stage",body),$("#b3d",body));
+      const kh=$(".g-keyhole",body);if(kh)kh.onclick=e=>{e.stopPropagation();gameDo("keyhole",b.id,kh);};
       const rm=$("#remove",body);
       rm.onclick=async()=>{if(!confirmBtn(rm,"Tap again to remove"))return;closeSheet();await save({kind:"book",id:b.id,deleted:true});toast(`Removed “${b.title}”.`);};
     });
@@ -2275,6 +2324,7 @@ function listSheet({listId,title,needName}){
       const go=async()=>{
         const name=needName?cleanStr($("#lN",body).value,80):null;const text=$("#lT",body).value;
         if(needName&&!name){$("#lN",body).focus();return;}
+        if(gSpellList(needName?name:(S.records.get(listId)||{}).name,needName?text:[...((S.records.get(listId)||{}).items||[]).map(i=>i.title),text].join("\n"))){closeSheet();return gameDo("spellList",needName?name:null,listId||null);}
         if(needName&&live("list").some(l=>norm(l.name)===norm(name))){toast(`You already have a list called ${name}.`);return;}
         if(!needName&&!text.trim()){$("#lT",body).focus();return;}
         const btn=$("#lGo",body);btn.disabled=true;btn.textContent=text.trim()&&canAsk()?"Tidying your list…":"Saving…";
@@ -2284,6 +2334,8 @@ function listSheet({listId,title,needName}){
       $("#lGo",body).onclick=go;
     });
 }
+// "Wingardium" with "Leviosa" as its only entry, once you've found Galef's note.
+const gSpellList=(name,text)=>gHas("note")&&!game().spell&&norm(name||"")==="wingardium"&&String(text||"").split("\n").map(x=>norm(x)).filter(Boolean).join("|")==="leviosa";
 function openItemSheet(listId){const l=S.records.get(listId);if(l)listSheet({listId,title:`Add to ${l.name}`});}
 function openNewList(){listSheet({title:"New list",needName:true});}
 function openMenu(){
@@ -2316,7 +2368,10 @@ function openMenu(){
     </div>
     <h3 class="sub">Testing</h3>
     <p class="muted" style="margin-top:0">Erases every book, series, list and saved photo on this phone. Your API key and settings stay.</p>
-    <button class="btn wide danger-text" id="clearAll">Clear everything</button>`,body=>{
+    <button class="btn wide danger-text" id="clearAll">Clear everything</button>
+    <div class="field" style="margin-top:14px"><label for="gStep">Galef’s game: jump to a step</label>
+      <select id="gStep"><option value="">Choose a step…</option>${["Start over","Doors solved, hole open","Key in the satchel","Key used, chamber open","Wand and note found","Spell learned","Spell cast, bookcase lifted","Trapdoor open","Met Galef, potion in hand","Dungeon unlocked"].map((t,i)=>`<option value="${i}">${t}</option>`).join("")}</select></div>`,body=>{
+      $("#gStep",body).onchange=e=>{const v=e.target.value;if(v!==""){closeSheet();gameDo("setStep",+v);}};
       $("#saveKey",body).onclick=()=>{const v=$("#apiKey",body).value.trim();if(!v){$("#apiKey",body).focus();return;}LS.set("study-api-key",v);toast("API key saved.");scheduleRender();openMenu();};
       const tk=$("#testKey",body);if(tk)tk.onclick=async()=>{tk.disabled=true;tk.textContent="Testing…";
         try{await Claude.json(`Reply with {"ok":true}`,{model:MODELS.cheap,maxTokens:20});toast("Your key works.");}catch(e){toast(sampleMsg(e)||"Test cancelled.");}
@@ -2383,12 +2438,15 @@ const stateIcon=st=>`<svg class="caret" width="10" height="10" viewBox="0 0 10 1
 const STATE_WORD={open:"open",peek:"half open",closed:"closed"};
 function bookcase(label,count,inner,opts={}){
   const can=!opts.blank,st=can?stateOf(label):"open";
+  const gi=opts.gi,gm=can&&gi!=null&&gi<3&&opts.n>=3&&lookNow()==="real"?game():null,puzzle=gm&&!gm.doors;
+  const cr=sd=>puzzle&&S.crack.labels===S.crackLabels&&S.crack.list.includes(gi+sd)?" cracked":"";
+  const hole=gm&&gi===0&&gm.doors&&!gm.key,lifted=gm&&gi===2&&gm.lifted;
   const plate=can?`<button class="plate" data-shelf="${esc(label)}" aria-label="${esc(label)}, ${count} books, ${STATE_WORD[st]}. Tap to change.">${esc(label)}${count!=null?`<small>${count}</small>`:""}${stateIcon(st)}</button>`
     :`<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>`;
-  return`<section class="case st-${st}"><div class="case-body" aria-hidden="true"><div class="case-bg"></div></div><div class="case-sh" aria-hidden="true"></div><div class="case-foot" aria-hidden="true"></div>${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
+  return`<section class="case st-${st}${lifted?" g-lifted":""}"><div class="case-body" aria-hidden="true"><div class="case-bg"></div></div><div class="case-sh" aria-hidden="true"></div><div class="case-foot" aria-hidden="true"></div>${CORNICE}${puzzle&&gi===2?`<i class="g-sigil" aria-hidden="true"><b></b><b></b><b></b></i>`:""}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
     <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div><i class="peekfade"></i></div>
-    ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors-mv"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div></div>`:""}
-    <div class="plinth" aria-hidden="true"></div><i class="prop arm" aria-hidden="true"></i>${opts.extra||""}</section>`;
+    ${can?`<div class="doors-wrap"${hole?"":` aria-hidden="true"`}><div class="doors-mv"><div class="doors-in"${puzzle?` data-gi="${gi}"`:""}><span class="door l${cr("l")}${hole?" swung":""}">${hole?`<button class="g-hole" data-g="hole" aria-label="A dark hole behind the handle"></button><i class="g-knob${S.crack.justSolved?" swing":""}"></i>`:""}</span><span class="door r${cr("r")}"></span></div></div></div>`:""}
+    <div class="plinth" aria-hidden="true"></div><i class="prop arm" aria-hidden="true"></i>${opts.extra||""}</section>${lifted?`<div class="g-trap${gm.trapOpen?" open":""}">${gm.trapOpen?`<button class="g-pit" data-g="lair" aria-label="The dark opening beneath the bookcase"></button>`:`<button class="g-eye" data-g="eye" aria-label="An arcane eye in an ornate holder"></button>`}</div>`:""}`;
 }
 const EASE="cubic-bezier(.22,.9,.25,1)";
 // Opening and closing a bookcase. Nothing is laid out again while it moves: the page is laid out once for the move, then the
@@ -2399,6 +2457,70 @@ function endShelfMotion(caseEl){
   const m=caseEl._m;if(!m)return;caseEl._m=null;
   m.anims.forEach(a=>a.cancel());m.cvOn.forEach(c=>c.classList.remove("cv-on"));
   for(const el of[m.wrap,m.inner,m.doors])if(el){el.style.height="";el.style.overflowY="";el.style.pointerEvents="";}
+}
+/* ---------- Galef's hidden game ---------- */
+// Progress is one record ("game") saved with the library, so it rides along in backups. Only the light parts live here:
+// the clue on the third bookcase, the doors that crack, the hole, the keyhole, the raised bookcase. Everything else
+// (satchel, chamber, spell, lair, potion) is in game.js, loaded the first time the game needs it.
+S.crack={labels:"",list:[],justSolved:false};
+const game=()=>S.records.get("game")||{kind:"game",id:"game",items:[]};
+const gHas=k=>(game().items||[]).includes(k);
+function syncBag(){const b=$("#bagBtn");if(b)b.hidden=!game().bag;}
+async function saveGame(p){const g={...game(),...p,kind:"game",id:"game"};await save(g);LS.set("study-looks-won",JSON.stringify(g.won||[]));syncBag();return g;}
+let _gjs=null;const gameJS=()=>_gjs||(_gjs=import("./game.js").catch(e=>{_gjs=null;throw e;}));
+function gameDo(fn,...a){return gameJS().then(m=>m[fn](...a)).catch(e=>{console.warn(e);toast("The magic fizzled. Try that again.");});}
+const gKeyholeFor=id=>{const g=game();return!!(g.key&&!g.chamberDone&&g.target===id);};
+// The doors: 1st bookcase left, 2nd both (either order), 3rd left. Anything else and they all swing shut again.
+const CRACK_WANT=[["0l"],["1l","1r"],["1l","1r"],["2l"]];
+const crackValid=list=>list.every((x,i)=>CRACK_WANT[i]&&CRACK_WANT[i].includes(x)&&list.indexOf(x)===i);
+function crackReset(){S.crack.list=[];document.querySelectorAll(".doors-in[data-gi] .door.cracked").forEach(d=>d.classList.remove("cracked"));}
+function crackAdd(key){
+  const c=S.crack;if(c.labels!==S.crackLabels){c.labels=S.crackLabels;c.list=[];}
+  c.list.push(key);
+  if(!crackValid(c.list)){setTimeout(crackReset,420);return;}
+  if(c.list.length===CRACK_WANT.length)setTimeout(async()=>{
+    crackReset();c.justSolved=true;await new Promise(r=>setTimeout(r,520));
+    await saveGame({doors:true});render();setTimeout(()=>{c.justSolved=false;},1500);},450);
+}
+$("#main").addEventListener("pointerdown",e=>{
+  const door=e.target.closest(".doors-in[data-gi] .door");if(!door||e.target.closest(".g-hole"))return;
+  const caseEl=door.closest(".case");if(!caseEl.classList.contains("st-closed")||caseEl._m)return;
+  const gi=door.parentElement.dataset.gi,side=door.classList.contains("l")?"l":"r",sgn=side==="l"?1:-1,was=door.classList.contains("cracked");
+  const id=e.pointerId,x0=e.clientX,y0=e.clientY;let ang=was?24:0,on=false;
+  const move=ev=>{if(ev.pointerId!==id||!door.isConnected)return;const dx=ev.clientX-x0,dy=ev.clientY-y0;
+    if(!on){if(Math.abs(dx)<6||Math.abs(dx)<Math.abs(dy))return;on=true;try{door.setPointerCapture(id);}catch(_){}}
+    ang=Math.max(0,Math.min(28,(was?24:0)+(was?-1:1)*Math.abs(dx)*0.8));door.style.transition="none";door.style.transform=`rotateY(${sgn*ang}deg)`;};
+  const end=ev=>{if(ev.pointerId!==id)return;removeEventListener("pointermove",move);removeEventListener("pointerup",end);removeEventListener("pointercancel",end);
+    if(!on||!door.isConnected)return;door.style.transition="";door.style.transform="";
+    const now=ev.type!=="pointercancel"&&ang>=10;door.classList.toggle("cracked",now);
+    if(now&&!was)crackAdd(gi+side);else if(!now&&was)crackReset();};
+  addEventListener("pointermove",move);addEventListener("pointerup",end);addEventListener("pointercancel",end);
+});
+// The back of the brass key quotes the opening line of your favourite book, so it's looked up whenever you're online,
+// long before anyone finds the key, and kept. Favourite: the highest rated (ties drawn at random when the key is found),
+// or with nothing rated, the longest.
+function gCandidates(){
+  const bs=live("book");if(!bs.length)return[];
+  const top=Math.max(...bs.map(b=>b.rating||0));if(top>0)return bs.filter(b=>(b.rating||0)===top);
+  const sz=b=>b.wordCount||(b.pages||0)*280;const big=Math.max(...bs.map(sz));return big>0?bs.filter(b=>sz(b)===big):bs;
+}
+let _glt=0,_glTimer=null;
+const gLinesSoon=(ms=6000)=>{clearTimeout(_glTimer);_glTimer=setTimeout(gLinesFetch,ms);};
+async function gLinesFetch(){
+  const g=game();if(g.keyUsed||!canAsk()||Date.now()-_glt<45000)return;
+  const have=g.lines||{};
+  let want=g.target?[S.records.get(g.target)].filter(b=>b&&!b.deleted):gCandidates();
+  want=want.filter(b=>!(b.id in have));if(!want.length)return;
+  want=want.sort(()=>Math.random()-.5).slice(0,6);_glt=Date.now();
+  try{
+    const r=await Claude.json(`Give the opening line of each book below: the first sentence of the main text, exactly as published.
+Books: ${JSON.stringify(want.map(b=>({key:b.id,title:b.title,author:b.author||""})))}
+Reply with only a JSON array: [{"key":"${want[0].id}","line":"..."}]
+Use null for any book whose opening line you don't know for certain.`,{maxTokens:1500});
+    const add={};for(const b of want)add[b.id]="";
+    for(const x of Array.isArray(r)?r:[])if(x&&x.key in add)add[x.key]=cleanStr(x.line,400)||"";
+    await saveGame({lines:{...(game().lines||{}),...add}});
+  }catch(e){if(e&&STOPS.includes(e.code))_glt=0;}
 }
 // Series cards. In the classic look the scroll unfurls as it opens and rolls up as it closes: the bottom roll travels with
 // the edge of the parchment, the parchment's window opens beneath it and the cards below slide along, all on their own layers.
@@ -2514,10 +2636,10 @@ function renderShelves(){
       <p>${canRead()?"Photograph a shelf and Claude will read the spines.":(Claude.key()?"Type a few books in, or save shelf photos for Claude to read once you’re online.":"Send your shelf photos to Claude in chat and paste what it gives you, or type a few books in.")}</p>
       <button class="btn brass" data-act="add">Add books</button></div>`});
   }
-  const{books,groups}=shelfLayout();const q=norm(S.q);
+  const{books,groups}=shelfLayout();const q=norm(S.q);S.crackLabels=groups.slice(0,3).map(g=>g[0]).join("\u0001");
   if(!books.length)return`<p class="empty-note">Nothing on your shelves matches “${esc(S.q)}”.</p>`;
   return`<div class="count-row"><p class="count">${q?`${books.length} of ${plural(all.length,"volume")}`:plural(all.length,"volume")}</p><button class="btn small ${S.selecting?"brass":""}" data-act="selectMode">${S.selecting?"Done":"Select"}</button></div>`+
-    groups.map(([label,list])=>bookcase(label,list.length,list.map(spine).join(""))).join("");
+    groups.map(([label,list],gi)=>bookcase(label,list.length,list.map(spine).join(""),{gi,n:groups.length})).join("");
 }
 function shelfLayout(){
   const all=live("book"),q=norm(S.q);
@@ -2839,6 +2961,7 @@ $("#main").addEventListener("click",e=>{
 });
 function mainClick(e){
   const card=e.target.closest(".ledger,.case");S.anchor=card&&card.id?card.id:null;
+  const gb=e.target.closest("[data-g]");if(gb)return gameDo("act",gb.dataset.g,gb);
   if(e.target.closest(".stars"))return;
   const t=e.target.closest("button,[data-book]");if(!t)return;const d=t.dataset;
   if(d.shelf!==undefined)return toggleShelf(t);
@@ -2899,7 +3022,8 @@ $("#lookBtn").onclick=nextLook;
 document.documentElement.dataset.look=lookNow();
 $("#q").addEventListener("input",e=>{if(S.tab==="series")S.sq=e.target.value;else S.q=e.target.value;render();});
 $("#group").addEventListener("change",e=>{S.group=e.target.value;try{localStorage.setItem("shelves-group",S.group);}catch(_){}render();});
-window.addEventListener("online",()=>{scheduleRender();setTimeout(stockUp,1500);setTimeout(processQueue,800);});
+window.addEventListener("online",()=>{scheduleRender();setTimeout(stockUp,1500);setTimeout(processQueue,800);gLinesSoon(3000);});
+$("#bagBtn").onclick=()=>gameDo("openBag");
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){setTimeout(processQueue,600);if(S.reading)holdScreen(true);}});
 window.addEventListener("offline",scheduleRender);
 
@@ -2909,6 +3033,7 @@ window.addEventListener("offline",scheduleRender);
   await store.open();
   for(const r of await store.all())S.records.set(r.id,r);
   S.version=(S.version||0)+1;S.shape=(S.shape||0)+1;
+  document.documentElement.dataset.look=lookNow();LS.set("study-looks-won",JSON.stringify(wonLooks()));syncBag();
   const photos=(await store.all("photos")).filter(p=>p&&p.blob);
   S.queued=photos.filter(p=>!p.read).sort((a,b)=>a.addedAt-b.addedAt);
   S.savedPhotos=photos.filter(p=>p.read).length;
@@ -2921,7 +3046,8 @@ window.addEventListener("offline",scheduleRender);
   if(!fontsIn)try{document.fonts.ready.then(()=>{_fit.clear();scheduleRender();});}catch(_){}
   try{if(navigator.storage&&navigator.storage.persist)S.persisted=await navigator.storage.persist();}catch(_){}
   setTimeout(async()=>{const m=await mergeDuplicates();if(m)toast(`Removed ${plural(m,"duplicate")} from overlapping photos.`);},400);
-  setTimeout(stockUp,1500);setTimeout(processQueue,700);
+  setTimeout(stockUp,1500);setTimeout(processQueue,700);gLinesSoon(5000);
+  {const g=game(),t=g.target&&S.records.get(g.target);if(g.key&&!g.chamberDone&&(!t||t.deleted))gameDo("keepTarget");}
   if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
