@@ -2,7 +2,7 @@
 // The page itself: newest version first when online (so updates show on the next open), saved copy otherwise.
 // Everything else (look images, fonts, icons) is saved on the phone at install and served from there:
 // each release has a new VERSION, which re-downloads them once, so they're never fetched on a normal open.
-const VERSION = "study-v30";
+const VERSION = "study-v31";
 const COVERS = "study-covers"; // cover pictures from Open Library / Google Books, kept across updates
 const COVER_URL = /^https:\/\/(covers\.openlibrary\.org\/b\/|books\.google\.com\/books\/content|books\.googleusercontent\.com\/)/;
 const FILES = [
@@ -17,8 +17,6 @@ const FILES = [
   "./look/c-door-r.webp",
   "./look/c-ledge.webp",
   "./look/c-parch.webp",
-  "./look/c-pier-l.webp",
-  "./look/c-pier-r.webp",
   "./look/c-roll.webp",
   "./look/c-row.webp",
   "./look/c-scroll.webp",
@@ -26,6 +24,16 @@ const FILES = [
   "./look/c-sign.webp",
   "./look/c-strip.webp",
   "./look/c-torch.webp",
+  "./look/r-pil-r-m.webp",
+  "./look/r-pil-r-d.webp",
+  "./look/r-pil-l-m.webp",
+  "./look/r-pil-l-d.webp",
+  "./look/p-pil-r-d.webp",
+  "./look/p-pil-l-d.webp",
+  "./look/p-pil-r-m.webp",
+  "./look/p-pil-l-m.webp",
+  "./look/c-pier-r-t.webp",
+  "./look/c-pier-l-t.webp",
   "./look/c-flame.webp",
   "./look/c-wall.webp",
   "./look/f-Cinzel.woff2",

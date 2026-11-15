@@ -89,9 +89,11 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 /* The bookcase's body (.case-bg, with the pillars) and its drop shadow (.case-sh) are their own layers, so opening and closing
    can stretch the body and slide the shadow without repainting anything. */
 .case{position:relative;isolation:isolate;margin:30px 12px 34px;padding:0 18px 0;border-radius:2px;--drop:0 22px 30px -10px rgba(0,0,0,.75)}
-.case-bg{position:absolute;inset:0;z-index:-1;border-radius:inherit;transform-origin:50% 0;pointer-events:none;
+.case-body{position:absolute;top:0;bottom:0;left:-80px;right:-80px;overflow:hidden;z-index:-1;pointer-events:none}
+.case-bg{position:absolute;top:0;bottom:0;left:80px;right:80px;border-radius:2px;pointer-events:none;
   background:var(--grain-v),linear-gradient(90deg,var(--walnut-dark),var(--walnut) 7%,var(--walnut-mid) 50%,var(--walnut) 93%,var(--walnut-dark));
   box-shadow:var(--drop-side,0 0 30px -10px rgba(0,0,0,.75)),0 0 0 1px rgba(0,0,0,.6);clip-path:inset(-1px -80px -1px -80px)}
+.case-foot{position:absolute;left:0;right:0;z-index:-1;pointer-events:none;display:none}
 .case-sh{position:absolute;left:0;right:0;bottom:0;height:90px;z-index:-2;border-radius:inherit;pointer-events:none;box-shadow:var(--drop);clip-path:inset(100% -90px -120px -90px)}
 .case-bg::before,.case-bg::after{content:"";position:absolute;top:62px;bottom:20px;width:11px;border-radius:2px;
   background:repeating-linear-gradient(90deg,rgba(0,0,0,.5) 0 1px,rgba(255,220,170,.13) 1px 2px,transparent 2px 4px)}
@@ -180,6 +182,8 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .tag.full{color:var(--ok);border:1px solid currentColor}
 .tag.soft{color:var(--text-2);border:1px solid var(--line);font-weight:500}
 .card-body{padding:2px 20px 18px}
+.ld-win,.ld-shade,.ld-foot{display:none}
+#main{overflow-x:clip}   /* the layers carrying side shadows reach past the screen edge; never let the page slide sideways */
 .ledger .card-body{border-top:1px solid rgba(196,154,69,.35);margin:0 10px;padding:4px 10px 18px}
 .entry{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px dotted rgba(196,154,69,.4)}
 .entry:last-of-type{border-bottom:0}
@@ -284,8 +288,14 @@ button.plate{border:0;cursor:pointer;display:inline-flex;align-items:baseline;ga
 .case.cv-on .shelf .slot{content-visibility:visible}
 .shelf-inner .shelf{transition:opacity .38s ease,transform .48s cubic-bezier(.22,.9,.25,1)}
 .case.st-peek .shelf-wrap{height:332px}
-.case.st-peek .shelf-inner{height:332px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
-  -webkit-mask-image:linear-gradient(#000 calc(100% - 26px),transparent);mask-image:linear-gradient(#000 calc(100% - 26px),transparent)}
+.case.st-peek .shelf-inner{height:332px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.peekfade{position:absolute;left:0;right:0;bottom:0;height:26px;pointer-events:none;opacity:0;
+  background:var(--case-back,linear-gradient(90deg,var(--walnut-dark),var(--walnut) 7%,var(--walnut-mid) 50%,var(--walnut) 93%,var(--walnut-dark)));
+  -webkit-mask-image:linear-gradient(transparent,#000);mask-image:linear-gradient(transparent,#000)}
+.case.st-peek .peekfade{opacity:1}
+html[data-look="real"] .case{--case-back:linear-gradient(90deg,#120a06,#1e120b 50%,#120a06)}
+html[data-look="pixel"] .case{--case-back:#1a130e}
+html[data-look="classic"] .case{--case-back:#140a05}
 .case.st-closed .shelf-wrap{height:0}
 .case.st-closed .shelf-inner .shelf{opacity:0;transform:translateY(-24px)}
 .doors-wrap{height:0;overflow:hidden}
@@ -411,16 +421,17 @@ html[data-look="real"] select{-webkit-appearance:none;appearance:none;padding-ri
 html[data-look="real"] .btn:not(.brass):not(.quiet){border:1px solid transparent;border-image:url(look/r-field.webp) 18/8px stretch;background:linear-gradient(#2a1a12,#1a100b);box-shadow:0 1px 3px rgba(0,0,0,.6)}
 html[data-look="real"] .count-row{background:linear-gradient(#0a110d 0,#0a110d 65%,rgba(10,17,13,0))}
 html[data-look="real"] .case{margin:28px 9px 30px;padding:0 20px;border-radius:0;--drop:0 26px 34px -12px rgba(0,0,0,.85)}
-html[data-look="real"] .case-bg{background:linear-gradient(90deg,#120a06,#1e120b 50%,#120a06);box-shadow:0 0 34px -12px rgba(0,0,0,.85)}
+html[data-look="real"] .case-bg{background:linear-gradient(90deg,#120a06,#1e120b 50%,#120a06);box-shadow:0 0 34px -12px rgba(0,0,0,.85);border-radius:0}
 html[data-look="real"] .case+.case::marker{content:none}
 /* a wall lamp between cases: damask shows only where its light falls */
 html[data-look="real"] .prop.arm{display:block;position:absolute;left:4%;right:4%;bottom:-62px;height:66px;pointer-events:none;z-index:0;
   background:radial-gradient(ellipse 46% 60% at 72% 50%,rgba(255,150,70,.20),transparent 75%),url(look/r-wall.webp) 0 0/220px 330px;
   -webkit-mask-image:radial-gradient(ellipse 42% 62% at 72% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);mask-image:radial-gradient(ellipse 42% 62% at 72% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);filter:brightness(1.9) sepia(.35)}
 html[data-look="real"] .case:nth-of-type(even) .prop.arm{background-position:center,40px 0;-webkit-mask-image:radial-gradient(ellipse 42% 62% at 26% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%);mask-image:radial-gradient(ellipse 42% 62% at 26% 50%,#000 10%,rgba(0,0,0,.5) 45%,transparent 75%)}
-html[data-look="real"] .case-bg::before,html[data-look="real"] .case-bg::after{top:61px;bottom:21px;width:21px;border-radius:0;background:none;border-style:solid;border-width:7px 0 11px;border-image:url(look/r-pil-l.webp) 14 0 21 fill/7px 0 11px stretch}
+html[data-look="real"] .case-bg::before,html[data-look="real"] .case-bg::after{top:61px;bottom:21px;width:21px;border-radius:0;background:none;border-style:solid;border-width:7px 0 0;border-image:url(look/r-pil-l.webp) 14 0 21/7px 0 0 stretch;--pm:url(look/r-pil-l-m.webp);--pd:url(look/r-pil-l-d.webp);background:var(--pm) 0 0/100% 330px no-repeat,var(--pd) 0 0/100% auto repeat-y}
 html[data-look="real"] .case-bg::before{left:0}
-html[data-look="real"] .case-bg::after{right:0;border-image-source:url(look/r-pil-r.webp)}
+html[data-look="real"] .case-bg::after{right:0;border-image-source:url(look/r-pil-r.webp);--pm:url(look/r-pil-r-m.webp);--pd:url(look/r-pil-r-d.webp)}
+html[data-look="real"] .case-foot{display:block;bottom:21px;height:11px;background:url(look/r-pil-l.webp) left bottom/21px auto no-repeat,url(look/r-pil-r.webp) right bottom/21px auto no-repeat}
 html[data-look="real"] .cornice{height:61px;margin:0 -24px;background:url(look/r-cornice.webp) center/100% 100% no-repeat}
 html[data-look="real"] .cornice>*{display:none}
 html[data-look="real"] .plate-row{margin:-40px 0 11px}
@@ -493,10 +504,11 @@ html[data-look="pixel"] select{-webkit-appearance:none;appearance:none;padding-r
 html[data-look="pixel"] .count,html[data-look="pixel"] .muted,html[data-look="pixel"] .card-sub,html[data-look="pixel"] .section-head p,html[data-look="pixel"] .empty-note,html[data-look="pixel"] .edit-hint{font-style:normal}
 html[data-look="pixel"] .count-row{background:linear-gradient(#120e0c 0,#120e0c 70%,rgba(18,14,12,0))}
 html[data-look="pixel"] .case{margin:26px 9px 28px;padding:0 18px;--drop:0 10px 0 rgba(0,0,0,.45)}
-html[data-look="pixel"] .case-bg{background:#1a130e;box-shadow:none}
-html[data-look="pixel"] .case-bg::before,html[data-look="pixel"] .case-bg::after{top:58px;bottom:21px;width:18px;background:none;border-style:solid;border-width:9px 0 9px;border-image:url(look/p-pil-l.webp) 9 0 9 fill/9px 0 9px stretch;image-rendering:pixelated}
+html[data-look="pixel"] .case-bg{background:#1a130e;box-shadow:none;border-radius:0}
+html[data-look="pixel"] .case-bg::before,html[data-look="pixel"] .case-bg::after{top:58px;bottom:21px;width:18px;background:none;border-style:solid;border-width:9px 0 0;border-image:url(look/p-pil-l.webp) 9 0 9/9px 0 0 stretch;--pm:url(look/p-pil-l-m.webp);--pd:url(look/p-pil-l-d.webp);background:var(--pm) 0 0/100% 330px no-repeat,var(--pd) 0 0/100% auto repeat-y;image-rendering:pixelated}
 html[data-look="pixel"] .case-bg::before{left:0}
-html[data-look="pixel"] .case-bg::after{right:0;border-image-source:url(look/p-pil-r.webp)}
+html[data-look="pixel"] .case-bg::after{right:0;border-image-source:url(look/p-pil-r.webp);--pm:url(look/p-pil-r-m.webp);--pd:url(look/p-pil-r-d.webp)}
+html[data-look="pixel"] .case-foot{display:block;bottom:21px;height:9px;image-rendering:pixelated;background:url(look/p-pil-l.webp) left bottom/18px auto no-repeat,url(look/p-pil-r.webp) right bottom/18px auto no-repeat}
 html[data-look="pixel"] .cornice{height:58px;margin:0 -22px;background:url(look/p-cornice.webp) center/100% 100% no-repeat;image-rendering:pixelated}
 html[data-look="pixel"] .cornice>*{display:none}
 html[data-look="pixel"] .plate-row{margin:-44px 0 14px}
@@ -575,10 +587,10 @@ html[data-look="classic"] .btn.quiet{border-image:none;border-color:transparent;
 html[data-look="classic"] .count{font-style:italic;color:#D9BF8E}
 html[data-look="classic"] .count-row{background:linear-gradient(rgba(20,10,4,.9) 0,rgba(20,10,4,.75) 70%,rgba(20,10,4,0))}
 html[data-look="classic"] .case{margin:30px 7px 30px;padding:0 22px;border-radius:0;--drop:0 20px 30px -10px rgba(0,0,0,.85)}
-html[data-look="classic"] .case-bg{background:#140a05;box-shadow:0 0 30px -10px rgba(0,0,0,.85)}
-html[data-look="classic"] .case-bg::before,html[data-look="classic"] .case-bg::after{top:84px;bottom:20px;width:22px;border-radius:0;background:url(look/c-pier-l.webp) center/100% 100% no-repeat}
+html[data-look="classic"] .case-bg{background:#140a05;box-shadow:0 0 30px -10px rgba(0,0,0,.85);border-radius:0}
+html[data-look="classic"] .case-bg::before,html[data-look="classic"] .case-bg::after{top:84px;bottom:20px;width:22px;border-radius:0;background:url(look/c-pier-l-t.webp) 0 0/22px auto repeat-y}
 html[data-look="classic"] .case-bg::before{left:0}
-html[data-look="classic"] .case-bg::after{right:0;background-image:url(look/c-pier-r.webp)}
+html[data-look="classic"] .case-bg::after{right:0;background-image:url(look/c-pier-r-t.webp)}
 html[data-look="classic"] .cornice{height:86px;margin:0 -26px;background:url(look/c-banner.webp) 10% 100%/22px 46px no-repeat,url(look/c-banner.webp) 90% 100%/22px 46px no-repeat,url(look/c-arch.webp) center/100% 100% no-repeat}
 html[data-look="classic"] .cornice>*{display:none}
 html[data-look="classic"] .plate-row{margin:-34px 0 10px}
@@ -655,7 +667,7 @@ html[data-look="pixel"] .case:nth-of-type(3n) .cornice{clip-path:polygon(0 3px,6
 html[data-look="pixel"] .plinth{clip-path:polygon(0 0,100% 0,100% calc(100% - 3px),calc(100% - 8px) calc(100% - 3px),calc(100% - 8px) 100%,30% 100%,30% calc(100% - 2px),calc(30% - 6px) calc(100% - 2px),calc(30% - 6px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px))}
 html[data-look="pixel"] .case:nth-of-type(odd) .plate-row{transform:translateX(-6px) rotate(-1.4deg)}
 html[data-look="pixel"] .case:nth-of-type(even) .plate-row{transform:translateX(5px) rotate(.9deg)}
-html[data-look="pixel"] .case:nth-of-type(3n+2){transform:rotate(-.25deg)}
+html[data-look="pixel"] .case:nth-of-type(3n+2) .cornice{transform:rotate(-.6deg);will-change:transform}   /* the top beam sits a little crooked; the moving parts below stay square so nothing shimmers as they start or stop */
 html[data-look="pixel"] .slot:nth-child(9n+5){margin-left:5px;content-visibility:visible}
 html[data-look="pixel"] .slot:nth-child(9n+5) .spine{transform:rotate(-4.5deg);transform-origin:100% 100%}
 html[data-look="pixel"] .slot:nth-child(13n+9) .spine{transform:translateY(2px)}
@@ -708,19 +720,26 @@ html[data-look="pixel"] .index-card .item{margin:0 -20px;padding:10px 20px;borde
 html[data-look="pixel"] .index-card .item:nth-of-type(even){background:rgba(60,40,10,.16)}
 
 /* ===== classic: series as rolled scrolls, lists with faint pen-and-ink vignettes ===== */
-html[data-look="classic"] .ledger.leather{margin:24px 24px 26px;border-radius:0;color:#2C1608;
-  background:linear-gradient(90deg,rgba(90,50,16,.42),transparent 7%,transparent 93%,rgba(90,50,16,.42)),
-    linear-gradient(rgba(70,36,10,.34),transparent 14px,transparent calc(100% - 14px),rgba(70,36,10,.34)),
-    url(look/c-parch.webp) 0 0/320px;
-  box-shadow:0 10px 18px rgba(0,0,0,.55),inset 0 0 22px rgba(110,60,20,.38)}
-html[data-look="classic"] .ledger.leather::before,html[data-look="classic"] .ledger.leather::after{content:"";position:absolute;left:-22px;right:-22px;height:26px;pointer-events:none;z-index:2;box-sizing:border-box;
+/* The scroll: parchment in a window whose bottom edge can slide (.ld-win/.ld-bg), the shading and the roll at the foot riding
+   that edge (.ld-shade/.ld-foot), so opening unfurls it and closing rolls it up without stretching anything. */
+html[data-look="classic"] .ledger.leather{margin:24px 24px 26px;border-radius:0;color:#2C1608;background:none;box-shadow:none;isolation:isolate}
+html[data-look="classic"] .ld-win{display:block;position:absolute;top:0;bottom:0;left:-30px;right:-30px;overflow:hidden;z-index:-1;pointer-events:none}
+html[data-look="classic"] .ld-bg{position:absolute;top:0;bottom:-40px;left:30px;right:30px;
+  background:linear-gradient(90deg,rgba(90,50,16,.42),transparent 7%,transparent 93%,rgba(90,50,16,.42)),linear-gradient(rgba(70,36,10,.34),transparent 14px),url(look/c-parch.webp) 0 0/320px;
+  box-shadow:0 0 16px rgba(0,0,0,.5),inset 0 0 22px rgba(110,60,20,.38)}
+html[data-look="classic"] .ledger.editing .ld-bg{box-shadow:0 0 16px rgba(0,0,0,.5),inset 0 0 0 2px rgba(122,26,16,.6),inset 0 0 22px rgba(110,60,20,.38)}
+html[data-look="classic"] .ld-shade{display:block;position:absolute;left:0;right:0;bottom:0;height:24px;z-index:-1;pointer-events:none;
+  background:linear-gradient(90deg,rgba(110,60,20,.3),transparent 12%,transparent 88%,rgba(110,60,20,.3)),linear-gradient(rgba(110,60,20,0),rgba(110,60,20,.22) 45%,rgba(70,36,10,.42))}
+html[data-look="classic"] .ld-foot{display:block;position:absolute;left:-22px;right:-22px;bottom:-15px;height:26px;pointer-events:none;z-index:2;box-sizing:border-box;
+  border-style:solid;border-width:0 22px;border-color:transparent;border-image:url(look/c-roll.webp) 0 101 fill/0 22px stretch;filter:drop-shadow(0 6px 5px rgba(0,0,0,.55))}
+html[data-look="classic"] .ledger.leather::before{content:"";position:absolute;left:-22px;right:-22px;height:26px;pointer-events:none;z-index:2;box-sizing:border-box;
   border-style:solid;border-width:0 22px;border-color:transparent;border-image:url(look/c-roll.webp) 0 101 fill/0 22px stretch;background:none;filter:drop-shadow(0 4px 4px rgba(0,0,0,.55))}
 html[data-look="classic"] .ledger.leather::before{top:-15px}
-html[data-look="classic"] .ledger.leather::after{bottom:-15px}
 html[data-look="classic"] .ledger .card-head{padding-top:18px}
 html[data-look="classic"] .ledger .card-title{color:#7A1A10;font-family:var(--display)}
-html[data-look="classic"] .ledger .card-body{border-top:1px solid rgba(122,26,16,.35);padding-bottom:22px}
-html[data-look="classic"] .ledger.editing{box-shadow:0 10px 18px rgba(0,0,0,.55),inset 0 0 0 2px rgba(122,26,16,.6),inset 0 0 22px rgba(110,60,20,.38)}
+html[data-look="classic"] .ledger .card-body{border-top:0;padding:0 0 22px}
+html[data-look="classic"] .ledger .cb-in{border-top:1px solid rgba(122,26,16,.35);padding:4px 10px 0}
+html[data-look="classic"] .ledger.editing{box-shadow:none}
 html[data-look="classic"] .index-card{background:url(look/c-art.webp) 100% 0/100% auto repeat-y,url(look/tx-paper.webp) 0 0/120px,radial-gradient(ellipse at 50% 40%,#F0DFB4 38%,#D2B47E 85%,#B08A52);background-blend-mode:normal,multiply,normal}
 html[data-look="classic"] .index-card .card-head{padding-top:22px}
 </style>
@@ -2366,8 +2385,8 @@ function bookcase(label,count,inner,opts={}){
   const can=!opts.blank,st=can?stateOf(label):"open";
   const plate=can?`<button class="plate" data-shelf="${esc(label)}" aria-label="${esc(label)}, ${count} books, ${STATE_WORD[st]}. Tap to change.">${esc(label)}${count!=null?`<small>${count}</small>`:""}${stateIcon(st)}</button>`
     :`<div class="plate">${esc(label)}${count!=null?`<small>${count}</small>`:""}</div>`;
-  return`<section class="case st-${st}"><div class="case-bg" aria-hidden="true"></div><div class="case-sh" aria-hidden="true"></div>${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
-    <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div></div>
+  return`<section class="case st-${st}"><div class="case-body" aria-hidden="true"><div class="case-bg"></div></div><div class="case-sh" aria-hidden="true"></div><div class="case-foot" aria-hidden="true"></div>${CORNICE}<div class="plate-row">${SCROLL("")}${plate}${SCROLL(" r")}</div>
+    <div class="shelf-wrap"><div class="shelf-inner"><div class="shelf${opts.blank?" blank":""}">${inner}</div></div><i class="peekfade"></i></div>
     ${can?`<div class="doors-wrap" aria-hidden="true"><div class="doors-mv"><div class="doors-in"><span class="door l"></span><span class="door r"></span></div></div></div>`:""}
     <div class="plinth" aria-hidden="true"></div><i class="prop arm" aria-hidden="true"></i>${opts.extra||""}</section>`;
 }
@@ -2381,6 +2400,46 @@ function endShelfMotion(caseEl){
   m.anims.forEach(a=>a.cancel());m.cvOn.forEach(c=>c.classList.remove("cv-on"));
   for(const el of[m.wrap,m.inner,m.doors])if(el){el.style.height="";el.style.overflowY="";el.style.pointerEvents="";}
 }
+// Series cards. In the classic look the scroll unfurls as it opens and rolls up as it closes: the bottom roll travels with
+// the edge of the parchment, the parchment's window opens beneath it and the cards below slide along, all on their own layers.
+let scrollMotion=null;
+function toggleSeriesCard(id,ids){
+  if(scrollMotion){scrollMotion.anims.forEach(a=>a.finish());}           // a tap mid-motion first lets the last one land
+  const open=ids.some(i=>S.openSeries.has(i)),el=document.getElementById("ser-"+id);
+  const moving=lookNow()==="classic"&&el&&!matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(open){
+    ids.forEach(i=>S.openSeries.delete(i));
+    const body=el&&el.querySelector(".card-body");
+    if(!moving||!body||S.editing.has(id))return render();
+    const before=el.offsetHeight;
+    // how tall it will be closed: measured on a stand-in without its body, so the roll-up lands exactly
+    const probe=el.cloneNode(true);probe.querySelector(".card-body").remove();probe.removeAttribute("id");probe.style.cssText="position:absolute;visibility:hidden;left:0;right:0";
+    el.parentNode.insertBefore(probe,el);const after=probe.offsetHeight;probe.remove();
+    return slideScroll(el,0,after-before,()=>render());
+  }
+  S.openSeries.add(id);
+  const before=el?el.offsetHeight:0;render();
+  const nu=document.getElementById("ser-"+id);if(!moving||!nu)return;
+  const grow=nu.offsetHeight-before;if(grow>1)slideScroll(nu,-grow,0,null);
+}
+function slideScroll(card,off0,off1,done){
+  const body=card.querySelector(".card-body"),inner=body&&body.firstElementChild;if(!body||!inner){if(done)done();return;}
+  const opt={duration:Math.min(900,450+Math.abs(off1-off0)*.4),easing:"cubic-bezier(.42,.08,.22,1)",fill:"both"},ty=v=>({translate:`0 ${v}px`}),anims=[];
+  const go=(el,k)=>{if(el)anims.push(el.animate(k,opt));};
+  body.style.overflow="hidden";body.style.pointerEvents="none";
+  go(body,[ty(off0),ty(off1)]);go(inner,[ty(-off0),ty(-off1)]);
+  go(card.querySelector(".ld-win"),[ty(off0),ty(off1)]);go(card.querySelector(".ld-bg"),[ty(-off0),ty(-off1)]);
+  go(card.querySelector(".ld-shade"),[ty(off0),ty(off1)]);go(card.querySelector(".ld-foot"),[ty(off0),ty(off1)]);
+  const lo=Math.min(off0,off1);
+  for(let n=card;n&&n.id!=="main";n=n.parentElement)for(let x=n.nextElementSibling;x;x=x.nextElementSibling){
+    if(x.getBoundingClientRect().top+lo>innerHeight+40)break;go(x,[ty(off0),ty(off1)]);}
+  const m={anims};scrollMotion=m;
+  Promise.all(anims.map(a=>a.finished)).then(()=>{
+    if(scrollMotion===m)scrollMotion=null;
+    if(done)done();
+    anims.forEach(a=>a.cancel());body.style.overflow=body.style.pointerEvents="";
+  }).catch(()=>{if(scrollMotion===m)scrollMotion=null;});
+}
 function toggleShelf(btn){
   const label=btn.dataset.shelf,caseEl=btn.closest(".case"),wrap=caseEl.querySelector(".shelf-wrap"),inner=caseEl.querySelector(".shelf-inner"),doors=caseEl.querySelector(".doors-wrap");
   const cur=stateOf(label),full=inner.querySelector(".shelf").offsetHeight;
@@ -2390,7 +2449,7 @@ function toggleShelf(btn){
   // where the shelf's edge and the doors are on screen right now, and whether the inside currently scrolls
   const m=caseEl._m;
   const w=m?m.Hw+tyOf(wrap):wrap.offsetHeight,d=m?tyOf(doors)+m.Hw+m.Hd-w:doors.offsetHeight;
-  const scrolls=getComputedStyle(inner).overflowY==="auto";
+  const scrolls=getComputedStyle(inner).overflowY==="auto",fade=caseEl.querySelector(".peekfade"),fade0=fade?+getComputedStyle(fade).opacity:0;
   endShelfMotion(caseEl);
   caseEl.classList.remove("st-open","st-peek","st-closed");caseEl.classList.add("st-"+next);
   btn.querySelector(".caret").outerHTML=stateIcon(next);
@@ -2405,9 +2464,9 @@ function toggleShelf(btn){
   if(next==="open"){inner.scrollTop=0;}
   else if(scrolls){inner.style.height=PEEK_H+"px";inner.style.overflowY="auto";}
   else{inner.style.height="auto";inner.style.overflowY="visible";}
-  const off0=w+d-Hw-Hd,off1=to+dTo-Hw-Hd,caseH=caseEl.offsetHeight;
+  const off0=w+d-Hw-Hd,off1=to+dTo-Hw-Hd;
   const below=[...caseEl.children].filter(el=>(el.compareDocumentPosition(doors)&Node.DOCUMENT_POSITION_PRECEDING)&&getComputedStyle(el).getPropertyValue("--pin").trim()!=="top");
-  below.push(caseEl.querySelector(".case-sh"));
+  below.push(caseEl.querySelector(".case-sh"),caseEl.querySelector(".case-foot"));
   const cvOn=[],lo=Math.min(off0,off1),hi=Math.max(off0,off1);
   for(let el=caseEl.nextElementSibling;el;el=el.nextElementSibling){
     const r=el.getBoundingClientRect();
@@ -2420,7 +2479,9 @@ function toggleShelf(btn){
   go(wrap,[ty(w-Hw),ty(to-Hw)]);go(inner,[ty(Hw-w),ty(Hw-to)]);          // the shelf's edge moves; the books stay put
   go(doors,[ty(off0),ty(off1)]);go(doors.firstElementChild,[ty(Hd-d),ty(Hd-dTo)]);   // (a plain wrapper: the doors' own 3D setting can't be slid on the graphics chip)
   below.forEach(el=>go(el,[ty(off0),ty(off1)]));
-  go(caseEl.querySelector(".case-bg"),[{scale:`1 ${(caseH+off0)/caseH}`},{scale:`1 ${(caseH+off1)/caseH}`}]);
+  // the case's body isn't stretched: its window's bottom edge slides with the base while the wood and stone stay put
+  go(caseEl.querySelector(".case-body"),[ty(off0),ty(off1)]);go(caseEl.querySelector(".case-bg"),[ty(-off0),ty(-off1)]);
+  if(fade)go(fade,[{opacity:fade0},{opacity:next==="peek"?1:0}]);
   const mm={wrap,inner,doors,Hw,Hd,anims,cvOn};caseEl._m=mm;
   if(!anims.length){endShelfMotion(caseEl);return;}
   Promise.all(anims.map(x=>x.finished)).then(()=>{if(caseEl._m!==mm)return;endShelfMotion(caseEl);if(next!=="peek")inner.scrollTop=0;}).catch(()=>{});
@@ -2518,14 +2579,14 @@ function topCardHTML(t,listed){
     :(t.custom?"":`<button class="btn small" data-refresh-top="${t.id}" ${busy?"disabled":""}>${busy?"Checking…":t.catalogued?"Check for newer books":"Load the full series"}</button>`)+
      (t.missing.length&&canRead()&&seriesPhotos(t).length?`<button class="btn small" data-relook="${t.id}" ${S.relooking===t.id?"disabled":""}>${S.relooking===t.id?"Looking…":"Look for these in my photos"}</button>`:"")+
      (t.missing.length>1?`<button class="btn small quiet" data-have-all="${t.id}">${S.confirmDel==="all:"+t.id?`Tap again to add ${t.missing.length} books`:"I have all of these"}</button>`:"");
-  return`<div class="ledger leather${t.hiddenTop?" dim":""}${ed?" editing":""}" id="ser-${t.id}">
+  return`<div class="ledger leather${t.hiddenTop?" dim":""}${ed?" editing":""}" id="ser-${t.id}"><i class="ld-win" aria-hidden="true"><i class="ld-bg"></i></i><i class="ld-shade" aria-hidden="true"></i><i class="ld-foot" aria-hidden="true"></i>
     <button class="card-edit${ed?" on":""}" data-edit-top="${t.id}" aria-label="${ed?"Finish editing":"Edit"} ${esc(t.name)}">${ed?"Done":`${PEN} Edit`}</button>
     <button class="card-head" data-toggle-series="${t.id}" aria-expanded="${open}">
       <p class="card-title">${esc(t.name)}${t.custom?` <span class="tag kindmark">yours</span>`:""}</p>
       <p class="card-sub">${esc(sub)}</p>
       <div class="progress-row"><div class="pips" aria-hidden="true">${t.groups.filter(g=>!g.hidden).flatMap(g=>g.entries.filter(e=>!e.hidden)).slice(0,80).map(e=>`<span class="pip${e.novella?" nv":""}${e.book?" own":" miss"}${e.upcoming?" up":""}"${e.book&&!e.novella?` style="--pc:${palette(e.book).c}"`:""}></span>`).join("")}</div>${tag}</div>
     </button>
-    ${open||ed?`<div class="card-body"><div class="series-rate">${starsHTML("series:"+t.id,t.rating,"Your rating for "+t.name)}</div>${ed?`<p class="edit-hint">Remove books or sub-series you don’t plan to read; the series then counts as complete without them. Nothing leaves your shelves.</p>`:""}${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div>`:""}
+    ${open||ed?`<div class="card-body"><div class="cb-in"><div class="series-rate">${starsHTML("series:"+t.id,t.rating,"Your rating for "+t.name)}</div>${ed?`<p class="edit-hint">Remove books or sub-series you don’t plan to read; the series then counts as complete without them. Nothing leaves your shelves.</p>`:""}${body||`<p class="muted">Nothing here yet.</p>`}<div class="card-foot">${foot}</div></div></div>`:""}
   </div>`;
 }
 function renderSeries(){
@@ -2784,7 +2845,7 @@ function mainClick(e){
   if(d.book){if(S.selecting&&S.tab==="shelves"){S.selected.has(d.book)?S.selected.delete(d.book):S.selected.add(d.book);return render();}return openBook(d.book);}
   if(d.act==="selectMode"){S.selecting=!S.selecting;S.selected.clear();return render();}
   if(d.toggleSeries){const id=d.toggleSeries;const t=topsView().find(x=>x.id===id);const ids=[id,...((t&&t.mergedIds)||[])];
-    if(ids.some(i=>S.openSeries.has(i)))ids.forEach(i=>S.openSeries.delete(i));else S.openSeries.add(id);return render();}
+    return toggleSeriesCard(id,ids);}
   if(d.toggleList){S.openLists.has(d.toggleList)?S.openLists.delete(d.toggleList):S.openLists.add(d.toggleList);return render();}
   if(d.want){const{t,g,e:m}=findEntry(d.want);
     if(m)return addToList(WISHLIST,{title:m.title,author:t.author,note:`${g.name}${m.number!=null&&!m.novella?`, book ${m.number}`:""}`});return;}
