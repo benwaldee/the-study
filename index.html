@@ -238,11 +238,15 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
    half-opening or closing the case never changes how the trapdoor and lever look */
 .case.g-lifted .prop.arm,.case.g-lifted .case-sh{visibility:hidden}
 @keyframes glift-wall{0%,100%{transform:translateY(10px)}50%{transform:translateY(19px)}}
-.g-trap{position:relative;height:100px;margin:-14px 9px 22px;border-radius:2px;overflow:hidden;isolation:isolate;background:#0b0705}
+/* At rest the trapdoor is one flat picture (its frame chosen by background position) with the lever and shadows painted on it,
+   so it slides as a single piece when the bookcase above opens or closes. Only while the door swings open is there a moving
+   filmstrip inside it. */
+.g-trap{position:relative;height:100px;margin:-14px 9px 22px;border-radius:2px;overflow:hidden;isolation:isolate;
+  background:url(look/g-trap.webp) 0 0/100% 2400% no-repeat,#0b0705}
+.g-trap.open{background-position:0 100%}
 .g-trap::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 14px 18px rgba(0,0,0,.85),inset 0 -8px 14px rgba(0,0,0,.6)}
-.g-trap .tf{position:absolute;left:0;top:0;width:100%;height:2400%;background:url(look/g-trap.webp) 0 0/100% 100% no-repeat;will-change:transform}
-.g-trap.open .tf{transform:translateY(-95.8333%)}
-.g-trap.opening .tf{animation:gtrap 1.1s steps(23,end) forwards}
+.g-trap .tf{display:none;position:absolute;left:0;top:0;width:100%;height:2400%;background:url(look/g-trap.webp) 0 0/100% 100% no-repeat}
+.g-trap.opening .tf{display:block;animation:gtrap 1.1s steps(23,end) forwards}
 @keyframes gtrap{from{transform:none}to{transform:translateY(-95.8333%)}}
 .g-lever{position:absolute;z-index:2;left:calc(50% + 70px);top:16px;width:34px;height:70px;border:0;padding:0;background:none;cursor:pointer}
 .g-lever::before{content:"";position:absolute;left:7px;bottom:6px;width:20px;height:16px;border-radius:3px;background:linear-gradient(#3a332c,#1a1612);box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 3px rgba(0,0,0,.7)}
@@ -691,9 +695,9 @@ html[data-look="classic"] .top-row{padding-left:12px}
 html[data-look="classic"] .top h1{flex:none;font-family:var(--display);font-size:34px;line-height:1;color:#2A1206;letter-spacing:.005em;
   text-shadow:0 1px 0 rgba(255,240,200,.45),0 0 1px rgba(42,18,6,.55)}
 html[data-look="classic"] #lookBtn{display:inline-block;padding:11px 0 2px}
-@media (max-width:384px){html[data-look="classic"] .top-row{padding-right:22px}html[data-look="classic"] .brand{gap:6px}html[data-look="classic"] .top h1{font-size:27px}html[data-look="classic"] #lookBtn{padding-top:9px}html[data-look="classic"] #lookBtn::first-letter{font-size:24px;line-height:33px;padding:0 6px;margin-top:-10px}}
-html[data-look="classic"] #lookBtn::first-letter{float:left;font-family:"Cinzel",var(--display);font-weight:900;font-size:30px;line-height:41px;
-  padding:0 8px;margin:-12px 4px 0 0;color:#F6D77A;
+@media (max-width:384px){html[data-look="classic"] .top-row{padding-right:22px}html[data-look="classic"] .brand{gap:6px}html[data-look="classic"] .top h1{font-size:27px}html[data-look="classic"] #lookBtn{padding-top:9px}html[data-look="classic"] #lookBtn::first-letter{font-size:24px;line-height:29px;padding:4px 6px 0;margin-top:-10px}}
+html[data-look="classic"] #lookBtn::first-letter{float:left;font-family:"Cinzel",var(--display);font-weight:900;font-size:30px;line-height:36px;
+  padding:5px 8px 0;margin:-12px 4px 0 0;color:#F6D77A;
   background:radial-gradient(circle at 50% 40%,#9c2016,#6a0f09 70%,#4a0905);border:2px solid #C9963A;border-radius:2px;
   box-shadow:inset 0 0 0 1px rgba(255,220,140,.35),inset 0 0 8px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.5);
   text-shadow:0 1px 0 #6a3a08,0 0 6px rgba(255,200,90,.55)}
