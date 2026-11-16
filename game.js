@@ -1,7 +1,7 @@
 /* Galef's hidden game. Loaded on demand by index.html the first time the game needs it, so it costs the app nothing until then.
    It uses the app's own helpers (S, $, save, render, openSheet, closeSheet, toast, game, saveGame, ...). */
 /* global S, $, esc, norm, uid, clone, save, render, openSheet, closeSheet, toast, cleanItem, live,
-   game, gHas, saveGame, gCandidates, gLinesFetch, gLineGaveUp, gFallbackLine, canAsk, lookNow, setLook, openLooks, LS */
+   game, gHas, saveGame, gCandidates, gLinesFetch, gLineGaveUp, gFallbackLine, canAsk, lookBadge, lookNow, setLook, openLooks, LS */
 
 const IMG = n => `look/${n}.webp`;
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -166,6 +166,7 @@ const ease = t => 1 - Math.pow(1 - t, 3);
 .gpstage .gbot .spr{filter:saturate(1.15) contrast(1.08) drop-shadow(0 14px 18px rgba(0,0,0,.55))}
 .gpstage .ring{position:absolute;width:300px;height:130px;margin:-65px 0 0 -150px;border-radius:50%;border:2px solid rgba(210,255,170,.95);pointer-events:none;opacity:0;
   box-shadow:0 0 22px rgba(150,255,110,.85),inset 0 0 22px rgba(150,255,110,.6)}
+.gintro{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:96;pointer-events:auto}
 #lookBtn.g-imbue{animation:gimbue 3.6s ease-out}
 @keyframes gimbue{0%{filter:drop-shadow(0 1px 0 rgba(0,0,0,.8)) drop-shadow(0 0 10px rgba(170,255,120,.9)) drop-shadow(0 0 26px rgba(90,220,70,.7))}
   100%{filter:drop-shadow(0 1px 0 rgba(0,0,0,.8)) drop-shadow(0 0 10px rgba(240,200,120,.12))}}
@@ -927,6 +928,74 @@ function pourShow(t, P) {
       st.remove(); done();
     }
   });
+}
+
+/* ---------- the first step into the dungeon ----------
+   A ring of green arcane fire closes in on the name, the world goes dark, the ember left at the centre turns to torchlight,
+   and a ring of fire opens out again on the dungeon. Only the first time; after that the name just switches. */
+export async function dungeonIntro() {
+  const t = $("#lookBtn"), VW = innerWidth, VH = innerHeight, DPR = Math.min(2, devicePixelRatio || 1);
+  const r = t.getBoundingClientRect(), C = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  const cv = document.createElement("canvas"); cv.className = "gintro"; cv.width = VW * DPR; cv.height = VH * DPR;
+  document.body.appendChild(cv); const ctx = cv.getContext("2d"); ctx.scale(DPR, DPR);
+  const Rmax = Math.max(...[[0, 0], [VW, 0], [0, VH], [VW, VH]].map(([x, y]) => Math.hypot(x - C.x, y - C.y))) + 60;
+  const GREEN = ["255,255,235", "150,255,110", "40,150,30"], FIRE = ["255,248,215", "255,170,60", "205,60,12"];
+  const parts = []; const R = (a, b) => a + Math.random() * (b - a);
+  const T1 = 1050, T2 = T1 + 520, T3 = T2 + 1350;   // closing, dark, opening
+  let swapped = false, swapDone = null;
+  const ringPath = (rad, T, k) => { const pts = []; const n = 160;
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2;
+      const w = 1 + k * (0.035 * Math.sin(5 * a + T / 300) + 0.025 * Math.sin(11 * a - T / 190) + 0.015 * Math.sin(23 * a + T / 120));
+      pts.push([C.x + Math.cos(a) * rad * w, C.y + Math.sin(a) * rad * w]); }
+    return pts; };
+  const T0 = performance.now(); let last = T0;
+  await new Promise(done => {
+    const step = now => {
+      const T = now - T0, dt = Math.min(0.033, (now - last) / 1000); last = now;
+      let rad, col, k = 1, fade = 1;
+      if (T < T1) { const p = T / T1; rad = Rmax * Math.pow(1 - p, 1.6); col = GREEN; }
+      else if (T < T2) { rad = 0; col = (T - T1) / (T2 - T1) > 0.5 ? FIRE : GREEN; }
+      else { const p = Math.min(1, (T - T2) / (T3 - T2)); rad = Rmax * (1 - Math.pow(1 - p, 2.4)); col = FIRE; fade = p > 0.85 ? 1 - (p - 0.85) / 0.15 : 1; }
+      if (T >= T1 && !swapped) { swapped = true; setLook("classic"); swapDone = (async () => { try { await document.fonts.ready; } catch (_) {} })(); }
+      // flames licking off the edge, and embers
+      const pts = rad > 2 ? ringPath(rad, T, k) : null;
+      if (pts) for (let i = 0; i < 26; i++) { const q = pts[Math.floor(Math.random() * pts.length)], dx = q[0] - C.x, dy = q[1] - C.y, d = Math.hypot(dx, dy) || 1;
+        const out = T < T1 ? -1 : 1;
+        parts.push({ x: q[0], y: q[1], vx: dx / d * R(20, 90) * out + R(-20, 20), vy: dy / d * R(20, 90) * out - R(30, 90), life: 0, max: R(0.25, 0.6), s: R(5, 13), c: col, ember: Math.random() < 0.12 }); }
+      if (T >= T1 && T < T2) { for (let i = 0; i < 4; i++) parts.push({ x: C.x + R(-4, 4), y: C.y + R(-4, 4), vx: R(-40, 40), vy: R(-80, -20), life: 0, max: R(0.3, 0.7), s: R(4, 9), c: col, ember: false }); }
+      for (const q of parts) { q.life += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy -= 40 * dt; }
+      for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life > parts[i].max) parts.splice(i, 1);
+      ctx.clearRect(0, 0, VW, VH);
+      ctx.save(); ctx.globalAlpha = fade;
+      // the dark, outside the ring (closing) or still waiting outside it (opening)
+      ctx.beginPath(); ctx.rect(0, 0, VW, VH);
+      if (pts) { ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]); ctx.closePath(); }
+      ctx.fillStyle = "#050302"; ctx.fill("evenodd");
+      if (pts) {     // the burning edge
+        for (const [w, a, blur, ci] of [[26, 0.22, 30, 2], [12, 0.55, 16, 1], [4, 0.95, 6, 0], [1.5, 1, 0, 0]]) {
+          ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]); ctx.closePath();
+          ctx.lineWidth = w; ctx.strokeStyle = `rgba(${col[ci]},${a})`; ctx.shadowColor = `rgba(${col[1]},.9)`; ctx.shadowBlur = blur; ctx.stroke(); }
+        ctx.shadowBlur = 0;
+      }
+      if (T >= T1 && T < T2 + 250) {   // the ember at the centre
+        const p = Math.min(1, (T - T1) / (T2 - T1)), pulse = 0.6 + 0.4 * Math.sin(T / 60), rr = 10 + 26 * p * pulse;
+        const g = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, rr); g.addColorStop(0, `rgba(${col[0]},1)`); g.addColorStop(0.35, `rgba(${col[1]},.8)`); g.addColorStop(1, `rgba(${col[2]},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C.x, C.y, rr, 0, 7); ctx.fill();
+      }
+      ctx.globalCompositeOperation = "lighter";
+      for (const q of parts) { const a = 1 - q.life / q.max, sz = q.s * (q.ember ? 0.35 : a);
+        const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, sz); g.addColorStop(0, `rgba(${q.c[0]},${a})`); g.addColorStop(0.4, `rgba(${q.c[1]},${a * 0.7})`); g.addColorStop(1, `rgba(${q.c[2]},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, sz, 0, 7); ctx.fill(); }
+      ctx.restore();
+      if (T < T3) requestAnimationFrame(step); else done();
+    };
+    requestAnimationFrame(step);
+  });
+  if (swapDone) await swapDone;
+  cv.remove();
+  if (!swapped) setLook("classic");
+  await saveGame({ seenDungeon: true });
+  lookBadge("classic");
 }
 
 /* ---------- testing: jump straight to a step ---------- */

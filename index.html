@@ -659,7 +659,17 @@ html[data-look="classic"] body::before{background:#1c1008}
 html[data-look="classic"] .top{background:linear-gradient(rgba(16,8,3,.55),rgba(16,8,3,.7)),url(look/c-wall.webp) 0 0/260px auto;box-shadow:0 8px 16px rgba(0,0,0,.6)}
 html[data-look="classic"] .top::after{height:8px;border-top:0;background:linear-gradient(#3a2412,#1a0e06)}
 html[data-look="classic"] .top-row{min-height:78px;margin:0 -10px;padding:6px 34px 10px;border-style:solid;border-width:0 24px;border-color:transparent;border-image:url(look/c-scroll.webp) 0 64 fill/0 24px stretch}
-html[data-look="classic"] .top h1{font-family:var(--display);font-size:33px;color:#8A1A12;text-shadow:0 1px 0 rgba(255,236,190,.45),0 0 1px rgba(60,10,4,.6)}
+html[data-look="classic"] .top-row{padding-left:12px}
+/* the name, as in an illuminated manuscript: a gilded capital on oxblood, then the rest in dark iron-gall ink */
+html[data-look="classic"] .top h1{flex:none;font-family:var(--display);font-size:34px;line-height:1;color:#2A1206;letter-spacing:.005em;
+  text-shadow:0 1px 0 rgba(255,240,200,.45),0 0 1px rgba(42,18,6,.55)}
+html[data-look="classic"] #lookBtn{display:inline-block;padding:2px 0}
+@media (max-width:384px){html[data-look="classic"] .top-row{padding-right:22px}html[data-look="classic"] .brand{gap:6px}html[data-look="classic"] .top h1{font-size:27px}html[data-look="classic"] #lookBtn::first-letter{font-size:24px;line-height:33px;padding:0 6px}}
+html[data-look="classic"] #lookBtn::first-letter{float:left;font-family:"Cinzel",var(--display);font-weight:900;font-size:30px;line-height:41px;
+  padding:0 8px;margin:-1px 4px 0 0;color:#F6D77A;
+  background:radial-gradient(circle at 50% 40%,#9c2016,#6a0f09 70%,#4a0905);border:2px solid #C9963A;border-radius:2px;
+  box-shadow:inset 0 0 0 1px rgba(255,220,140,.35),inset 0 0 8px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.5);
+  text-shadow:0 1px 0 #6a3a08,0 0 6px rgba(255,200,90,.55)}
 html[data-look="classic"] #menuBtn{background:none;border:0;color:#3A1E0A;width:30px}
 html[data-look="classic"] #addBtn{width:58px;height:58px;padding:0;margin:-6px -14px -6px 0;border:0;border-radius:50%;background:url(look/c-seal.webp) center/100% 100% no-repeat;box-shadow:none;font-size:0;color:transparent;text-shadow:none;position:relative}
 html[data-look="classic"] #addBtn::before{content:"+";font:400 30px/1 var(--display);color:#F6D896;text-shadow:0 1px 2px rgba(40,0,0,.8);position:absolute;inset:0;display:grid;place-items:center;padding-bottom:3px}
@@ -1965,7 +1975,10 @@ function wonLooks(){const g=S.records.get("game");let w=g&&Array.isArray(g.won)?
 function openLooks(){if(!LOOKS_LOCKED)return LOOKS;const won=wonLooks();return LOOKS.filter(l=>l==="real"||won.includes(l));}
 function lookNow(){const l=document.documentElement.dataset.look;return openLooks().includes(l)?l:"real";}
 function setLook(l){if(!openLooks().includes(l))l="real";document.documentElement.dataset.look=l;LS.set("study-look",l);_fit.clear();render();}
-function nextLook(){const o=openLooks();if(o.length<2)return;const n=o[(o.indexOf(lookNow())+1)%o.length];setLook(n);lookBadge(n);}
+function nextLook(){const o=openLooks();if(o.length<2)return;const n=o[(o.indexOf(lookNow())+1)%o.length];
+  // the very first step into the dungeon gets its own entrance
+  if(n==="classic"&&!game().seenDungeon&&!matchMedia("(prefers-reduced-motion: reduce)").matches)return gameDo("dungeonIntro");
+  setLook(n);lookBadge(n);}
 // The look's name, shown as a small plaque in that look's own style; it glows in, holds, and fades away by itself.
 function lookBadge(l){
   let b=$("#lookBadge");if(b)b.remove();
