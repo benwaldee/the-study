@@ -1,7 +1,7 @@
 /* Galef's hidden game. Loaded on demand by index.html the first time the game needs it, so it costs the app nothing until then.
    It uses the app's own helpers (S, $, save, render, openSheet, closeSheet, toast, game, saveGame, ...). */
 /* global S, $, esc, norm, uid, clone, save, render, openSheet, closeSheet, toast, cleanItem, live,
-   game, gHas, saveGame, gCandidates, gLinesFetch, lookNow, setLook, openLooks, LS */
+   game, gHas, saveGame, gCandidates, gLinesFetch, gLineGaveUp, gFallbackLine, canAsk, lookNow, setLook, openLooks, LS */
 
 const IMG = n => `look/${n}.webp`;
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -58,7 +58,7 @@ const ease = t => 1 - Math.pow(1 - t, 3);
 .gbag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:12px;margin:10px 0 4px}
 .gbag-item{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px 12px;border-radius:6px;border:1px solid rgba(214,178,100,.35);
   background:radial-gradient(circle at 50% 40%,rgba(255,220,160,.1),rgba(0,0,0,.25));color:inherit;font:600 15px/1.2 var(--serif);cursor:pointer}
-.gbag-item .th{width:100px;height:68px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.gbag-item .th{width:100px;height:68px;display:flex;align-items:center;justify-content:center;overflow:visible}
 .gi-back{margin:0 0 6px;padding:4px 0;border:0;background:none;color:var(--brass-hi,#E0BC6C);font:600 15px var(--serif);cursor:pointer}
 .gi-stage{height:260px;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
 .gi-name{margin:6px 0 2px;text-align:center;font:600 21px/1.2 var(--serif)}
@@ -88,7 +88,11 @@ const ease = t => 1 - Math.pow(1 - t, 3);
 .gx{position:absolute;right:12px;top:calc(env(safe-area-inset-top) + 12px);z-index:4;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   border:1px solid rgba(214,178,100,.6);background:rgba(20,12,6,.78);color:#E8D2A0;cursor:pointer}
 /* key into the lock */
-.gkey-in{position:fixed;left:0;top:0;z-index:90;pointer-events:none;width:120px;height:96px;background-repeat:no-repeat}
+.gkey-in{position:fixed;left:0;top:0;z-index:90;pointer-events:none;background-repeat:no-repeat;
+  -webkit-mask:radial-gradient(closest-side,#000 78%,transparent);mask:radial-gradient(closest-side,#000 78%,transparent)}
+.gkey-glint{position:fixed;z-index:91;width:70px;height:70px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,250,220,.95),rgba(255,214,120,.45) 25%,rgba(255,200,90,0) 62%),conic-gradient(from 0deg,transparent 0 40deg,rgba(255,240,200,.6) 45deg,transparent 50deg 130deg,rgba(255,240,200,.6) 135deg,transparent 140deg 220deg,rgba(255,240,200,.6) 225deg,transparent 230deg 310deg,rgba(255,240,200,.6) 315deg,transparent 320deg);
+  -webkit-mask:radial-gradient(circle,#000 30%,transparent 70%);mask:radial-gradient(circle,#000 30%,transparent 70%)}
 .gask{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;width:220px;padding:14px;border-radius:8px;text-align:center;
   background:rgba(20,12,6,.94);border:1px solid rgba(214,178,100,.55);box-shadow:0 10px 30px rgba(0,0,0,.7)}
 .gask p{margin:0 0 10px;font:italic 400 18px/1.3 var(--serif);color:#F2DDA6}
@@ -111,6 +115,7 @@ const ease = t => 1 - Math.pow(1 - t, 3);
 .glair{position:fixed;inset:0;z-index:72;background:#000;overflow:hidden;opacity:0;transition:opacity 1s;touch-action:none;-webkit-user-select:none;user-select:none}
 .glair.in{opacity:1}
 .glair .room{position:absolute;left:0;top:0;will-change:transform;cursor:grab}
+.glair .room::after{content:"";position:absolute;inset:-1px;pointer-events:none;background:linear-gradient(#000,rgba(0,0,0,0) 9%,rgba(0,0,0,0) 91%,#000),linear-gradient(90deg,#000,rgba(0,0,0,0) 4%,rgba(0,0,0,0) 96%,#000)}
 .glair .room>img,.glair .lay{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 .glair .wiz{transform-origin:var(--ox) var(--oy);animation:gfidget 7s ease-in-out infinite}
 @keyframes gfidget{0%,100%{transform:none}22%{transform:scaleY(1.006) rotate(.35deg)}38%{transform:scaleY(1.002) rotate(.1deg)}55%{transform:scaleY(1.007) rotate(-.4deg)}72%{transform:scaleY(1.001) rotate(-.15deg)}86%{transform:scaleY(1.005) rotate(.2deg)}}
@@ -143,25 +148,27 @@ const ease = t => 1 - Math.pow(1 - t, 3);
 .glair .tip{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top) + 22px);z-index:3;text-align:center;font:italic 400 15px var(--serif);color:rgba(240,226,192,.75);
   text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .6s}
 /* potion over the title */
-.gpstage{position:fixed;inset:0;z-index:88;pointer-events:auto}
-.gpstage .dim{position:absolute;inset:0;opacity:0;background:radial-gradient(circle at 50% 56%,rgba(12,30,10,.55),rgba(0,0,0,.88))}
-.gpstage .rays{position:absolute;left:50%;top:56%;width:640px;height:640px;margin:-320px 0 0 -320px;opacity:0;pointer-events:none;
-  background:repeating-conic-gradient(from 0deg,rgba(170,255,140,.2) 0deg 5deg,transparent 5deg 17deg);-webkit-mask:radial-gradient(circle,#000 12%,transparent 60%);mask:radial-gradient(circle,#000 12%,transparent 60%)}
-.gpstage .gname{position:absolute;left:0;top:0;white-space:nowrap;line-height:1.1;transform-origin:0 0;color:#E9CF8E;text-shadow:0 2px 3px rgba(0,0,0,.8);
-  background:linear-gradient(180deg,#f2ffe0 0%,#b6ff7a 22%,#5ad23a 46%,#E9CF8E 54%,#E9CF8E 100%);background-size:100% 260%;background-position:0 100%;-webkit-background-clip:text;background-clip:text}
-.gpstage .gname.soak{color:transparent;animation:gsoak 1.6s ease-out forwards,gwet 2.2s 1.6s ease-in-out infinite;text-shadow:none;
-  filter:drop-shadow(0 0 6px rgba(160,255,120,.9)) drop-shadow(0 0 22px rgba(90,220,70,.7)) drop-shadow(0 2px 2px rgba(0,0,0,.7))}
-@keyframes gsoak{from{background-position:0 100%}to{background-position:0 0}}
-@keyframes gwet{0%,100%{filter:drop-shadow(0 0 6px rgba(160,255,120,.9)) drop-shadow(0 0 22px rgba(90,220,70,.7))}50%{filter:drop-shadow(0 0 10px rgba(200,255,160,1)) drop-shadow(0 0 36px rgba(110,240,80,.85))}}
-.gring{position:fixed;z-index:90;width:260px;height:120px;border-radius:50%;border:2px solid rgba(190,255,150,.9);box-shadow:0 0 18px rgba(140,255,110,.8),inset 0 0 18px rgba(140,255,110,.6);pointer-events:none}
-.gpour{position:fixed;left:0;top:0;z-index:91;pointer-events:none;background-repeat:no-repeat}
-.gstream{position:fixed;z-index:90;width:5px;border-radius:3px;pointer-events:none;transform-origin:50% 0;background:linear-gradient(#b8ff8a,#4ab02a);box-shadow:0 0 8px #8aff60}
-.gdrop{position:fixed;left:0;top:0;z-index:92;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e8ffc8,#4aa02a);box-shadow:0 0 6px #8aff60;pointer-events:none}
-.gdrip{position:fixed;left:0;top:0;z-index:92;width:6px;height:11px;border-radius:50% 50% 50% 50%/40% 40% 60% 60%;background:linear-gradient(#c8ff9a,#3a9020);box-shadow:0 0 5px #8aff60;pointer-events:none;transform-origin:50% 0}
-.gbloom{position:fixed;z-index:89;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(200,255,170,.75),rgba(120,240,100,.35) 30%,rgba(90,200,80,.12) 55%,rgba(60,160,60,0) 72%);mix-blend-mode:screen}
-.gmote2{position:fixed;left:0;top:0;z-index:92;width:5px;height:5px;border-radius:50%;background:#eaffd8;box-shadow:0 0 8px #9aff70,0 0 2px #fff;pointer-events:none}
-#lookBtn.g-imbue{animation:gimbue 3.4s ease-out}
-@keyframes gimbue{0%{text-shadow:none}18%{text-shadow:0 0 10px #d8ffb8,0 0 24px #7aff50,0 0 48px #3ac030;color:#f0ffe0}55%{text-shadow:0 0 8px #b8ff90,0 0 22px #5ad040;color:#e0ffcc}100%{text-shadow:none}}
+.gpstage{position:fixed;inset:0;z-index:88;pointer-events:auto;overflow:hidden}
+.gpstage .dim{position:absolute;inset:0;opacity:0;background:radial-gradient(ellipse 80% 60% at 50% 58%,rgba(14,26,10,.62),rgba(2,4,2,.93))}
+.gpstage canvas{position:absolute;left:0;top:0;pointer-events:none}
+.gpstage .cvg{filter:blur(9px);mix-blend-mode:screen;opacity:0}
+.gpstage .gname{position:absolute;left:0;top:0;white-space:nowrap;line-height:1.1;transform-origin:0 0;color:transparent;
+  background:linear-gradient(180deg,#F8E6A8,#C89640 55%,#F1D58C);-webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.8)) drop-shadow(0 0 10px rgba(240,200,120,.12))}
+.gpstage .gname .bl{display:inline-block;width:0;height:0;vertical-align:baseline}
+.gpstage .gname.imbued{background:linear-gradient(100deg,#F1D58C 0%,#e8ffb8 18%,#C89640 32%,#b8f070 46%,#F8E6A8 60%,#d6ff9a 76%,#C89640 100%);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;animation:gimb 2.4s linear infinite;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.8)) drop-shadow(0 0 8px rgba(170,255,120,.75)) drop-shadow(0 0 26px rgba(90,220,70,.5))}
+@keyframes gimb{from{background-position:0% 0}to{background-position:300% 0}}
+.gpstage .gbot{position:absolute;left:0;top:0;will-change:transform}
+.gpstage .gbot i{position:absolute;inset:0;background-repeat:no-repeat}
+.gpstage .gbot .halo{inset:12%;border-radius:50%;background:radial-gradient(circle,rgba(150,255,120,.28),rgba(90,200,70,.08) 45%,rgba(60,160,50,0) 70%);animation:ghalo 3s ease-in-out infinite}
+.gpstage .gbot .spr{filter:saturate(1.15) contrast(1.08) drop-shadow(0 14px 18px rgba(0,0,0,.55))}
+.gpstage .ring{position:absolute;width:300px;height:130px;margin:-65px 0 0 -150px;border-radius:50%;border:2px solid rgba(210,255,170,.95);pointer-events:none;opacity:0;
+  box-shadow:0 0 22px rgba(150,255,110,.85),inset 0 0 22px rgba(150,255,110,.6)}
+#lookBtn.g-imbue{animation:gimbue 3.6s ease-out}
+@keyframes gimbue{0%{filter:drop-shadow(0 1px 0 rgba(0,0,0,.8)) drop-shadow(0 0 10px rgba(170,255,120,.9)) drop-shadow(0 0 26px rgba(90,220,70,.7))}
+  100%{filter:drop-shadow(0 1px 0 rgba(0,0,0,.8)) drop-shadow(0 0 10px rgba(240,200,120,.12))}}
 @media (prefers-reduced-motion: reduce){.gch .mote,.glair .steam,.glair .smoke,.glair .glow,.glair .fire i b,.glair .spk,.glair .wiz,.glair .drag,.gmyst p,.gfx .rays,.gfx .halo{animation:none}}
 `;
   document.head.appendChild(st);
@@ -172,6 +179,7 @@ function keyLine(g) {
   const b = g.target && S.records.get(g.target);
   const line = g.lines && g.lines[g.target];
   if (line) return { tag: line, read: `Written on the tag in faded ink: “${line}”`, ok: true };
+  if (b && gLineGaveUp(b.id)) { const f = gFallbackLine(b); return { tag: f, read: `Scratched on the tag, its letters all in a jumble: “${f}”`, ok: false }; }
   if (b) return { tag: "…", read: "The ink on the tag is still too faint to read. Give it a moment.", ok: false };
   return { tag: "…", read: "The tag is blank, worn smooth by many hands.", ok: false };
 }
@@ -199,6 +207,7 @@ function spinner(k, scale = 1) {
   else el.innerHTML = `<i class="spr" style="background-image:url(${IMG(`g-${k}-t`)});background-size:${T ? T.cols * 100 : 600}% ${T ? Math.ceil(T.n / T.cols) * 100 : 600}%"></i>${k === "key" ? `<span class="gi-tag"></span>` : ""}${k === "wand" ? `<i class="gi-glow"></i>` : ""}`;
   if (k === "note") { const s = w / w0; el.querySelectorAll(".gnote").forEach(n => { n.style.width = w0 + "px"; n.style.minHeight = h0 + "px"; n.style.transform = `scale(${s})`; n.style.transformOrigin = "0 0"; }); }
   const spr = el.querySelector(".spr"), tag = el.querySelector(".gi-tag"), glow = el.querySelector(".gi-glow"), rot = el.querySelector(".nrot");
+  if (glow) { const gs = Math.max(18, Math.round(46 * scale)); glow.style.width = glow.style.height = gs + "px"; glow.style.margin = `${-gs / 2}px 0 0 ${-gs / 2}px`; }
   const fit = txt => { tag.textContent = txt; tag.classList.toggle("long", txt.length > 70); tag.classList.toggle("vlong", txt.length > 120); };
   if (tag) fit(keyLine(game()).tag);
   let ang = 0, anim = 0;
@@ -290,7 +299,7 @@ async function inspect(k) {
       show(); sp.el.addEventListener("turn", () => rd.classList.toggle("on", sp.facing()));
       const onLines = () => { if (rd.isConnected) show(); else document.removeEventListener("game-lines", onLines); };
       document.addEventListener("game-lines", onLines);
-      if (!keyLine(game()).ok) gLinesFetch(true);
+      if (!keyLine(game()).ok && canAsk()) gLinesFetch(true);
     }
     body.querySelectorAll("[data-spell]").forEach(x => x.onclick = () => { closeSheet(); castSpell(x.dataset.spell); });
     const use = $("#gUse", body); if (use) use.onclick = () => { closeSheet(); pourPotion(); };
@@ -353,8 +362,6 @@ export async function act(what, el) {
 /* the hole behind the handle: the handle swings back up and a key spins out */
 async function takeKey(el) {
   const g = game(); if (g.key || !g.doors) return;
-  const knob = el.parentElement && el.parentElement.querySelector(".g-knob");
-  if (knob) { knob.classList.remove("swing"); knob.classList.add("back"); }
   const cands = gCandidates(), lines = g.lines || {};
   const known = cands.filter(b => lines[b.id]);
   const pool = known.length ? known : cands;
@@ -362,6 +369,8 @@ async function takeKey(el) {
   await saveGame({ target });
   if (target && !(game().lines || {})[target]) gLinesFetch(true);
   await collect("key", el, "A brass key");
+  const knob = document.querySelector(".g-knob");
+  if (knob && !reduce()) { knob.style.animationDelay = ""; knob.classList.remove("swing"); void knob.offsetWidth; knob.classList.add("back"); await wait(800); }
   await saveGame({ key: true, bag: true, items: addItems(game(), "key") });
   render();
 }
@@ -383,24 +392,27 @@ export async function keyhole(bookId, khEl) {
   };
 }
 async function keyTurn(khEl) {
-  await geom();
-  if (reduce() || !khEl) return;
-  const r = khEl.getBoundingClientRect(), sp = spinner("key", 0.42);
-  const k = document.createElement("div"); k.className = "gkey-in"; k.style.width = sp.el.style.width; k.style.height = sp.el.style.height; k.appendChild(sp.el);
+  const G = await geom(), K = G.keyins;
+  if (reduce() || !khEl || !K) return;
+  const r = khEl.getBoundingClientRect(), D = 200, rows = Math.ceil(K.n / K.cols);
+  const hx = r.left + r.width * 0.5, hy = r.top + r.height * 0.4;   // the round of the keyhole
+  const k = document.createElement("div"); k.className = "gkey-in";
+  k.style.cssText = `width:${D}px;height:${D}px;left:${hx - K.hole[0] * D}px;top:${hy - K.hole[1] * D}px;background-image:url(${IMG("g-keyins")});background-size:${K.cols * 100}% ${rows * 100}%`;
   document.body.appendChild(k);
-  const W = parseFloat(sp.el.style.width), H = parseFloat(sp.el.style.height);
-  // the key comes in end-on, its tip to the hole, slides home, turns a quarter, and is gone
-  const x = r.left + r.width / 2 - W * 0.73, y = r.top + r.height * 0.35 - H * 0.37;
-  sp.set(90);
-  await k.animate([{ transform: `translate(${x + 40}px,${y - 60}px) scale(1.4)`, opacity: 0 }, { transform: `translate(${x}px,${y}px) scale(1)`, opacity: 1 }],
-    { duration: 700, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" }).finished;
-  await k.animate([{ transform: `translate(${x}px,${y}px) scale(1)` }, { transform: `translate(${x + W * 0.3}px,${y}px) scale(.8)` }], { duration: 350, easing: "ease-in", fill: "forwards" }).finished;
-  k.style.transformOrigin = `${W * 0.73}px ${H * 0.37}px`;
-  await k.animate([{ transform: `translate(${x + W * 0.3}px,${y}px) scale(.8) rotate(0)` }, { transform: `translate(${x + W * 0.3}px,${y}px) scale(.8) rotate(90deg)` }],
-    { duration: 420, easing: "cubic-bezier(.6,0,.4,1)", fill: "forwards" }).finished;
+  const show = f => { k.style.backgroundPosition = `${(f % K.cols) / (K.cols - 1) * 100}% ${Math.floor(f / K.cols) / Math.max(1, rows - 1) * 100}%`; };
+  const play = (f0, f1, ms) => new Promise(res => { const t0 = performance.now();
+    const step = t => { const p = Math.min(1, (t - t0) / ms); show(Math.round(f0 + (f1 - f0) * p)); if (p < 1) requestAnimationFrame(step); else res(); };
+    requestAnimationFrame(step); });
+  show(0); k.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, fill: "forwards" });
+  await play(0, K.turnFrom - 1, 900);              // in it goes
+  await wait(160);
+  await play(K.turnFrom, K.n - 1, 640);            // and turns
   khEl.classList.add("open");
-  await k.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280, fill: "forwards" }).finished;
-  k.remove(); await wait(200);
+  const glint = document.createElement("i"); glint.className = "gkey-glint"; glint.style.left = hx + "px"; glint.style.top = hy + "px"; document.body.appendChild(glint);
+  glint.animate([{ transform: "translate(-50%,-50%) scale(.2)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.35 }, { transform: "translate(-50%,-50%) scale(1.6)", opacity: 0 }], { duration: 700, easing: "ease-out", fill: "forwards" });
+  await wait(260);
+  await k.animate([{ opacity: 1, filter: "brightness(1)" }, { opacity: 0, filter: "brightness(1.8)" }], { duration: 420, easing: "ease-in", fill: "forwards" }).finished;
+  k.remove(); await wait(300); glint.remove();
 }
 
 /* ---------- the secret chamber inside the book ---------- */
@@ -637,16 +649,21 @@ async function openLair() {
     <button class="gx x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`;
   document.body.appendChild(ov); document.body.classList.add("locked"); requestAnimationFrame(() => ov.classList.add("in"));
   const room = ov.querySelector(".room"), AR = (L.w || 1320) / (L.h || 1720);
-  // the room is a little taller than the screen and a good deal wider; drag to look round it
-  let RH = 0, RW = 0, x = 0, y = 0;
-  const size = () => { RH = Math.max(innerHeight * 1.08, innerWidth / AR); RW = RH * AR; room.style.width = RW + "px"; room.style.height = RH + "px"; };
-  const clamp = () => { x = Math.min(0, Math.max(innerWidth - RW, x)); y = Math.min(0, Math.max(innerHeight - RH, y)); room.style.transform = `translate(${x}px,${y}px)`; };
-  size(); x = innerWidth / 2 - RW * ((wb[0] + wb[2]) / 2); y = (innerHeight - RH) / 2; clamp();
+  // the room fills most of the screen's height, framed by darkness above and below; drag to look a little way to either side
+  let RH = 0, RW = 0, x = 0, y = 0, x0 = 0, reach = 0;
+  const size = () => {
+    RH = Math.max(Math.min(innerHeight * 0.62, innerWidth * 2.2 / AR), innerWidth * 1.12 / AR); RW = RH * AR;
+    room.style.width = RW + "px"; room.style.height = RH + "px";
+    x0 = Math.min(0, Math.max(innerWidth - RW, innerWidth / 2 - RW * ((wb[0] + wb[2]) / 2)));  // Galef in the middle
+    reach = Math.min(innerWidth * 0.42, RW * 0.18); y = Math.max(0, (innerHeight - RH) / 2 - innerHeight * 0.025);
+  };
+  const clamp = () => { x = Math.min(0, Math.max(innerWidth - RW, x0 - reach, Math.min(x0 + reach, x))); room.style.transform = `translate(${x}px,${y}px)`; };
+  size(); x = x0; clamp();
   let drag = null;
   room.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, x0: x, y0: y, moved: 0, id: e.pointerId }; });
   addEventListener("pointermove", function mv(e) { if (!ov.isConnected) return removeEventListener("pointermove", mv);
     if (!drag || e.pointerId !== drag.id) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
-    if (drag.moved > 6) { x = drag.x0 + dx; y = drag.y0 + dy; clamp(); } });
+    if (drag.moved > 6) { x = drag.x0 + dx; clamp(); } });
   addEventListener("pointerup", function upf(e) { if (!ov.isConnected) return removeEventListener("pointerup", upf);
     if (!drag || e.pointerId !== drag.id) return; const tap = drag.moved <= 6, tgt = e.target; drag = null;
     if (tap && tgt && tgt.closest && tgt.closest(".who")) talk(); });
@@ -672,86 +689,244 @@ async function openLair() {
 }
 
 /* ---------- the Dungeon Potion, poured over the name of the study ----------
-   The name lifts off the top bar into the middle of the screen (there's no room to pour above it up there),
-   the potion tips over it, it splashes, drips and glows, and the name settles back into place, changed. */
+   The name lifts off the top bar into the middle of the screen. The bottle (a rendered sequence, its brew keeping level as it
+   tips) drifts in and is uncorked; the brew pours out in a falling stream, splashes on the letters, coats them and runs down
+   them, gathering into drips that fall away. Then the letters drink it in with a pulse of light, and the name goes home. */
 async function pourPotion() {
-  await geom();
-  const t = $("#lookBtn");
-  if (!reduce()) {
-    const r0 = t.getBoundingClientRect(), cs = getComputedStyle(t);
-    const stage = document.createElement("div"); stage.className = "gpstage";
-    stage.innerHTML = `<i class="dim"></i><i class="rays"></i><b class="gname">${esc(t.textContent)}</b>`;
-    document.body.appendChild(stage);
-    const nm = stage.querySelector(".gname"), dim = stage.querySelector(".dim"), rays = stage.querySelector(".rays");
-    nm.style.fontFamily = cs.fontFamily; nm.style.fontWeight = cs.fontWeight; nm.style.letterSpacing = cs.letterSpacing;
-    nm.style.fontSize = Math.min(parseFloat(cs.fontSize) * 2, (innerWidth - 40) / Math.max(1, r0.width) * parseFloat(cs.fontSize)) + "px";
-    const nr0 = nm.getBoundingClientRect();
-    const cx = innerWidth / 2, cy = innerHeight * 0.56, nx = cx - nr0.width / 2, ny = cy - nr0.height / 2;
-    nm.style.left = nx + "px"; nm.style.top = ny + "px";
-    const k = r0.width / nr0.width, back = `translate(${r0.left - nx}px,${r0.top - ny}px) scale(${k})`;
-    t.style.visibility = "hidden";
-    dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, fill: "forwards" });
-    await nm.animate([{ transform: back }, { transform: "none" }], { duration: 900, easing: "cubic-bezier(.3,.7,.2,1)", fill: "forwards" }).finished;
-    const r = nm.getBoundingClientRect();
-    // the bottle: comes in from above, tips over the name
-    const sp = spinner("potion", 0.66), W = parseFloat(sp.el.style.width), H = parseFloat(sp.el.style.height);
-    const p = document.createElement("div"); p.className = "gpour"; p.style.width = W + "px"; p.style.height = H + "px"; p.style.transformOrigin = `${W / 2}px ${H * 0.3}px`; p.appendChild(sp.el);
-    stage.appendChild(p); sp.set(0);
-    const A = -118 * Math.PI / 180, v = [0, H * 0.04 - H * 0.3];          // mouth, relative to the pivot
-    const mo = [v[0] * Math.cos(A) - v[1] * Math.sin(A), v[0] * Math.sin(A) + v[1] * Math.cos(A)];
-    const hit = { x: r.left + r.width * 0.52, y: r.top + r.height * 0.3 }, mouth = { x: hit.x + 26, y: Math.max(H * 0.5, hit.y - 110) };
-    const px = mouth.x - mo[0], py = mouth.y - mo[1], x = px - W / 2, y = py - H * 0.3;
-    let turning = true, last = performance.now();
-    const turn = tt => { if (!turning) return; sp.set(sp.angle + (tt - last) * 0.09); last = tt; requestAnimationFrame(turn); }; requestAnimationFrame(turn);
-    await p.animate([{ transform: `translate(${x + 30}px,${y - 160}px) scale(.6)`, opacity: 0 }, { transform: `translate(${x}px,${y}px) scale(1)`, opacity: 1 }], { duration: 800, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" }).finished;
-    turning = false; await sp.spin(-(sp.angle % 360), 300);    // label to the front as it tips
-    await p.animate([{ transform: `translate(${x}px,${y}px) rotate(0)` }, { transform: `translate(${x}px,${y}px) rotate(-128deg)`, offset: 0.8 }, { transform: `translate(${x}px,${y}px) rotate(-118deg)` }],
-      { duration: 700, easing: "ease-in-out", fill: "forwards" }).finished;
-    // the stream
-    const st = document.createElement("i"); st.className = "gstream"; stage.appendChild(st);
-    st.style.left = mouth.x - 3 + "px"; st.style.top = mouth.y + "px"; st.style.height = Math.hypot(hit.x - mouth.x, hit.y - mouth.y) + "px";
-    st.style.transform = `rotate(${(Math.atan2(hit.x - mouth.x, hit.y - mouth.y) * -180 / Math.PI).toFixed(1)}deg)`;
-    await st.animate([{ clipPath: "inset(0 0 100% 0)" }, { clipPath: "inset(0 0 0 0)" }], { duration: 240, easing: "ease-in", fill: "forwards" }).finished;
-    // it lands: the name is soaked from the top down, light bursts out, drops leap, drips run off the letters
-    nm.classList.add("soak");
-    rays.animate([{ opacity: 0, transform: "scale(.6) rotate(0)" }, { opacity: 1, transform: "scale(1) rotate(30deg)", offset: 0.35 }, { opacity: 0, transform: "scale(1.25) rotate(80deg)" }], { duration: 3600, easing: "ease-out", fill: "forwards" });
-    const bloom = document.createElement("i"); bloom.className = "gbloom"; stage.appendChild(bloom);
-    const bw = Math.max(r.width * 1.9, 320); bloom.style.width = bw + "px"; bloom.style.height = bw * 0.8 + "px"; bloom.style.left = r.left + r.width / 2 - bw / 2 + "px"; bloom.style.top = r.top + r.height / 2 - bw * 0.4 + "px";
-    bloom.animate([{ transform: "scale(.15)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.25 }, { transform: "scale(1.08)", opacity: 0.9, offset: 0.7 }, { transform: "scale(1.3)", opacity: 0 }], { duration: 3800, easing: "ease-out", fill: "forwards" });
-    const ring = document.createElement("i"); ring.className = "gring"; stage.appendChild(ring); ring.style.left = hit.x + "px"; ring.style.top = hit.y + "px";
-    ring.animate([{ transform: "translate(-50%,-50%) scale(.1)", opacity: 1 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 0 }], { duration: 1100, easing: "cubic-bezier(.1,.7,.3,1)", fill: "forwards" });
-    const fly = (cls, x0, y0, kf, o) => { const d = document.createElement("i"); d.className = cls; stage.appendChild(d);
-      d.animate(kf.map(q => ({ ...q, transform: `translate(${x0 + (q.dx || 0)}px,${y0 + (q.dy || 0)}px) ${q.s || ""}` })), { ...o, fill: "both" }).finished.then(() => d.remove()); };
-    for (let i = 0; i < 26; i++) {   // the splash: droplets leaping off the letters in arcs
-      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, vv = 40 + Math.random() * 80;
-      fly("gdrop", hit.x - 4 + (Math.random() - 0.5) * 40, hit.y - 4,
-        [{ dx: 0, dy: 0, opacity: 1 }, { dx: Math.cos(a) * vv, dy: Math.sin(a) * vv, opacity: 1, offset: 0.4 }, { dx: Math.cos(a) * vv * 1.6, dy: Math.sin(a) * vv * 0.4 + 90, opacity: 0, s: "scale(.5)" }],
-        { duration: 800 + Math.random() * 400, delay: Math.random() * 900, easing: "cubic-bezier(.2,.6,.6,1)", fill: "forwards" });
-    }
-    for (let i = 0; i < 14; i++) {   // drips gather along the bottom of the letters, stretch, and fall
-      const dx = r.left + r.width * (0.06 + 0.88 * Math.random()), dy = r.top + r.height * (0.72 + Math.random() * 0.1);
-      fly("gdrip", dx, dy, [{ dx: 0, dy: 0, opacity: 0, s: "scale(.6,.3)" }, { dx: 0, dy: 2, opacity: 1, s: "scale(1,1)", offset: 0.3 }, { dx: 0, dy: 7, opacity: 1, s: "scale(.8,2)", offset: 0.55 },
-        { dx: 0, dy: 140 + Math.random() * 80, opacity: 0, s: "scale(.7,1.4)" }],
-        { duration: 1700 + Math.random() * 800, delay: 400 + Math.random() * 1900, easing: "cubic-bezier(.6,0,.9,.5)", fill: "forwards" });
-    }
-    for (let i = 0; i < 34; i++) {  // and green light swirling up off the name
-      const x0 = r.left + r.width * Math.random(), y0 = r.top + r.height * (0.2 + Math.random() * 0.6), a = Math.random() * Math.PI * 2;
-      fly("gmote2", x0, y0, [{ dx: 0, dy: 0, opacity: 0, s: "scale(.4)" }, { dx: Math.cos(a) * 18, dy: -16, opacity: 1, s: "scale(1.2)", offset: 0.3 }, { dx: Math.cos(a + 2) * 34, dy: -70 - Math.random() * 60, opacity: 0, s: "scale(.4)" }],
-        { duration: 1700 + Math.random() * 1000, delay: 300 + Math.random() * 2200, easing: "ease-out", fill: "forwards" });
-    }
-    await wait(1300);
-    st.animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(100% 0 0 0)" }], { duration: 280, easing: "ease-out", fill: "forwards" }).finished.then(() => st.remove());
-    p.animate([{ opacity: 1, transform: `translate(${x}px,${y}px) rotate(-118deg)` }, { opacity: 0, transform: `translate(${x + 20}px,${y - 60}px) rotate(-40deg) scale(.7)` }], { duration: 700, easing: "ease-in", fill: "forwards" });
-    await wait(1900);
-    // the name settles back where it belongs, still glowing
-    dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, delay: 200, fill: "forwards" });
-    await nm.animate([{ transform: "none" }, { transform: back }], { duration: 900, easing: "cubic-bezier(.5,0,.3,1)", fill: "forwards" }).finished;
-    t.style.visibility = ""; t.classList.remove("g-imbue"); void t.offsetWidth; t.classList.add("g-imbue");
-    stage.remove();
-  }
+  const G = await geom();
+  if (!reduce() && G.pour) { try { await pourShow($("#lookBtn"), G.pour); } catch (e) { console.warn(e); document.querySelectorAll(".gpstage").forEach(x => x.remove()); $("#lookBtn").style.visibility = ""; } }
   const g = game();
   await saveGame({ potionUsed: true, won: [...new Set([...(g.won || []), "classic"])], items: dropItems(g, "potion") });
   await mystery("The Study shimmers, and its stones remember an older age. Tap its name to step into the dungeon.");
+}
+function pourShow(t, P) {
+  return new Promise(async done => {
+    const VW = innerWidth, VH = innerHeight, DPR = Math.min(2, devicePixelRatio || 1);
+    const r0 = t.getBoundingClientRect(), cs = getComputedStyle(t), fs0 = parseFloat(cs.fontSize);
+    const st = document.createElement("div"); st.className = "gpstage";
+    st.innerHTML = `<i class="dim"></i><b class="gname">${esc(t.textContent)}<i class="bl"></i></b><canvas class="cvg"></canvas><canvas class="cv"></canvas>
+      <div class="gbot"><i class="halo"></i><i class="spr"></i><i class="cork"></i></div><i class="ring"></i>`;
+    document.body.appendChild(st);
+    const nm = st.querySelector(".gname"), dim = st.querySelector(".dim"), cv = st.querySelector(".cv"), cvg = st.querySelector(".cvg");
+    const bot = st.querySelector(".gbot"), spr = bot.querySelector(".spr"), cork = bot.querySelector(".cork"), ring = st.querySelector(".ring");
+    const F = Math.min(fs0 * 2.15, (VW - 36) / Math.max(1, r0.width) * fs0);
+    Object.assign(nm.style, { fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, fontSize: F + "px", letterSpacing: cs.letterSpacing === "normal" ? "normal" : parseFloat(cs.letterSpacing) * F / fs0 + "px" });
+    const nr0 = nm.getBoundingClientRect(), nx = VW / 2 - nr0.width / 2, ny = VH * 0.6 - nr0.height / 2;
+    nm.style.left = nx + "px"; nm.style.top = ny + "px";
+    const back = `translate(${r0.left - nx}px,${r0.top - ny}px) scale(${r0.width / nr0.width})`;
+    for (const c of [cv, cvg]) { c.width = VW * DPR; c.height = VH * DPR; c.style.width = VW + "px"; c.style.height = VH + "px"; }
+    const ctx = cv.getContext("2d"), gtx = cvg.getContext("2d"); ctx.scale(DPR, DPR); gtx.scale(DPR, DPR);
+    t.style.visibility = "hidden";
+    dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, fill: "forwards" });
+    nm.animate([{ transform: back }, { transform: "none" }], { duration: 950, easing: "cubic-bezier(.3,.7,.2,1)", fill: "forwards" });
+
+    // ---- the letters' shape, measured once: where the tops are (for the stream to land on) and where drips can hang from
+    const pad = 14, nb = { x: nx - pad, y: ny - pad, w: Math.ceil(nr0.width + pad * 2), h: Math.ceil(nr0.height + pad * 2 + 6) };
+    await wait(960);
+    const bl = nm.querySelector(".bl").getBoundingClientRect().top;
+    const mk = (w, h) => { const c = document.createElement("canvas"); c.width = Math.ceil(w * DPR); c.height = Math.ceil(h * DPR); const x = c.getContext("2d"); x.scale(DPR, DPR); return [c, x]; };
+    const [M, mx] = mk(nb.w, nb.h), [C, cx] = mk(nb.w, nb.h), [X, xx] = mk(nb.w, nb.h);
+    mx.font = `${cs.fontWeight} ${F}px ${cs.fontFamily}`; try { mx.letterSpacing = nm.style.letterSpacing; } catch (_) {}
+    mx.textBaseline = "alphabetic"; mx.fillStyle = "#fff"; mx.fillText(t.textContent, nx - nb.x, bl - nb.y);
+    const md = mx.getImageData(0, 0, M.width, M.height).data, MW = M.width, MH = M.height;
+    const ink = (x, y) => { const X_ = Math.round(x * DPR), Y_ = Math.round(y * DPR); return X_ >= 0 && Y_ >= 0 && X_ < MW && Y_ < MH && md[(Y_ * MW + X_) * 4 + 3] > 110; };
+    const top = new Array(nb.w).fill(null);
+    for (let x = 0; x < nb.w; x++) for (let y = 0; y < nb.h; y++) if (ink(x, y)) { top[x] = y; break; }
+    const xs = top.map((v, i) => v == null ? null : i).filter(v => v != null), mid = xs[Math.floor(xs.length * 0.42)] || nb.w / 2;
+
+    // ---- the bottle: placed so its mouth, mid-pour, is up and to the right of the middle of the name
+    const D = Math.min(230, VW * 0.56), PF = P.pour.findIndex(Boolean), FM = Math.min(P.n - 1, PF + 5);
+    const ax = P.axis[FM], spd0 = 95, g = 1500, fallH = 150;
+    const tf = (-ax[1] * spd0 + Math.sqrt(Math.pow(ax[1] * spd0, 2) + 2 * g * fallH)) / g;
+    const mouthAt = { x: nb.x + mid - ax[0] * spd0 * tf, y: nb.y + top[Math.round(mid)] - fallH };
+    const bx = mouthAt.x - P.mouth[FM][0] * D, by = mouthAt.y - P.mouth[FM][1] * D;
+    const rows = Math.ceil(P.n / P.cols);
+    Object.assign(bot.style, { width: D + "px", height: D + "px" });
+    spr.style.backgroundImage = `url(${IMG("g-pour")})`; spr.style.backgroundSize = `${P.cols * 100}% ${rows * 100}%`;
+    cork.style.backgroundImage = `url(${IMG("g-pour-cork")})`; cork.style.backgroundSize = "100% 100%";
+    cork.style.transformOrigin = `${P.mouth[0][0] * 100}% ${P.mouth[0][1] * 100}%`;
+    let frame = -1; const showF = f => { f = Math.max(0, Math.min(P.n - 1, f)); if (f === frame) return; frame = f; spr.style.backgroundPosition = `${(f % P.cols) / (P.cols - 1) * 100}% ${Math.floor(f / P.cols) / Math.max(1, rows - 1) * 100}%`; };
+    showF(0);
+    let bobX = 0, bobY = 0, botOp = 0;
+    const placeBot = () => { bot.style.transform = `translate(${bx + bobX}px,${by + bobY}px)`; bot.style.opacity = botOp; };
+    // the mouth and the neck's direction, followed smoothly between the rendered frames so the stream doesn't jitter
+    let fpos = 0;
+    const lerp = (A, k) => { const i = Math.max(0, Math.min(P.n - 2, Math.floor(k))), u = Math.max(0, Math.min(1, k - i)); return [A[i][0] + (A[i + 1][0] - A[i][0]) * u, A[i][1] + (A[i + 1][1] - A[i][1]) * u]; };
+    const mouth = () => { const m = lerp(P.mouth, fpos); return { x: bx + bobX + m[0] * D, y: by + bobY + m[1] * D }; };
+
+    // ---- the simulation
+    const stream = [], drops = [], drips = [], runners = [], wisps = [], sparks = [];
+    let sid = 0, coatAmt = 0, coatFade = 1, glowK = 0, sweep = -1, flow = 0, lastHit = null, popped = false;
+    const R = (a, b) => a + Math.random() * (b - a);
+    const blob = (x, y, r, a = 0.9) => { const gr = cx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(120,230,80,${a})`); gr.addColorStop(0.6, `rgba(90,200,60,${a * 0.8})`); gr.addColorStop(1, "rgba(70,170,50,0)"); cx.fillStyle = gr; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill(); };
+    const isBottom = (x, y) => ink(x, y) && !ink(x, y + 1.5) && !ink(x, y + 3);
+    const impact = (x, y, w) => {
+      const lx = x - nb.x, ly = y - nb.y; lastHit = { x: lx, y: ly }; coatAmt += w * 0.6;
+      blob(lx + R(-2, 2), ly + R(0, 3), R(4, 7) + w * 0.6);
+      if (Math.random() < 0.55) for (let k = 0, n = 1 + (Math.random() < 0.4); k < n; k++)
+        drops.push({ x, y: y - 1, vx: R(-150, 150), vy: R(-260, -90), r: R(1.1, 2.4), life: 0 });
+      if (Math.random() < 0.22) runners.push({ x: lx + R(-6, 6), y: ly + 2, v: R(18, 34), r: R(2.2, 3.6) });
+    };
+    const spawnDrip = (lx, ly) => { if (drips.some(d => Math.abs(d.x - lx) < 5 && d.state === 0)) return;
+      drips.push({ x: lx, y0: ly, L: 0, r: 0.8, rMax: R(2.3, 3.6), state: 0, grow: R(9, 16), vy: 0, y: 0, neck: 1 }); };
+
+    const T0 = performance.now(); let last = T0, raf = 0;
+    const Tin = 900, Tpop = 2350, Ttilt0 = 2950, Ttilt1 = 4250, Tstop = 6500, Tleave = 6900, Tglow = 5200, Tsweep = 8500, Tabsorb = 8700, Tend = 9700;
+    const easeIO = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    const step = now => {
+      const T = now - T0, dt = Math.min(0.033, (now - last) / 1000); last = now;
+      // bottle: drifts in, bobs, is uncorked, tips, pours, then rises away
+      if (T < Tin) { botOp = 0; } else if (T < Tin + 800) { const p = ease((T - Tin) / 800); botOp = p; bobY = (1 - p) * -90; bobX = (1 - p) * 30; }
+      else if (T < Tleave) { botOp = 1; const k = T < Ttilt0 ? 1 : 0.25; bobY = Math.sin(T / 520) * 3 * k; bobX = Math.sin(T / 830) * 1.5 * k; }
+      else { const p = Math.min(1, (T - Tleave) / 900); botOp = 1 - p; bobY = -80 * p * p; bobX = 40 * p * p; }
+      placeBot();
+      if (!popped && T > Tpop - 450) {   // a wiggle, then pop
+        const w = (T - (Tpop - 450)) / 450; cork.style.transform = `rotate(${Math.sin(w * Math.PI * 6) * 7 * (1 - w * 0.3)}deg)`;
+      }
+      if (!popped && T > Tpop) {
+        popped = true; const m = mouth();
+        cork.animate([{ transform: "translate(0,0) rotate(0)", opacity: 1 }, { transform: "translate(26px,-120px) rotate(260deg)", opacity: 1, offset: 0.45 }, { transform: "translate(70px,40px) rotate(620deg)", opacity: 0 }],
+          { duration: 1100, easing: "cubic-bezier(.15,.6,.5,1)", fill: "forwards" });
+        for (let k = 0; k < 9; k++) wisps.push({ x: m.x + R(-3, 3), y: m.y, vx: R(-14, 14), vy: R(-50, -24), r: R(5, 10), a: R(0.25, 0.45), life: 0, max: R(1.1, 1.9) });
+        for (let k = 0; k < 7; k++) sparks.push({ x: m.x + R(-10, 10), y: m.y + R(-16, 4), life: 0, max: R(0.5, 0.9), s: R(3, 6) });
+      }
+      if (T > Ttilt0) { fpos = easeIO(Math.min(1, (T - Ttilt0) / (Ttilt1 - Ttilt0))) * (P.n - 1); showF(Math.round(fpos)); }
+      // the stream: how hard it runs follows whether the brew has reached the mouth, easing in and out
+      const pouring = fpos >= PF && T < Tstop;
+      flow += ((pouring ? 1 : 0) - flow) * Math.min(1, dt * (pouring ? 7 : 5));
+      if (flow > 0.04 && T < Tstop + 600) {
+        const m = mouth(), a = lerp(P.axis, fpos), sp = spd0 * (0.55 + 0.45 * flow);
+        stream.push({ id: sid++, x: m.x + a[0] * 2, y: m.y + a[1] * 2, vx: a[0] * sp + R(-4, 4), vy: a[1] * sp, w: 2.4 + 6.4 * flow, age: 0 });
+      }
+      for (const p of stream) {
+        p.vy += g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.age += dt;
+        const lx = Math.round(p.x - nb.x);
+        if (lx >= 0 && lx < nb.w && top[lx] != null && p.y >= nb.y + top[lx]) { p.dead = true; impact(p.x, nb.y + top[lx], p.w); }
+        else if (p.y > VH + 30) p.dead = true;
+      }
+      for (let i = stream.length - 1; i >= 0; i--) if (stream[i].dead) stream.splice(i, 1);
+      // splashes: drops arc out and fall back; one landing on a letter wets it
+      for (const d of drops) {
+        d.vy += g * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.life += dt;
+        if (d.vy > 0 && ink(d.x - nb.x, d.y - nb.y)) { d.dead = true; blob(d.x - nb.x, d.y - nb.y, d.r * 2.2, 0.8); coatAmt += 0.3; }
+        if (d.y > VH + 20) d.dead = true;
+      }
+      for (let i = drops.length - 1; i >= 0; i--) if (drops[i].dead) drops.splice(i, 1);
+      // the coat spreads from where it lands, and runs down the strokes of the letters
+      if (lastHit && coatAmt > 0) {
+        const n = Math.min(10, 2 + coatAmt * 0.05), Rr = 8 + Math.sqrt(coatAmt) * 4.2;
+        for (let k = 0; k < n; k++) { const ang = R(0, Math.PI * 2), rr = Math.sqrt(Math.random()) * Rr;
+          const x = lastHit.x + Math.cos(ang) * rr * 1.5, y = lastHit.y + Math.abs(Math.sin(ang)) * rr * 0.9; if (ink(x, y)) blob(x, y, R(3, 6.5), 0.75); }
+        if (flow > 0.3 && Math.random() < 0.5) { const ang = R(0, Math.PI * 2), rr = R(0, Rr * 1.2); runners.push({ x: lastHit.x + Math.cos(ang) * rr * 1.4, y: lastHit.y + R(0, 6), v: R(16, 32), r: R(2, 3.4) }); }
+      }
+      // once it glows, the brew's light creeps out along the whole name from where it landed
+      if (glowK > 0 && lastHit && T < Tabsorb) {
+        const reachX = (T - Tglow) / 1000 * 150;
+        for (let k = 0; k < 14; k++) { const side = Math.random() < 0.5 ? -1 : 1, x = lastHit.x + side * R(0, reachX), y = R(0, nb.h);
+          if (ink(x, y)) blob(x, y, R(3, 6), 0.55); }
+      }
+      for (const u of runners) {
+        if (!ink(u.x, u.y)) { u.dead = true; continue; }
+        u.y += u.v * dt; u.x += Math.sin(u.y * 0.5) * 0.15; blob(u.x, u.y, u.r, 0.7);
+        if (isBottom(u.x, u.y)) { u.dead = true; spawnDrip(u.x, u.y + 0.5); }
+      }
+      for (let i = runners.length - 1; i >= 0; i--) if (runners[i].dead) runners.splice(i, 1);
+      // drips: swell under the letter, stretch on a thinning neck, let go and fall
+      for (const d of drips) {
+        if (d.state === 0) { d.r = Math.min(d.rMax, d.r + dt * 2.4); d.L += dt * (2 + d.L * 0.9) * (d.r / d.rMax) * 4; if (d.L > d.grow) { d.state = 1; d.y = d.y0 + d.L; d.vy = 30; } }
+        else { d.vy += g * dt; d.y += d.vy * dt; d.neck = Math.max(0, d.neck - dt * 5); if (d.y + nb.y > VH + 20) d.dead = true; }
+      }
+      for (let i = drips.length - 1; i >= 0; i--) if (drips[i].dead) drips.splice(i, 1);
+      // later, the brew glows; wisps of green rise off it and sparks wink
+      if (T > Tglow) glowK = Math.min(1, (T - Tglow) / 1800);
+      if (glowK > 0 && T < Tabsorb + 600 && Math.random() < 0.35 * glowK) {
+        const x = R(xs[0] || 0, xs[xs.length - 1] || nb.w); if (top[Math.round(x)] != null) wisps.push({ x: nb.x + x, y: nb.y + top[Math.round(x)] + R(0, 10), vx: R(-8, 8), vy: R(-38, -18), r: R(6, 14), a: R(0.1, 0.22) * glowK, life: 0, max: R(1.6, 2.8) });
+      }
+      if (glowK > 0 && Math.random() < 0.25 * glowK) { const x = R(xs[0] || 0, xs[xs.length - 1] || nb.w); sparks.push({ x: nb.x + x, y: nb.y + R(0, nb.h * 0.8), life: 0, max: R(0.5, 1.1), s: R(2.5, 6) }); }
+      for (const w of wisps) { w.life += dt; w.x += (w.vx + Math.sin(w.life * 3 + w.r) * 9) * dt; w.y += w.vy * dt; w.r += dt * 7; }
+      for (let i = wisps.length - 1; i >= 0; i--) if (wisps[i].life > wisps[i].max) wisps.splice(i, 1);
+      for (const k of sparks) k.life += dt;
+      for (let i = sparks.length - 1; i >= 0; i--) if (sparks[i].life > sparks[i].max) sparks.splice(i, 1);
+      if (T > Tsweep && sweep < 0) sweep = 0; if (sweep >= 0) sweep += dt / 0.75;
+      if (T > Tabsorb) coatFade = Math.max(0, 1 - (T - Tabsorb) / 900);
+      if (T > Tabsorb && !nm.classList.contains("imbued")) {   // the moment it's drunk in: a ring of light, and the letters take on the brew's sheen
+        nm.classList.add("imbued"); ring.style.left = nb.x + nb.w / 2 + "px"; ring.style.top = nb.y + nb.h * 0.5 + "px";
+        ring.animate([{ transform: "scale(.2)", opacity: 1 }, { transform: "scale(1.5)", opacity: 0 }], { duration: 1100, easing: "cubic-bezier(.1,.7,.3,1)", fill: "forwards" });
+      }
+
+      // ---- draw
+      ctx.clearRect(0, 0, VW, VH);
+      // the coat on the letters: lit from above, glossy, with a sheen that slides across
+      xx.setTransform(1, 0, 0, 1, 0, 0); xx.clearRect(0, 0, X.width, X.height); xx.globalCompositeOperation = "source-over";
+      xx.drawImage(C, 0, 0); xx.globalCompositeOperation = "destination-in"; xx.drawImage(M, 0, 0); xx.globalCompositeOperation = "source-atop"; xx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      const tb = bl - nb.y, gy = xx.createLinearGradient(0, tb - F * 0.75, 0, tb + F * 0.12);
+      gy.addColorStop(0, "#d8ffb0"); gy.addColorStop(0.3, "#86ea56"); gy.addColorStop(0.75, "#3fae2c"); gy.addColorStop(1, "#1f6e18");
+      xx.fillStyle = gy; xx.fillRect(0, 0, nb.w, nb.h);
+      const shx = ((T / 1400) % 1.6 - 0.3) * nb.w, sh = xx.createLinearGradient(shx - 30, 0, shx + 30, nb.h * 0.6);
+      sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.5, "rgba(245,255,230,.55)"); sh.addColorStop(1, "rgba(255,255,255,0)"); xx.fillStyle = sh; xx.fillRect(0, 0, nb.w, nb.h);
+      if (sweep >= 0 && sweep < 1.3) { const sx = (sweep - 0.15) * nb.w * 1.1, sg = xx.createLinearGradient(sx - 40, 0, sx + 40, 0);
+        sg.addColorStop(0, "rgba(255,255,240,0)"); sg.addColorStop(0.5, "rgba(255,255,240,1)"); sg.addColorStop(1, "rgba(255,255,240,0)"); xx.fillStyle = sg; xx.fillRect(0, 0, nb.w, nb.h); }
+      xx.globalCompositeOperation = "source-over";
+      ctx.save(); ctx.globalAlpha = coatFade; ctx.shadowColor = `rgba(130,255,100,${0.5 + 0.4 * glowK})`; ctx.shadowBlur = 6 + 14 * glowK; ctx.drawImage(X, nb.x, nb.y, nb.w, nb.h); ctx.restore();
+      // the stream
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      const passes = [[1.25, "#2b7f1c", 12, "rgba(120,255,90,.75)"], [0.72, "#79e651", 0, null], [0.22, "rgba(236,255,220,.9)", 0, null]];
+      for (const [k, col, blur, sc] of passes) {
+        ctx.strokeStyle = col; ctx.shadowBlur = blur; ctx.shadowColor = sc || "transparent";
+        for (let i = 1; i < stream.length - 1; i++) { const a = stream[i - 1], b = stream[i], c = stream[i + 1]; if (b.id !== a.id + 1 || c.id !== b.id + 1) continue;
+          const wob = q => Math.sin(q.age * 30 + T / 110) * 0.35, off = k < 0.3 ? -b.w * 0.16 : 0;
+          const ax_ = (a.x + b.x) / 2 + off + wob(a), ay_ = (a.y + b.y) / 2, cx_ = (b.x + c.x) / 2 + off + wob(c), cy_ = (b.y + c.y) / 2;
+          ctx.lineWidth = Math.max(0.6, b.w * k / Math.sqrt(1 + b.age * 2.2));
+          ctx.beginPath(); ctx.moveTo(ax_, ay_); ctx.quadraticCurveTo(b.x + off + wob(b), b.y, cx_, cy_); ctx.stroke(); }
+      }
+      ctx.restore();
+      // splash drops, drips
+      const drop = (x, y, r, sx, sy, ang) => { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(sx, sy);
+        const gr = ctx.createRadialGradient(-r * 0.3, -r * 0.35, 0, 0, 0, r); gr.addColorStop(0, "#f2ffe0"); gr.addColorStop(0.35, "#8ef062"); gr.addColorStop(1, "#2f8a1e");
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); ctx.restore(); };
+      ctx.save(); ctx.shadowColor = "rgba(130,255,100,.8)"; ctx.shadowBlur = 6;
+      for (const d of drops) { const sp = Math.hypot(d.vx, d.vy); drop(d.x, d.y, d.r, 1, 1 + Math.min(1.4, sp / 400), Math.atan2(d.vy, d.vx) - Math.PI / 2); }
+      for (const d of drips) {
+        const x = nb.x + d.x, y0 = nb.y + d.y0;
+        if (d.state === 0) {      // hanging: neck from the letter down to the swelling bulb
+          const y = y0 + d.L, nw = 1.2 + d.r * 0.25;
+          const gr = ctx.createLinearGradient(x - d.r, 0, x + d.r, 0); gr.addColorStop(0, "#2f8a1e"); gr.addColorStop(0.45, "#8ef062"); gr.addColorStop(1, "#2f8a1e");
+          ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x - nw - 1, y0 - 1); ctx.quadraticCurveTo(x - nw * 0.6, y - d.r * 0.6, x - d.r, y);
+          ctx.arc(x, y, d.r, Math.PI, 0, true); ctx.quadraticCurveTo(x + nw * 0.6, y - d.r * 0.6, x + nw + 1, y0 - 1); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = "rgba(245,255,235,.85)"; ctx.beginPath(); ctx.arc(x - d.r * 0.35, y - d.r * 0.2, d.r * 0.28, 0, 7); ctx.fill();
+        } else {
+          if (d.neck > 0) { ctx.strokeStyle = `rgba(110,220,70,${d.neck})`; ctx.lineWidth = 1.2 * d.neck; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + 3 + (1 - d.neck) * 2); ctx.stroke(); }
+          drop(x, nb.y + d.y, d.rMax, 1, 1 + Math.min(1.2, d.vy / 600), 0);
+        }
+      }
+      ctx.restore();
+      // sparks
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (const k of sparks) { const a = Math.sin(Math.PI * k.life / k.max), sz = k.s * (0.6 + 0.4 * a);
+        ctx.fillStyle = `rgba(230,255,200,${a})`; ctx.beginPath();
+        ctx.moveTo(k.x, k.y - sz); ctx.quadraticCurveTo(k.x, k.y, k.x + sz, k.y); ctx.quadraticCurveTo(k.x, k.y, k.x, k.y + sz); ctx.quadraticCurveTo(k.x, k.y, k.x - sz, k.y); ctx.quadraticCurveTo(k.x, k.y, k.x, k.y - sz); ctx.fill(); }
+      ctx.restore();
+      // the glow layer: a blurred copy of everything, plus the rising wisps
+      gtx.clearRect(0, 0, VW, VH); gtx.drawImage(cv, 0, 0, VW, VH);
+      gtx.save(); gtx.globalCompositeOperation = "lighter";
+      for (const w of wisps) { const a = w.a * Math.sin(Math.PI * Math.min(1, w.life / w.max)); const gr = gtx.createRadialGradient(w.x, w.y, 0, w.x, w.y, w.r);
+        gr.addColorStop(0, `rgba(170,255,140,${a})`); gr.addColorStop(1, "rgba(90,200,70,0)"); gtx.fillStyle = gr; gtx.beginPath(); gtx.arc(w.x, w.y, w.r, 0, 7); gtx.fill(); }
+      gtx.restore();
+      cvg.style.opacity = Math.min(1, 0.45 + 0.5 * glowK * (0.8 + 0.2 * Math.sin(T / 260))) * (T < Tabsorb ? 1 : coatFade * 0.6 + 0.4);
+
+      if (T < Tend) raf = requestAnimationFrame(step); else finish();
+    };
+    raf = requestAnimationFrame(step);
+    // the moment it's drunk in: a ring of light and the letters take on the brew's sheen
+    async function finish() {
+      cancelAnimationFrame(raf);
+      dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, delay: 150, fill: "forwards" });
+      cv.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: "forwards" }); cvg.animate([{ opacity: cvg.style.opacity }, { opacity: 0 }], { duration: 500, fill: "forwards" });
+      await nm.animate([{ transform: "none" }, { transform: back }], { duration: 950, easing: "cubic-bezier(.5,0,.3,1)", fill: "forwards" }).finished;
+      t.style.visibility = ""; t.classList.remove("g-imbue"); void t.offsetWidth; t.classList.add("g-imbue");
+      st.remove(); done();
+    }
+  });
 }
 
 /* ---------- testing: jump straight to a step ---------- */
