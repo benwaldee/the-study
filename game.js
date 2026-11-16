@@ -736,7 +736,7 @@ function pourShow(t, P) {
     const xs = top.map((v, i) => v == null ? null : i).filter(v => v != null), mid = xs[Math.floor(xs.length * 0.42)] || nb.w / 2;
 
     // ---- the bottle: placed so its mouth, mid-pour, is up and to the right of the middle of the name
-    const D = Math.min(230, VW * 0.56), PF = P.pour.findIndex(Boolean), FM = Math.min(P.n - 1, PF + 5);
+    const D = Math.min(230, VW * 0.56), PF = P.pour.findIndex(Boolean), FM = Math.min(P.n - 1, Math.round((PF + P.n - 1) / 2));
     const ax = P.axis[FM], spd0 = 95, g = 1500, fallH = 150;
     const tf = (-ax[1] * spd0 + Math.sqrt(Math.pow(ax[1] * spd0, 2) + 2 * g * fallH)) / g;
     const mouthAt = { x: nb.x + mid - ax[0] * spd0 * tf, y: nb.y + top[Math.round(mid)] - fallH };
@@ -772,7 +772,7 @@ function pourShow(t, P) {
       drips.push({ x: lx, y0: ly, L: 0, r: 0.8, rMax: R(2.3, 3.6), state: 0, grow: R(9, 16), vy: 0, y: 0, neck: 1 }); };
 
     const T0 = performance.now(); let last = T0, raf = 0;
-    const Tin = 900, Tpop = 2350, Ttilt0 = 2950, Ttilt1 = 4250, Tstop = 6500, Tleave = 6900, Tglow = 5200, Tsweep = 8500, Tabsorb = 8700, Tend = 9700;
+    const Tin = 900, Tpop = 2350, Ttilt0 = 2950, Ttilt1 = 3850, Tstop = 6700, Tleave = 7000, Tglow = 5200, Tsweep = 8500, Tabsorb = 8700, Tend = 9700;
     const easeIO = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
     const step = now => {
       const T = now - T0, dt = Math.min(0.033, (now - last) / 1000); last = now;
@@ -791,13 +791,17 @@ function pourShow(t, P) {
         for (let k = 0; k < 9; k++) wisps.push({ x: m.x + R(-3, 3), y: m.y, vx: R(-14, 14), vy: R(-50, -24), r: R(5, 10), a: R(0.25, 0.45), life: 0, max: R(1.1, 1.9) });
         for (let k = 0; k < 7; k++) sparks.push({ x: m.x + R(-10, 10), y: m.y + R(-16, 4), life: 0, max: R(0.5, 0.9), s: R(3, 6) });
       }
-      if (T > Ttilt0) { fpos = easeIO(Math.min(1, (T - Ttilt0) / (Ttilt1 - Ttilt0))) * (P.n - 1); showF(Math.round(fpos)); }
+      // the frames are a timeline: tipping until the brew reaches the mouth, then draining steadily while it pours
+      let drain = 0;
+      if (T > Ttilt0 && T <= Ttilt1) fpos = easeIO((T - Ttilt0) / (Ttilt1 - Ttilt0)) * (PF - 1);
+      else if (T > Ttilt1) { drain = Math.min(1, (T - Ttilt1) / (Tstop - Ttilt1)); fpos = PF - 1 + drain * (P.n - PF); }
+      if (T > Ttilt0) showF(Math.round(fpos));
       // the stream: how hard it runs follows whether the brew has reached the mouth, easing in and out
-      const pouring = fpos >= PF && T < Tstop;
+      const pouring = fpos >= PF - 0.5 && T < Tstop;
       flow += ((pouring ? 1 : 0) - flow) * Math.min(1, dt * (pouring ? 7 : 5));
       if (flow > 0.04 && T < Tstop + 600) {
         const m = mouth(), a = lerp(P.axis, fpos), sp = spd0 * (0.55 + 0.45 * flow);
-        stream.push({ id: sid++, x: m.x + a[0] * 2, y: m.y + a[1] * 2, vx: a[0] * sp + R(-4, 4), vy: a[1] * sp, w: 2.4 + 6.4 * flow, age: 0 });
+        stream.push({ id: sid++, x: m.x + a[0] * 2, y: m.y + a[1] * 2, vx: a[0] * sp + R(-4, 4), vy: a[1] * sp, w: (2.4 + 6.4 * flow) * (1 - 0.5 * drain), age: 0 });   // the stream thins as the bottle empties
       }
       for (const p of stream) {
         p.vy += g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.age += dt;
