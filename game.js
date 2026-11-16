@@ -930,6 +930,50 @@ function pourShow(t, P) {
   });
 }
 
+/* ---------- runes and arcane signs, drawn as strokes in a 0..1 box (so no special font is needed) ---------- */
+const RUNES = [
+  [[[.15, 0], [.15, 1]], [[.15, .28], [.6, 0]], [[.15, .55], [.6, .28]]],                         // fehu
+  [[[.15, 1], [.15, 0], [.6, .35], [.6, 1]]],                                                       // uruz
+  [[[.15, 0], [.15, 1]], [[.15, .25], [.55, .5], [.15, .75]]],                                      // thurisaz
+  [[[.15, 0], [.15, 1]], [[.15, 0], [.6, .28]], [[.15, .32], [.6, .6]]],                            // ansuz
+  [[[.15, 1], [.15, 0], [.55, .25], [.15, .5], [.6, 1]]],                                           // raidho
+  [[[.55, .15], [.15, .5], [.55, .85]]],                                                            // kenaz
+  [[[.05, .05], [.65, .95]], [[.65, .05], [.05, .95]]],                                             // gebo
+  [[[.15, 1], [.15, 0], [.55, .22], [.15, .45]]],                                                   // wunjo
+  [[[.1, 0], [.1, 1]], [[.6, 0], [.6, 1]], [[.1, .35], [.6, .65]]],                                 // hagalaz
+  [[[.35, 0], [.35, 1]], [[.1, .35], [.6, .6]]],                                                    // nauthiz
+  [[[.3, .05], [.08, .3], [.3, .55]], [[.4, .45], [.62, .7], [.4, .95]]],                           // jera
+  [[[.35, 0], [.35, 1]], [[.35, 0], [.6, .2]], [[.35, 1], [.1, .8]]],                               // eihwaz
+  [[[.35, 1], [.35, 0]], [[.35, .42], [.08, 0]], [[.35, .42], [.62, 0]]],                           // algiz
+  [[[.55, 0], [.12, .38], [.55, .62], [.12, 1]]],                                                   // sowilo
+  [[[.35, 1], [.35, 0]], [[.35, 0], [.08, .32]], [[.35, 0], [.62, .32]]],                           // tiwaz
+  [[[.15, 0], [.15, 1]], [[.15, 0], [.55, .25], [.15, .5], [.55, .75], [.15, 1]]],                  // berkano
+  [[[.08, 1], [.08, 0], [.35, .35], [.62, 0], [.62, 1]]],                                           // ehwaz
+  [[[.08, 1], [.08, 0], [.62, .5]], [[.62, 1], [.62, 0], [.08, .5]]],                               // mannaz
+  [[[.15, 1], [.15, 0], [.55, .32]]],                                                               // laguz
+  [[[.35, .15], [.62, .5], [.35, .85], [.08, .5], [.35, .15]]],                                     // ingwaz
+  [[[.08, 0], [.08, 1], [.62, 0], [.62, 1], [.08, 0]]],                                             // dagaz
+  [[[.08, 1], [.5, .5], [.2, .2], [.35, 0], [.5, .2], [.2, .5], [.62, 1]]],                         // othala
+];
+function drawSign(c, kind, x, y, sz, rot) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.lineCap = "round"; c.lineJoin = "round";
+  if (kind < RUNES.length) {
+    c.translate(-sz * 0.35, -sz * 0.5);
+    for (const stroke of RUNES[kind]) { c.beginPath(); stroke.forEach(([px, py], i) => i ? c.lineTo(px * sz, py * sz) : c.moveTo(px * sz, py * sz)); c.stroke(); }
+  } else {
+    const r = sz * 0.42, k = kind - RUNES.length; c.beginPath();
+    if (k === 0) { c.arc(0, 0, r, 0, 7); c.moveTo(r * 0.12, 0); c.arc(0, 0, r * 0.12, 0, 7); }                       // sun
+    else if (k === 1) { c.arc(0, 0, r, Math.PI * 0.3, Math.PI * 1.7); c.arc(r * 0.45, 0, r * 0.8, Math.PI * 1.45, Math.PI * 0.55, true); } // moon
+    else if (k === 2) { c.moveTo(0, -r); c.lineTo(r * 0.87, r * 0.5); c.lineTo(-r * 0.87, r * 0.5); c.closePath(); c.moveTo(-r * 0.6, 0); c.lineTo(r * 0.6, 0); } // air
+    else if (k === 3) { c.moveTo(0, r); c.lineTo(r * 0.87, -r * 0.5); c.lineTo(-r * 0.87, -r * 0.5); c.closePath(); }      // water
+    else if (k === 4) { for (let i = 0; i <= 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; i ? c.lineTo(Math.cos(a) * r, Math.sin(a) * r) : c.moveTo(Math.cos(a) * r, Math.sin(a) * r); } } // pentagram
+    else { c.arc(0, -r * 0.35, r * 0.4, 0, 7); c.moveTo(0, 0.05 * r); c.lineTo(0, r); c.moveTo(-r * 0.4, r * 0.55); c.lineTo(r * 0.4, r * 0.55); } // venus-like sign
+    c.stroke();
+  }
+  c.restore();
+}
+const SIGNS = RUNES.length + 6;
+
 /* ---------- the first step into the dungeon ----------
    A ring of green arcane fire closes in on the name, the world goes dark, the ember left at the centre turns to torchlight,
    and a ring of fire opens out again on the dungeon. Only the first time; after that the name just switches. */
@@ -941,7 +985,40 @@ export async function dungeonIntro() {
   const Rmax = Math.max(...[[0, 0], [VW, 0], [0, VH], [VW, VH]].map(([x, y]) => Math.hypot(x - C.x, y - C.y))) + 60;
   const GREEN = ["255,255,235", "150,255,110", "40,150,30"], FIRE = ["255,248,215", "255,170,60", "205,60,12"];
   const parts = []; const R = (a, b) => a + Math.random() * (b - a);
-  const T1 = 1050, T2 = T1 + 520, T3 = T2 + 1350;   // closing, dark, opening
+  const T1 = 1250, T2 = T1 + 1100, T3 = T2 + 1500;   // closing, dark, opening
+  // the night that the ring closes over: stars, a little nebula, slow magic circles and runes drifting up
+  const stars = Array.from({ length: Math.round(VW * VH / 1400) }, () => ({ x: R(0, VW), y: R(0, VH), r: Math.pow(Math.random(), 3) * 1.6 + 0.35, ph: R(0, 7), sp: R(1.5, 4), big: Math.random() < 0.05 }));
+  const nebs = Array.from({ length: 4 }, (_, i) => ({ x: R(0, VW), y: R(0, VH), r: R(160, 320), c: ["90,40,150", "20,110,120", "40,60,160", "120,40,110"][i] }));
+  const circles = [{ x: VW * R(0.62, 0.82), y: VH * R(0.55, 0.75), r: Math.min(VW, VH) * R(0.24, 0.3), dir: 1 }, { x: VW * R(0.12, 0.35), y: VH * R(0.25, 0.4), r: Math.min(VW, VH) * R(0.16, 0.2), dir: -1 }]
+    .map(c => ({ ...c, signs: Array.from({ length: 12 }, () => Math.floor(R(0, SIGNS))) }));
+  const runes = Array.from({ length: Math.round(VW * VH / 16000) + 6 }, () => ({ x: R(0, VW), y: R(0, VH), k: Math.floor(R(0, SIGNS)), sz: R(14, 34), rot: R(-0.5, 0.5), vr: R(-0.25, 0.25), vy: R(-14, -5), ph: R(0, 7), fl: R(0.6, 1.6) }));
+  const mixC = (a, b, u) => a.split(",").map((v, i) => Math.round(+v + (+b.split(",")[i] - +v) * u)).join(",");
+  const drawVoid = (T, dt, warm) => {
+    ctx.fillStyle = "#03020a"; ctx.fillRect(0, 0, VW, VH);
+    for (const n of nebs) { const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r); g.addColorStop(0, `rgba(${n.c},.22)`); g.addColorStop(1, `rgba(${n.c},0)`); ctx.fillStyle = g; ctx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2); }
+    // stars drift slowly away from the centre, as if falling inward through them
+    const zoom = 1 + T / 26000;
+    for (const st of stars) { const x = C.x + (st.x - C.x) * zoom, y = C.y + (st.y - C.y) * zoom, a = 0.45 + 0.55 * Math.sin(T / 1000 * st.sp + st.ph);
+      ctx.fillStyle = `rgba(235,240,255,${Math.max(0.08, a)})`; ctx.beginPath(); ctx.arc(x, y, st.r, 0, 7); ctx.fill();
+      if (st.big && a > 0.6) { ctx.strokeStyle = `rgba(220,230,255,${(a - 0.6) * 1.5})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); ctx.stroke(); } }
+    const glow = mixC("120,255,190", "255,196,96", warm), core = mixC("220,255,236", "255,240,200", warm);
+    ctx.save(); ctx.lineWidth = 1.2; ctx.shadowColor = `rgba(${glow},.9)`; ctx.shadowBlur = 10;
+    for (const c of circles) {     // slowly turning circles of signs
+      const a0 = T / 1000 * 0.18 * c.dir; ctx.strokeStyle = `rgba(${glow},.32)`;
+      ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(c.x, c.y, c.r * 0.78, 0, 7); ctx.stroke();
+      ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = a0 * -0.6 + i * Math.PI / 3; ctx.moveTo(c.x + Math.cos(a) * c.r * 0.78, c.y + Math.sin(a) * c.r * 0.78); ctx.lineTo(c.x + Math.cos(a + Math.PI * 2 / 3) * c.r * 0.78, c.y + Math.sin(a + Math.PI * 2 / 3) * c.r * 0.78); } ctx.stroke();
+      ctx.strokeStyle = `rgba(${core},.55)`; ctx.lineWidth = 1;
+      c.signs.forEach((k, i) => { const a = a0 + i * Math.PI * 2 / c.signs.length, rr = c.r * 0.89; drawSign(ctx, k, c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr, c.r * 0.13, a + Math.PI / 2); });
+      ctx.lineWidth = 1.2;
+    }
+    for (const r of runes) {       // runes drifting up, flickering
+      r.y += r.vy * dt; r.rot += r.vr * dt; if (r.y < -40) { r.y = VH + 40; r.x = R(0, VW); }
+      const a = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(T / 1000 * r.fl + r.ph), 2);
+      ctx.strokeStyle = `rgba(${core},${a})`; ctx.shadowColor = `rgba(${glow},${a})`; ctx.shadowBlur = 8 + 10 * a; ctx.lineWidth = 1.4 + r.sz / 30;
+      drawSign(ctx, r.k, r.x + Math.sin(T / 1400 + r.ph) * 6, r.y, r.sz, r.rot);
+    }
+    ctx.restore();
+  };
   let swapped = false, swapDone = null;
   const ringPath = (rad, T, k) => { const pts = []; const n = 160;
     for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2;
@@ -967,10 +1044,10 @@ export async function dungeonIntro() {
       for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life > parts[i].max) parts.splice(i, 1);
       ctx.clearRect(0, 0, VW, VH);
       ctx.save(); ctx.globalAlpha = fade;
-      // the dark, outside the ring (closing) or still waiting outside it (opening)
-      ctx.beginPath(); ctx.rect(0, 0, VW, VH);
+      // the starry dark, outside the ring (closing) or still waiting outside it (opening)
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, VW, VH);
       if (pts) { ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]); ctx.closePath(); }
-      ctx.fillStyle = "#050302"; ctx.fill("evenodd");
+      ctx.clip("evenodd"); drawVoid(T, dt, T < T1 ? 0 : Math.min(1, (T - T1) / (T2 - T1))); ctx.restore();
       if (pts) {     // the burning edge
         for (const [w, a, blur, ci] of [[26, 0.22, 30, 2], [12, 0.55, 16, 1], [4, 0.95, 6, 0], [1.5, 1, 0, 0]]) {
           ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]); ctx.closePath();
