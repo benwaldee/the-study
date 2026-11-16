@@ -234,6 +234,9 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 @keyframes glift{0%,100%{transform:translateY(-10px)}50%{transform:translateY(-19px)}}
 /* the lamplight on the wall belongs to the wall: it stays put while the bookcase floats (and the float keeps its rhythm through redraws) */
 .case.g-lifted .prop.arm{animation:glift-wall 2.4s var(--gld,0s) ease-in-out infinite}
+/* nothing of the bookcase's own (its lamplight on the wall, its drop shadow) falls across the trapdoor beneath it, so opening,
+   half-opening or closing the case never changes how the trapdoor and lever look */
+.case.g-lifted .prop.arm,.case.g-lifted .case-sh{visibility:hidden}
 @keyframes glift-wall{0%,100%{transform:translateY(10px)}50%{transform:translateY(19px)}}
 .g-trap{position:relative;height:100px;margin:-14px 9px 22px;border-radius:2px;overflow:hidden;isolation:isolate;background:#0b0705}
 .g-trap::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 14px 18px rgba(0,0,0,.85),inset 0 -8px 14px rgba(0,0,0,.6)}
@@ -345,6 +348,30 @@ main{overflow-anchor:none;max-width:1100px;margin:0 auto;padding:2px 0 104px}
 .stars .fill svg{fill:var(--brass-hi);stroke:var(--brass);stroke-width:1}
 .st-val{font-family:var(--display);font-size:18px;color:var(--brass-hi);min-width:3ch}
 .st-clear{padding:2px 6px}
+.rate-modal{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6);opacity:0;transition:opacity .2s}
+.rate-modal.in{opacity:1}
+.rm-card{width:100%;max-width:360px;padding:20px 18px 16px;border-radius:10px;text-align:center;transform:translateY(12px) scale(.97);transition:transform .22s cubic-bezier(.2,.8,.3,1);box-shadow:0 18px 40px rgba(0,0,0,.6)}
+.rate-modal.in .rm-card{transform:none}
+.rm-title{margin:0 0 6px;font:italic 400 17px/1.3 var(--serif);opacity:.85}
+.rm-val{margin:0 0 12px}
+.rm-val b{display:block;font:600 40px/1.05 var(--display);color:var(--brass-hi)}
+.rm-val span{display:block;min-height:1.3em;font:italic 400 16px var(--serif);opacity:.85}
+.rm-stars{position:relative;width:290px;max-width:100%;height:58px;margin:0 auto;cursor:pointer;touch-action:none}
+.rm-stars:focus{outline:none}
+.rm-stars .st{position:absolute;left:0;top:0;height:58px;display:flex;overflow:hidden;white-space:nowrap}
+.rm-stars .st svg{flex:none;width:58px;height:58px}
+.rm-stars .base svg{fill:none;stroke:var(--brass-lo);stroke-width:1.1}
+.rm-stars .fill{width:0;filter:drop-shadow(0 0 6px rgba(240,200,120,.35))}
+.rm-stars .fill svg{fill:var(--brass-hi);stroke:var(--brass);stroke-width:.8}
+.rm-ticks{display:flex;justify-content:space-between;width:290px;max-width:100%;height:8px;margin:2px auto 12px;padding:0 1px;box-sizing:border-box}
+.rm-ticks i{width:1px;height:4px;background:var(--brass-lo);opacity:.6}.rm-ticks i.maj{height:8px;opacity:.9}
+.rm-fine{display:flex;justify-content:center;gap:12px;margin:0 0 14px}
+.rm-fine .btn{min-width:64px;font-size:18px}
+.rm-actions{display:flex;justify-content:space-between;gap:10px}
+.rm-actions .btn{flex:1}
+html[data-look="pixel"] .rm-stars .fill svg{fill:#E2C478;stroke:#0C0907}
+html[data-look="classic"] .rm-stars .fill svg{fill:#C9953E;stroke:#7A5424}
+html[data-look="classic"] .rm-card{--text:#2C1608;--brass:#8A5A1E;--brass-hi:#8A1A12;--brass-lo:#8A6A3E;color:#2C1608}
 .status-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .status-row .chip{font-size:14px;padding:5px 11px}
 .series-rate{margin:4px 0 2px}
@@ -2273,25 +2300,57 @@ function starsHTML(key,v,label){
     <div class="st base">${STAR.repeat(5)}</div><div class="st fill" style="width:${v/5*100}%">${STAR.repeat(5)}</div></div>
     <span class="st-val">${v?fmtRating(v):"Not rated"}</span>${v?`<button class="btn small quiet st-clear" data-rate-clear="${key}">Clear</button>`:""}</div>`;
 }
-// Drag or tap across the stars; values snap to quarters.
+// The small stars open a large rating card: drag or tap across big stars in quarter steps, nudge by a quarter, then save.
+// Arrow keys still change the small stars directly.
+const RATE_WORDS=["","Did not like it","It was OK","Liked it","Really liked it","It was amazing"];
 function mountStars(root,onSet){
   root.querySelectorAll(".stars").forEach(el=>{
-    const key=el.dataset.rate;let v=+el.getAttribute("aria-valuenow")||0,down=false,was=v;
+    const key=el.dataset.rate;let v=+el.getAttribute("aria-valuenow")||0,down=null;
     const show=x=>{el.querySelector(".fill").style.width=x/5*100+"%";const lab=el.parentNode.querySelector(".st-val");if(lab)lab.textContent=x?fmtRating(x):"Not rated";};
-    const at=e=>{const r=el.getBoundingClientRect();return Math.max(0,Math.min(5,Math.round((e.clientX-r.left)/r.width*20)/4));};
-    el.addEventListener("pointerdown",e=>{down=true;was=v;try{el.setPointerCapture(e.pointerId);}catch(_){}v=at(e);show(v);e.preventDefault();});
-    el.addEventListener("pointermove",e=>{if(!down)return;v=at(e);show(v);});
-    const up=()=>{if(!down)return;down=false;if(v<.25)v=.25;show(v);onSet(key,v);};
-    el.addEventListener("pointerup",up);
-    el.addEventListener("pointercancel",()=>{if(!down)return;down=false;v=was;show(v);});   // an interrupted touch (a system gesture, a call) changes nothing
-    el.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowUp"){v=Math.min(5,v+.25);}else if(e.key==="ArrowLeft"||e.key==="ArrowDown"){v=Math.max(0,v-.25);}else return;
+    el.addEventListener("pointerdown",e=>{down={x:e.clientX,y:e.clientY};e.preventDefault();});
+    el.addEventListener("pointerup",e=>{if(!down)return;const far=Math.hypot(e.clientX-down.x,e.clientY-down.y)>12;down=null;if(far)return;
+      openRateCard(el.getAttribute("aria-label")||"Your rating",v,nv=>{v=nv;show(v);onSet(key,v);});});
+    el.addEventListener("pointercancel",()=>{down=null;});
+    el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openRateCard(el.getAttribute("aria-label")||"Your rating",v,nv=>{v=nv;show(v);onSet(key,v);});return;}
+      if(e.key==="ArrowRight"||e.key==="ArrowUp"){v=Math.min(5,v+.25);}else if(e.key==="ArrowLeft"||e.key==="ArrowDown"){v=Math.max(0,v-.25);}else return;
       e.preventDefault();show(v);onSet(key,v);});
   });
   root.querySelectorAll("[data-rate-clear]").forEach(b=>b.onclick=e=>{e.stopPropagation();onSet(b.dataset.rateClear,0);});
 }
+function openRateCard(label,v0,done){
+  const old=$(".rate-modal");if(old)old.remove();
+  let v=v0||0;
+  const m=document.createElement("div");m.className="rate-modal";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");m.setAttribute("aria-label",label);
+  m.innerHTML=`<div class="rm-card leather">
+    <p class="rm-title">${esc(label)}</p>
+    <p class="rm-val"><b></b><span></span></p>
+    <div class="rm-stars" role="slider" tabindex="0" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="5"><div class="st base">${STAR.repeat(5)}</div><div class="st fill">${STAR.repeat(5)}</div></div>
+    <div class="rm-ticks" aria-hidden="true">${Array.from({length:21},(_,i)=>`<i class="${i%4===0?"maj":""}"></i>`).join("")}</div>
+    <div class="rm-fine"><button class="btn quiet" data-d="-0.25" aria-label="A quarter star less">−¼</button><button class="btn quiet" data-d="0.25" aria-label="A quarter star more">+¼</button></div>
+    <div class="rm-actions"><button class="btn quiet" data-clear>${v0?"Clear rating":"Cancel"}</button><button class="btn brass" data-save>Save</button></div></div>`;
+  document.body.appendChild(m);requestAnimationFrame(()=>m.classList.add("in"));
+  const stars=m.querySelector(".rm-stars"),fill=m.querySelector(".fill"),num=m.querySelector(".rm-val b"),word=m.querySelector(".rm-val span"),save=m.querySelector("[data-save]");
+  const show=()=>{fill.style.width=v/5*100+"%";num.textContent=v?fmtRating(v):"–";word.textContent=v?RATE_WORDS[Math.max(1,Math.round(v))]:"Drag across the stars";
+    stars.setAttribute("aria-valuenow",String(v));stars.setAttribute("aria-valuetext",v?fmtRating(v)+" stars":"Not rated");save.disabled=!v;};
+  const at=e=>{const r=stars.getBoundingClientRect();return Math.max(.25,Math.min(5,Math.round((e.clientX-r.left)/r.width*20)/4));};
+  let down=false;
+  stars.addEventListener("pointerdown",e=>{down=true;try{stars.setPointerCapture(e.pointerId);}catch(_){}v=at(e);show();e.preventDefault();});
+  stars.addEventListener("pointermove",e=>{if(down){v=at(e);show();}});
+  stars.addEventListener("pointerup",()=>{down=false;});stars.addEventListener("pointercancel",()=>{down=false;});
+  stars.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowUp")v=Math.min(5,v+.25);else if(e.key==="ArrowLeft"||e.key==="ArrowDown")v=Math.max(.25,v-.25);else if(e.key==="Enter"){close(true);return;}else return;e.preventDefault();show();});
+  m.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{v=Math.max(.25,Math.min(5,(v||0)+ +b.dataset.d));show();});
+  const close=commit=>{m.classList.remove("in");setTimeout(()=>m.remove(),200);document.removeEventListener("keydown",esc_);if(commit!==null)done(commit===true?v:0);};
+  const esc_=e=>{if(e.key==="Escape")close(null);};document.addEventListener("keydown",esc_);
+  save.onclick=()=>close(true);
+  m.querySelector("[data-clear]").onclick=()=>close(v0?false:null);
+  m.addEventListener("click",e=>{if(e.target===m)close(null);});
+  show();stars.focus({preventScroll:true});
+}
 async function setRating(key,v){
   const[kind,id]=key.split(":");
-  if(kind==="book"){const b=S.records.get(id);if(!b)return;const c=clone(b);c.rating=v||null;await save(c);if(!game().keyUsed)gLinesSoon();}
+  if(kind==="book"){const b=S.records.get(id);if(!b)return;const c=clone(b);c.rating=v||null;
+    if(v&&c.status!=="read"){c.status="read";if(!c.finishedAt)c.finishedAt=Date.now();}   // rating a book means you've read it
+    await save(c);if(!game().keyUsed)gLinesSoon();}
   else await setPrefs(id,p=>{p.rating=v||null;});
 }
 const STATUS={want:"Want to read",reading:"Currently reading",read:"Read"};
@@ -2320,7 +2379,8 @@ function openBook(id){
         const el=document.getElementById("ser-"+tid);if(el)el.scrollIntoView({block:"start"});};
       const rf=$("#refresh",body);if(rf)rf.onclick=()=>{closeSheet();fillDetails([b.id]);toast("Looking up details…");};
       $("#edit",body).onclick=()=>editBook(b.id);
-      const onRate=async(key,v)=>{await setRating(key,v);const row=body.querySelector(".rate-row");if(row){row.outerHTML=starsHTML(key,v,"Your rating");mountStars(body,onRate);}};
+      const onRate=async(key,v)=>{await setRating(key,v);const row=body.querySelector(".rate-row");if(row){row.outerHTML=starsHTML(key,v,"Your rating");mountStars(body,onRate);}
+        const st=(S.records.get(b.id)||{}).status;body.querySelectorAll("[data-status]").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.status===st)));};
       mountStars(body,onRate);
       body.querySelectorAll("[data-status]").forEach(btn=>btn.onclick=async()=>{const cur=S.records.get(b.id);const k=btn.dataset.status;const c=clone(cur);
         c.status=cur.status===k?null:k;if(c.status==="read"&&!c.finishedAt)c.finishedAt=Date.now();if(c.status==="reading"&&!c.startedAt)c.startedAt=Date.now();await save(c);
