@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Kitchen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="The Kitchen">
+<meta name="theme-color" content="#E1E7EF">
+<style>
+@font-face{font-family:"Barlow Condensed";font-weight:600;font-display:swap;src:url(look/f-barlowc-600.woff2) format("woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:800;font-display:swap;src:url(look/f-barlowc-800.woff2) format("woff2")}
+@font-face{font-family:"Plex Mono";font-weight:400;font-display:swap;src:url(look/f-plexmono-400.woff2) format("woff2")}
+@font-face{font-family:"Plex Mono";font-weight:600;font-display:swap;src:url(look/f-plexmono-600.woff2) format("woff2")}
+:root{
+  --tile:#E1E7EF; --tile-2:#D2DAE6; --card:#F7F9FC; --paper:#FFFFFF;
+  --ink:#17205C; --ink-2:#4F5A86; --ink-3:#8790B3; --line:#C3CCDC;
+  --yellow:#F6C21C; --yellow-lo:#FCE9A8; --red:#C2362C; --green:#2C7A4C;
+  --sign:"Barlow Condensed","Arial Narrow","Helvetica Neue",sans-serif;
+  --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"Plex Mono",ui-monospace,Menlo,monospace;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--tile);color:var(--ink);font:16px/1.4 var(--body)}
+body{min-height:100vh;padding:calc(var(--safe-t) + 8px) 0 calc(var(--safe-b) + 84px)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+.hide{display:none!important}
+main{max-width:560px;margin:0 auto;padding:0 16px}
+section.tab{display:none}
+section.tab.on{display:block}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:10px 0 14px}
+h1{font:800 44px/0.95 var(--sign);margin:0;letter-spacing:-.01em}
+h2{font:800 26px/1 var(--sign);margin:26px 0 10px}
+.sub{color:var(--ink-2);font-size:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:10px;font:600 19px/1 var(--sign);background:var(--card);border:1.5px solid var(--line)}
+.btn.go{background:var(--yellow);border-color:#D9A800}
+.btn.ink{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.warn{color:var(--red)}
+.btn.small{min-height:36px;padding:0 12px;font-size:17px}
+.btn.wide{width:100%}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.row-btns .btn{flex:1}
+
+/* trip */
+.days{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);font:800 24px/1 var(--sign)}
+.daysn{font:800 30px/1 var(--sign);min-width:20px;text-align:center}
+.slots{list-style:none;margin:0;padding:0;border-radius:14px;background:var(--card);border:1.5px solid var(--line);overflow:hidden}
+.slot{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;min-height:68px;border-top:1px solid var(--line)}
+.slots li:first-child .slot{border-top:0}
+.num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;font:800 20px/1 var(--sign)}
+.slot.empty .num{background:transparent;border:1.5px dashed var(--ink-3);color:var(--ink-3)}
+.slot b{display:block;font:600 22px/1.1 var(--sign)}
+.slot.empty b{color:var(--ink-3)}
+.slot small{display:block;color:var(--ink-2);font-size:13px;margin-top:2px}
+.slot .go-arrow{margin-left:auto;color:var(--ink-3);font-size:22px}
+.checks{list-style:none;margin:0;padding:0}
+.checks li{display:flex;align-items:center;gap:10px;min-height:46px;border-bottom:1px solid var(--line)}
+.checks label{display:flex;align-items:center;gap:12px;flex:1;min-height:46px}
+.checks input[type=checkbox]{width:22px;height:22px;accent-color:var(--ink)}
+.checks .q{color:var(--ink-2);font-size:14px}
+.x{width:36px;height:36px;border-radius:50%;color:var(--ink-3);font-size:20px;flex:none}
+.adder{display:flex;gap:8px;margin-top:10px}
+.adder input{flex:1;min-width:0;height:44px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);padding:0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:38px;padding:0 14px;border-radius:19px;border:1.5px solid var(--line);background:var(--card);font-size:15px;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip.out,.chip.out[aria-pressed=true]{background:var(--yellow-lo);border-color:#D9A800;color:var(--ink)}
+.chip .cx{font-size:16px;color:var(--red);margin-left:2px}
+.hint{color:var(--ink-2);font-size:14px;margin:4px 0 10px}
+
+/* meals */
+.search{width:100%;height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--paper);padding:0 14px;margin-bottom:10px}
+.filters{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin:0 -16px 8px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.filters .chip{flex:none}
+.meals{list-style:none;margin:0;padding:0}
+.meal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 2px;border-bottom:1px solid var(--line);min-height:64px}
+.meal b{display:block;font:600 22px/1.1 var(--sign)}
+.meal small{display:block;color:var(--ink-2);font-size:13px;margin-top:2px}
+.tag-new{font:600 13px/1 var(--body);color:var(--ink);background:var(--yellow-lo);border-radius:6px;padding:3px 6px;margin-left:6px;vertical-align:3px}
+.intrip{margin-left:auto;flex:none;font:800 16px/1 var(--sign);background:var(--yellow);border-radius:14px;padding:6px 10px}
+
+/* receipt */
+.pcheck{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:16px}
+.pcheck h3{font:800 22px/1 var(--sign);margin:0 0 4px}
+.receipt{position:relative;background:var(--paper);font-family:var(--mono);font-size:15px;padding:22px 16px 26px;box-shadow:0 1px 0 var(--line);
+  --zz:linear-gradient(135deg,transparent 6px,var(--paper) 0) 0 0/12px 12px repeat-x;}
+.receipt::before,.receipt::after{content:"";position:absolute;left:0;right:0;height:10px;background:linear-gradient(-45deg,var(--tile) 7px,transparent 0) 0 0/14px 10px repeat-x,linear-gradient(45deg,var(--tile) 7px,transparent 0) 0 0/14px 10px repeat-x}
+.receipt::before{top:-1px;transform:scaleY(-1)}
+.receipt::after{bottom:-1px}
+.r-top{text-align:center;margin-bottom:14px}
+.r-top b{display:block;font:600 17px/1.2 var(--mono)}
+.r-top span{font-size:13px;color:var(--ink-2)}
+.r-aisle{display:flex;align-items:center;gap:8px;margin:16px 0 4px;font-weight:600;font-size:14px;color:var(--ink-2)}
+.r-aisle::before,.r-aisle::after{content:"";flex:1;border-top:1.5px dashed var(--line)}
+.r-line{display:flex;align-items:flex-start;gap:6px}
+.r-line .r-tap{display:flex;gap:10px;flex:1;text-align:left;padding:8px 0;min-height:44px;align-items:flex-start}
+.r-box{flex:none;width:20px;height:20px;border:1.5px solid var(--ink);border-radius:4px;margin-top:1px;display:grid;place-items:center;font-size:14px;line-height:1}
+.r-name{flex:1}
+.r-name small{display:block;font-size:12px;color:var(--ink-3);margin-top:1px}
+.r-q{flex:none;color:var(--ink-2);white-space:nowrap;padding-left:6px}
+.r-line.got .r-name>span,.r-line.got .r-q{text-decoration:line-through;color:var(--ink-3)}
+.r-line.got .r-box{background:var(--green);border-color:var(--green);color:#fff}
+.r-line .x{margin-top:4px}
+.opt{font-size:12px;color:var(--ink-2);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:4px}
+.r-total{border-top:1.5px dashed var(--line);margin-top:16px;padding-top:10px;display:flex;justify-content:space-between;font-weight:600}
+.r-empty{text-align:center;color:var(--ink-2);padding:20px 0}
+.dropped{margin-top:14px;font-size:14px;color:var(--ink-2)}
+.dropped button{text-decoration:underline}
+
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--ink);padding:6px 8px calc(var(--safe-b) + 6px);display:flex;justify-content:center;z-index:5}
+nav .in{display:flex;gap:4px;max-width:560px;width:100%}
+nav button{flex:1;min-height:56px;color:#B9C1E0;font:600 21px/1 var(--sign);border-radius:12px;position:relative}
+nav button[aria-selected=true]{color:var(--ink);background:var(--yellow)}
+nav .badge{font:600 13px/1 var(--body);margin-left:4px;vertical-align:2px}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,16,48,.45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--tile);width:100%;max-width:600px;max-height:calc(100vh - var(--safe-t) - 24px);overflow:auto;border-radius:20px 20px 0 0;padding:8px 16px calc(var(--safe-b) + 20px);animation:up .22s ease-out;overscroll-behavior:contain}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.grip{width:44px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 10px}
+.sheet-h{display:flex;align-items:flex-start;gap:10px;justify-content:space-between;margin-bottom:6px}
+.sheet h2{margin:4px 0 4px;font-size:32px}
+.close{width:44px;height:44px;border-radius:50%;background:var(--card);border:1.5px solid var(--line);font-size:22px;flex:none}
+.ing{list-style:none;margin:8px 0;padding:0;background:var(--card);border:1.5px solid var(--line);border-radius:12px}
+.ing li{display:flex;gap:10px;padding:10px 12px;border-top:1px solid var(--line);font-size:15px}
+.ing li:first-child{border-top:0}
+.ing .q{flex:none;width:76px;color:var(--ink-2)}
+.ing .home{font-size:12px;color:var(--ink-2);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:4px;white-space:nowrap}
+.notes{background:var(--paper);border-radius:12px;padding:12px 14px;margin:10px 0;font-size:15px;white-space:pre-wrap}
+.sides{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.f{display:block;margin:12px 0}
+.f > span{display:block;font-weight:600;font-size:14px;margin-bottom:4px;color:var(--ink-2)}
+.f input,.f textarea,.f select{width:100%;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);padding:10px 12px;min-height:44px}
+.f textarea{min-height:90px;resize:vertical}
+.edrow{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px}
+.edrow .l1,.edrow .l2{display:flex;gap:6px;align-items:center}
+.edrow .l2{margin-top:6px;flex-wrap:wrap}
+.edrow input,.edrow select{border-radius:8px;border:1.5px solid var(--line);background:var(--paper);padding:6px 8px;min-height:40px;min-width:0}
+.edrow .eq{width:56px}.edrow .eu{width:74px}.edrow .en{flex:1}
+.edrow label{display:flex;align-items:center;gap:6px;font-size:14px;min-height:40px}
+.edrow .ex{margin-left:auto}
+.toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 84px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:20;font-size:15px;max-width:90vw}
+</style>
+</head>
+<body>
+<main>
+  <section class="tab on" id="t-trip" aria-labelledby="h-trip">
+    <div class="head"><h1 id="h-trip">This trip</h1><button class="btn small" id="suggest">Fill for me</button></div>
+    <div class="days" aria-label="Dinners this trip">
+      <button class="step" id="dminus" aria-label="One fewer dinner">–</button>
+      <span class="daysn" id="daysn">5</span>
+      <button class="step" id="dplus" aria-label="One more dinner">+</button>
+      <span class="sub">dinners</span>
+    </div>
+    <ul class="slots" id="slots"></ul>
+
+    <h2>Breakfast, lunch &amp; snacks</h2>
+    <ul class="checks" id="extras"></ul>
+    <form class="adder" id="extra-add"><input id="extra-in" placeholder="Add something, e.g. 2 bag grapes" aria-label="Add a breakfast, lunch or snack item" maxlength="80"><button class="btn small" type="submit">Add</button></form>
+
+    <h2>Always at home</h2>
+    <p class="hint">Tap anything you're out of and it goes on the list.</p>
+    <div class="chips" id="pantry"></div>
+    <form class="adder" id="pantry-add"><input id="pantry-in" placeholder="Add a staple" aria-label="Add a pantry staple" maxlength="40"><button class="btn small" type="submit">Add</button></form>
+
+    <h2>Share or start over</h2>
+    <div class="row-btns">
+      <button class="btn ink" id="send">Send this trip</button>
+      <button class="btn" id="load">Load a trip</button>
+    </div>
+    <div class="row-btns"><button class="btn warn" id="newtrip">Start a new trip</button><button class="btn" id="more">Meal backup</button></div>
+  </section>
+
+  <section class="tab" id="t-meals" aria-labelledby="h-meals">
+    <div class="head"><h1 id="h-meals">Meals</h1><button class="btn small go" id="newmeal">New meal</button></div>
+    <input class="search" id="q" type="search" placeholder="Search meals or ingredients" aria-label="Search meals or ingredients">
+    <div class="filters" id="filters" role="group" aria-label="Filter meals"></div>
+    <ul class="meals" id="meals"></ul>
+  </section>
+
+  <section class="tab" id="t-list" aria-labelledby="h-list">
+    <div class="head"><h1 id="h-list">Grocery list</h1><button class="btn small" id="sharelist">Share</button></div>
+    <div id="pcheck"></div>
+    <div class="receipt" id="receipt"></div>
+    <form class="adder" id="list-add"><input id="list-in" placeholder="Add an item, e.g. 1 gal milk" aria-label="Add an item to the list" maxlength="80"><button class="btn small" type="submit">Add</button></form>
+    <div class="row-btns"><button class="btn" id="cleargot">Uncheck all</button></div>
+  </section>
+</main>
+
+<nav><div class="in" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="trip">Trip</button>
+  <button role="tab" aria-selected="false" data-tab="meals">Meals</button>
+  <button role="tab" aria-selected="false" data-tab="list">List<span class="badge" id="lbadge"></span></button>
+</div></nav>
+<div id="sheet-root"></div>
+
+<script src="meals.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const KEY="kitchen-v1";
+const AISLES=[["produce","Produce"],["bakery","Bread"],["deli","Deli & refrigerated"],["meat","Meat & seafood"],["dairy","Dairy & eggs"],["frozen","Frozen"],["pantry","Pantry"],["snacks","Snacks & drinks"],["other","Other"]];
+const AISLE_IDS=AISLES.map(a=>a[0]);
+const aisleName=id=>(AISLES.find(a=>a[0]===id)||AISLES[8])[1];
+const FILTERS=[["all","All"],["in","In this trip"],["new","New ideas"],["chicken","Chicken"],["beef","Beef"],["pork","Pork"],["turkey","Turkey"],["fish","Fish"],["seafood","Shrimp"],["bowl","Bowls"],["pasta","Pasta"],["sandwich","Sandwiches"],["sheet pan","Sheet pan"],["breakfast","Breakfast"]];
+
+/* ---------- helpers ---------- */
+function el(tag,attrs,...kids){const n=document.createElement(tag);if(attrs)for(const k in attrs){const v=attrs[k];if(v==null||v===false)continue;if(k==="class")n.className=v;else if(k==="text")n.textContent=v;else if(k.startsWith("on"))n.addEventListener(k.slice(2),v);else n.setAttribute(k,v===true?"":v);}for(const c of kids.flat()){if(c==null||c===false)continue;n.append(c.nodeType?c:document.createTextNode(String(c)));}return n;}
+const uid=()=>"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const norm=s=>String(s||"").toLowerCase().replace(/\s+/g," ").trim();
+const clip=(s,n)=>String(s==null?"":s).slice(0,n);
+const num=v=>{const n=parseFloat(v);return isFinite(n)&&n>0&&n<1000?Math.round(n*100)/100:0;};
+function toast(msg){const t=el("div",{class:"toast",role:"status",text:msg});document.body.append(t);setTimeout(()=>t.remove(),2200);}
+
+function parseItem(str){const p=String(str).split("|");const f=p[4]||"";return {q:num(p[0]),u:clip(p[1],12),n:clip(p[2],60),a:AISLE_IDS.includes(p[3])?p[3]:"other",s:f.includes("s"),o:f.includes("o"),on:f.includes("on")};}
+function seedMeal(m){return {id:m.id,name:m.name,src:m.src,tags:m.tags.slice(),side:!!m.side,notes:m.notes||"",items:m.items.map(parseItem).map(({on,...i})=>i)};}
+
+const UNIT_RE=/^(lbs?|oz|pkgs?|bags?|box(?:es)?|cans?|jars?|bunch(?:es)?|dozen|gal|loaf|loaves|tubs?|heads?|bottles?|packets?|pouch(?:es)?|kits?|wedges?|balls?)\b\.?/i;
+const FRAC={"½":.5,"¼":.25,"¾":.75};
+function parseFree(text){let s=String(text).trim(),q=0,u="";const m=s.match(/^(\d+(?:\.\d+)?|½|¼|¾)\s*/);if(m){q=FRAC[m[1]]||num(m[1]);s=s.slice(m[0].length);}const um=s.match(UNIT_RE);if(um){u=singular(um[1].toLowerCase());s=s.slice(um[0].length).trim();s=s.replace(/^of\s+/i,"");}s=s.charAt(0).toUpperCase()+s.slice(1);return {q,u,n:clip(s,60),a:guessAisle(s),s:false,o:false};}
+const GUESS=[["frozen",/frozen|ice cream|hash brown|pierog/],["produce",/apple|banana|grape|berr|lettuce|salad|spinach|onion|potato|tomato|pepper|broccoli|carrot|celery|cucumber|avocado|lemon|lime|orange|garlic|herb|cilantro|basil|kale|cabbage|fruit|melon|mushroom|zucchini|asparagus|corn|bean sprout|green bean/],["dairy",/milk|egg|cheese|yogurt|butter|cream|creamer/],["meat",/chicken|beef|steak|pork|turkey|sausage|bacon|salmon|fish|shrimp|tilapia|cod|ham\b|brat|kielbasa/],["deli",/deli|lunch meat|hummus|salami|pepperoni|meatball|tortellini/],["bakery",/bread|bun|roll|bagel|tortilla|naan|muffin|ciabatta|hoagie/],["snacks",/chip|cracker|cookie|pretzel|popcorn|soda|juice|water|candy|bar\b|bars\b|nuts/]];
+function guessAisle(s){const t=norm(s);for(const [a,re] of GUESS)if(re.test(t))return a;return "pantry";}
+function singular(u){u=String(u||"").toLowerCase();const map={lbs:"lb",pkgs:"pkg",bags:"bag",boxes:"box",cans:"can",jars:"jar",bunches:"bunch",loaves:"loaf",tubs:"tub",heads:"head",bottles:"bottle",packets:"packet",pouches:"pouch",kits:"kit",wedges:"wedge",balls:"ball"};return map[u]||u;}
+function plural(u,q){if(!u||q<=1||/^(lb|oz|gal|dozen)$/.test(u))return u;if(/(x|ch)$/.test(u))return u+"es";if(u==="loaf")return "loaves";return u+"s";}
+function fmtQ(q){if(!q)return "";const w=Math.floor(q),f=Math.round((q-w)*100)/100;const fr={0.5:"½",0.25:"¼",0.75:"¾"}[f];if(fr)return (w?w:"")+fr;return String(Math.round(q*100)/100);}
+function fmtQU(q,u){if(!q&&!u)return "";return [fmtQ(q),plural(u,q)].filter(Boolean).join(" ");}
+
+/* ---------- state ---------- */
+function defaultState(){return {v:1,seed:window.KITCHEN_SEED,meals:window.KITCHEN_MEALS.map(seedMeal),removed:[],
+  extras:window.KITCHEN_EXTRAS.map(s=>{const i=parseItem(s);return {id:uid(),n:i.n,q:i.q,u:i.u,a:i.a,on:i.on};}),
+  pantry:window.KITCHEN_PANTRY.slice(),
+  trip:{slots:Array.from({length:5},()=>({m:null,side:null})),got:{},drop:{},need:{},adds:[]}};}
+let S;
+function load(){let raw=null;try{raw=JSON.parse(localStorage.getItem(KEY));}catch(e){}
+  S=raw&&raw.v===1?raw:defaultState();
+  // new default meals arrive without touching edits; meals you deleted stay deleted
+  if((S.seed||0)<window.KITCHEN_SEED){const have=new Set(S.meals.map(m=>m.id));for(const m of window.KITCHEN_MEALS)if(!have.has(m.id)&&!S.removed.includes(m.id))S.meals.push(seedMeal(m));S.seed=window.KITCHEN_SEED;save();}
+  // a meal removed from the library leaves its slot empty instead of breaking the trip
+  const ids=new Set(S.meals.map(m=>m.id));for(const sl of S.trip.slots)if(sl.m&&!ids.has(sl.m))sl.m=null;}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast("Couldn't save on this phone (storage full?)");}}
+const mealById=id=>S.meals.find(m=>m.id===id);
+const sideById=id=>window.KITCHEN_SIDES.find(s=>s.id===id);
+
+/* ---------- grocery list ---------- */
+function tripItems(){const out=[];
+  S.trip.slots.forEach((sl,i)=>{const m=sl.m&&mealById(sl.m);if(!m)return;for(const it of m.items)out.push({...it,for:m.name});
+    const sd=m.side&&sl.side&&sideById(sl.side);if(sd)for(const s of sd.items){const it=parseItem(s);out.push({...it,for:m.name+" (side)"});}});
+  for(const e of S.extras)if(e.on)out.push({q:e.q,u:e.u,n:e.n,a:e.a,s:false,o:false,for:"Breakfast & lunch"});
+  for(const a of S.trip.adds)out.push({q:a.q,u:a.u,n:a.n,a:a.a,s:false,o:false,for:"",add:a.id});
+  return out;}
+function buildList(){const map=new Map();
+  for(const it of tripItems()){const k=norm(it.n);if(!k)continue;let g=map.get(k);
+    if(!g){g={key:k,n:it.n,a:it.a,qs:[],for:new Set(),s:true,o:true,adds:[]};map.set(k,g);}
+    g.qs.push({q:it.q,u:singular(it.u)});if(it.for)g.for.add(it.for);g.s=g.s&&it.s;g.o=g.o&&it.o;if(it.add)g.adds.push(it.add);}
+  // staples you're out of
+  for(const p of S.pantry){const k=norm(p);if(S.trip.need[k]&&!map.has(k))map.set(k,{key:k,n:p,a:guessAisle(p),qs:[],for:new Set(["Running low"]),s:true,o:false,adds:[]});}
+  const check=[],buy=[];
+  for(const g of map.values()){
+    // a stock item only goes on the list once you say you need it; the same for staples
+    const isStock=g.s;g.qty=sumQ(g.qs);
+    if(isStock&&!S.trip.need[g.key])check.push(g);else buy.push(g);}
+  return {check,buy};}
+function sumQ(qs){const by=new Map();let bare=0;for(const {q,u} of qs){if(!u){bare+=q||1;continue;}by.set(u,(by.get(u)||0)+(q||1));}
+  const parts=[...by].map(([u,q])=>fmtQU(q,u));if(bare)parts.push(fmtQ(bare));return parts.join(" + ");}
+
+/* ---------- render: trip ---------- */
+function renderTrip(){const n=S.trip.slots.length;$("#daysn").textContent=n;$("#dminus").disabled=n<=1;$("#dplus").disabled=n>=7;
+  const ul=$("#slots");ul.replaceChildren();
+  S.trip.slots.forEach((sl,i)=>{const m=sl.m&&mealById(sl.m);const sd=m&&m.side&&sl.side&&sideById(sl.side);
+    const sub=m?(m.side?(sd?"with "+sd.name.toLowerCase():"pick a side"):m.tags.join(", ")):"";
+    ul.append(el("li",null,el("button",{class:"slot"+(m?"":" empty"),onclick:()=>m?openSlot(i):openPicker(i)},
+      el("span",{class:"num","aria-hidden":"true",text:String(i+1)}),
+      el("span",null,el("b",{text:m?m.name:"Pick a dinner"}),sub?el("small",{text:sub}):null),
+      el("span",{class:"go-arrow","aria-hidden":"true",text:m?"›":"+"}))));});
+  const ex=$("#extras");ex.replaceChildren();
+  for(const e of S.extras){const id="ex-"+e.id;ex.append(el("li",null,
+    el("label",{for:id},el("input",{type:"checkbox",id,checked:e.on,onchange:ev=>{e.on=ev.target.checked;save();renderBadge();}}),el("span",null,e.n," ",el("span",{class:"q",text:fmtQU(e.q,e.u)}))),
+    el("button",{class:"x","aria-label":"Remove "+e.n,text:"×",onclick:()=>{S.extras=S.extras.filter(x=>x!==e);save();renderTrip();renderBadge();}})));}
+  const pc=$("#pantry");pc.replaceChildren();
+  for(const p of S.pantry){const k=norm(p),out=!!S.trip.need[k];
+    pc.append(el("button",{class:"chip"+(out?" out":""),"aria-pressed":String(out),"aria-label":p+(out?", out, on the list":""),onclick:()=>{if(out)delete S.trip.need[k];else S.trip.need[k]=true;save();renderTrip();renderBadge();},
+      oncontextmenu:ev=>{ev.preventDefault();removeStaple(p);}},out?"Out: ":"",p));}
+  if(S.pantry.length)pc.append(el("button",{class:"chip",text:"Edit staples",onclick:openStaples}));}
+function removeStaple(p){if(!confirm("Remove "+p+" from your staples?"))return;S.pantry=S.pantry.filter(x=>x!==p);delete S.trip.need[norm(p)];save();renderTrip();}
+
+/* ---------- render: meals ---------- */
+let filter="all";
+function renderFilters(){const f=$("#filters");f.replaceChildren();for(const [id,label] of FILTERS)f.append(el("button",{class:"chip","aria-pressed":String(filter===id),text:label,onclick:()=>{filter=id;renderFilters();renderMeals();}}));}
+function inTripCount(id){return S.trip.slots.filter(s=>s.m===id).length;}
+function renderMeals(){const q=norm($("#q").value);const ul=$("#meals");ul.replaceChildren();
+  const list=S.meals.filter(m=>{if(filter==="in"&&!inTripCount(m.id))return false;if(filter==="new"&&m.src!=="new")return false;if(!["all","in","new"].includes(filter)&&!m.tags.includes(filter))return false;
+    if(q&&!norm(m.name+" "+m.tags.join(" ")+" "+m.items.map(i=>i.n).join(" ")).includes(q))return false;return true;})
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  if(!list.length){ul.append(el("li",{class:"hint",text:filter==="in"?"Nothing picked yet. Tap a meal to add it to this trip.":"No meals match. Try another word, or make a new meal."}));return;}
+  for(const m of list){const c=inTripCount(m.id);
+    ul.append(el("li",null,el("button",{class:"meal",onclick:()=>openMeal(m.id)},
+      el("span",null,el("b",null,m.name,m.src==="new"?el("span",{class:"tag-new",text:"new"}):null),el("small",{text:(m.tags.join(", ")||"no tags")+(m.side?" · plus a side":"")})),
+      c?el("span",{class:"intrip",text:c>1?"In trip ×"+c:"In trip"}):null)));}}
+
+/* ---------- render: list ---------- */
+function renderList(){const {check,buy}=buildList();const pc=$("#pcheck");pc.replaceChildren();
+  if(check.length){pc.append(el("div",{class:"pcheck"},el("h3",{text:"Check at home first"}),el("p",{class:"hint",text:"These meals use things you probably have. Tap anything you're out of to add it."}),
+    el("div",{class:"chips"},check.sort((a,b)=>a.n.localeCompare(b.n)).map(g=>el("button",{class:"chip",onclick:()=>{S.trip.need[g.key]=true;save();renderAll();},title:[...g.for].join(", ")},"+ ",g.n)))));}
+  const r=$("#receipt");r.replaceChildren();
+  const shown=buy.filter(g=>!S.trip.drop[g.key]),dropped=buy.filter(g=>S.trip.drop[g.key]);
+  const got=shown.filter(g=>S.trip.got[g.key]).length;
+  r.append(el("div",{class:"r-top"},el("b",{text:"The Kitchen"}),el("span",{text:S.trip.slots.filter(s=>s.m).length+" dinners · "+new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"})})));
+  if(!shown.length)r.append(el("p",{class:"r-empty",text:"Your list is empty. Pick dinners on the Trip tab and everything they need shows up here."}));
+  for(const [aid,aname] of AISLES){const rows=shown.filter(g=>g.a===aid).sort((a,b)=>a.n.localeCompare(b.n));if(!rows.length)continue;
+    r.append(el("div",{class:"r-aisle",text:aname}));
+    for(const g of rows){const isGot=!!S.trip.got[g.key];const forTxt=[...g.for].join(", ");
+      r.append(el("div",{class:"r-line"+(isGot?" got":"")},
+        el("button",{class:"r-tap","aria-pressed":String(isGot),onclick:()=>{if(isGot)delete S.trip.got[g.key];else S.trip.got[g.key]=true;save();renderList();renderBadge();}},
+          el("span",{class:"r-box","aria-hidden":"true",text:isGot?"✓":""}),
+          el("span",{class:"r-name"},el("span",{text:g.n}),g.o?el("span",{class:"opt",text:"optional"}):null,forTxt?el("small",{text:forTxt}):null),
+          el("span",{class:"r-q",text:g.qty})),
+        el("button",{class:"x","aria-label":"Take "+g.n+" off the list",text:"×",onclick:()=>dropItem(g)})));}}
+  if(shown.length)r.append(el("div",{class:"r-total"},el("span",{text:"In the cart"}),el("span",{text:got+" of "+shown.length})));
+  if(dropped.length)r.append(el("div",{class:"dropped"},"Taken off: "+dropped.map(g=>g.n).join(", ")+". ",el("button",{text:"Put them back",onclick:()=>{for(const g of dropped)delete S.trip.drop[g.key];save();renderAll();}})));}
+function dropItem(g){if(g.adds.length&&g.for.size===0){S.trip.adds=S.trip.adds.filter(a=>!g.adds.includes(a.id));}else if(g.s&&S.trip.need[g.key]){delete S.trip.need[g.key];}else S.trip.drop[g.key]=true;delete S.trip.got[g.key];save();renderAll();}
+function renderBadge(){const {buy}=buildList();const left=buy.filter(g=>!S.trip.drop[g.key]&&!S.trip.got[g.key]).length;$("#lbadge").textContent=left?String(left):"";}
+function renderAll(){renderTrip();renderMeals();renderList();renderBadge();}
+
+/* ---------- sheets ---------- */
+let lastFocus=null;
+function sheet(build,label){closeSheet(true);lastFocus=document.activeElement;const box=el("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":label||"Details"},el("div",{class:"grip"}));build(box);
+  const scrim=el("div",{class:"scrim",onclick:ev=>{if(ev.target===scrim)closeSheet();}},box);$("#sheet-root").append(scrim);document.body.style.overflow="hidden";
+  const f=box.querySelector("[autofocus]")||box.querySelector(".close");if(f)f.focus({preventScroll:true});}
+function closeSheet(quiet){$("#sheet-root").replaceChildren();document.body.style.overflow="";if(!quiet&&lastFocus&&lastFocus.isConnected)lastFocus.focus({preventScroll:true});}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#sheet-root").firstChild)closeSheet();});
+const sheetHead=(title,sub)=>el("div",{class:"sheet-h"},el("div",null,el("h2",{text:title}),sub?el("div",{class:"sub",text:sub}):null),el("button",{class:"close","aria-label":"Close",text:"×",onclick:()=>closeSheet()}));
+function ingList(m){return el("ul",{class:"ing"},m.items.map(i=>el("li",null,el("span",{class:"q",text:fmtQU(i.q,i.u)||"—"}),el("span",null,i.n,i.s?el("span",{class:"home",text:"usually have"}):null,i.o?el("span",{class:"home",text:"optional"}):null))));}
+
+function openPicker(slotIdx){let q="";sheet(box=>{box.append(sheetHead("Pick dinner "+(slotIdx+1)));
+  const inp=el("input",{class:"search",type:"search",placeholder:"Search meals","aria-label":"Search meals",autofocus:true});const ul=el("ul",{class:"meals"});
+  const draw=()=>{ul.replaceChildren();const used=new Set(S.trip.slots.map(s=>s.m));
+    for(const m of S.meals.filter(m=>!q||norm(m.name+" "+m.tags.join(" ")).includes(q)).sort((a,b)=>(used.has(a.id)-used.has(b.id))||a.name.localeCompare(b.name)))
+      ul.append(el("li",null,el("button",{class:"meal",onclick:()=>{S.trip.slots[slotIdx]={m:m.id,side:null};save();renderAll();if(m.side)openSlot(slotIdx);else closeSheet();}},
+        el("span",null,el("b",null,m.name,m.src==="new"?el("span",{class:"tag-new",text:"new"}):null),el("small",{text:m.tags.join(", ")})),used.has(m.id)?el("span",{class:"intrip",text:"In trip"}):null)));};
+  inp.addEventListener("input",()=>{q=norm(inp.value);draw();});box.append(inp,ul);draw();},"Pick a dinner");}
+
+function sidePicker(sl,after){return el("div",null,el("h3",{class:"sub",style:"font-weight:600;margin:14px 0 4px",text:"Starch side"}),
+  el("div",{class:"sides"},window.KITCHEN_SIDES.map(s=>el("button",{class:"chip","aria-pressed":String(sl.side===s.id),text:s.name,onclick:()=>{sl.side=sl.side===s.id?null:s.id;save();renderAll();after();}}))));}
+
+function openSlot(i){const sl=S.trip.slots[i];const m=mealById(sl.m);if(!m)return openPicker(i);
+  sheet(box=>{const draw=()=>{box.replaceChildren(el("div",{class:"grip"}),sheetHead(m.name,"Dinner "+(i+1)));
+    if(m.side)box.append(sidePicker(sl,draw));
+    box.append(ingList(m));if(m.notes)box.append(el("div",{class:"notes",text:m.notes}));
+    box.append(el("div",{class:"row-btns"},el("button",{class:"btn go",text:"Swap",onclick:()=>openPicker(i)}),el("button",{class:"btn",text:"Edit meal",onclick:()=>openEditor(m.id)}),
+      el("button",{class:"btn warn",text:"Clear",onclick:()=>{S.trip.slots[i]={m:null,side:null};save();renderAll();closeSheet();}})));};draw();},m.name);}
+
+function openMeal(id){const m=mealById(id);if(!m)return;
+  sheet(box=>{box.append(sheetHead(m.name,(m.tags.join(", ")||"")+(m.side?" · plus a side":"")));box.append(ingList(m));if(m.notes)box.append(el("div",{class:"notes",text:m.notes}));
+    box.append(el("div",{class:"row-btns"},el("button",{class:"btn go",text:"Add to trip",onclick:()=>addToTrip(m)}),el("button",{class:"btn",text:"Edit",onclick:()=>openEditor(m.id)})),
+      el("div",{class:"row-btns"},el("button",{class:"btn",text:"Duplicate",onclick:()=>{const c=JSON.parse(JSON.stringify(m));c.id=uid();c.name=m.name+" (copy)";c.src="ours";S.meals.push(c);save();renderMeals();openEditor(c.id);}}),
+        el("button",{class:"btn warn",text:"Delete",onclick:()=>{if(!confirm("Delete "+m.name+"? It comes off this trip too."))return;S.meals=S.meals.filter(x=>x.id!==m.id);if(!S.removed.includes(m.id))S.removed.push(m.id);for(const s of S.trip.slots)if(s.m===m.id){s.m=null;s.side=null;}save();renderAll();closeSheet();toast("Deleted "+m.name);}})));},m.name);}
+
+function addToTrip(m){let i=S.trip.slots.findIndex(s=>!s.m);if(i<0){if(S.trip.slots.length>=7){toast("Trip is full (7 dinners). Swap one on the Trip tab.");return;}S.trip.slots.push({m:null,side:null});i=S.trip.slots.length-1;}
+  S.trip.slots[i]={m:m.id,side:null};save();renderAll();toast(m.name+" is dinner "+(i+1));if(m.side)openSlot(i);else closeSheet();}
+
+function openEditor(id){const orig=id&&mealById(id);const m=orig?JSON.parse(JSON.stringify(orig)):{id:uid(),name:"",src:"ours",tags:[],side:false,notes:"",items:[{q:1,u:"",n:"",a:"meat",s:false,o:false}]};
+  sheet(box=>{box.append(sheetHead(orig?"Edit meal":"New meal"));
+    const name=el("input",{value:m.name,maxlength:"60",autofocus:!orig});const tags=el("input",{value:m.tags.join(", "),maxlength:"80",placeholder:"chicken, bowl"});
+    const side=el("input",{type:"checkbox",checked:m.side,style:"width:22px;height:22px"});const notes=el("textarea",{maxlength:"600"});notes.value=m.notes;
+    const rows=el("div");
+    const addRow=it=>{const q=el("input",{class:"eq",inputmode:"decimal",value:it.q?String(it.q):"","aria-label":"Amount"});const u=el("input",{class:"eu",value:it.u,placeholder:"unit","aria-label":"Unit",maxlength:"12"});
+      const n=el("input",{class:"en",value:it.n,placeholder:"Ingredient","aria-label":"Ingredient",maxlength:"60"});
+      const a=el("select",{"aria-label":"Aisle"},AISLES.map(([v,l])=>el("option",{value:v,selected:it.a===v,text:l})));
+      const s=el("input",{type:"checkbox",checked:it.s});const o=el("input",{type:"checkbox",checked:it.o});
+      const row=el("div",{class:"edrow"},el("div",{class:"l1"},q,u,n),el("div",{class:"l2"},a,el("label",null,s,"Usually have"),el("label",null,o,"Optional"),el("button",{class:"x ex",type:"button","aria-label":"Remove ingredient",text:"×",onclick:()=>row.remove()})));
+      row._get=()=>({q:num(q.value),u:singular(u.value.trim()),n:clip(n.value.trim(),60),a:a.value,s:s.checked,o:o.checked});
+      n.addEventListener("change",()=>{if(!n.dataset.touched&&!it.n)a.value=guessAisle(n.value);});a.addEventListener("change",()=>{n.dataset.touched="1";});rows.append(row);};
+    m.items.forEach(addRow);
+    box.append(el("label",{class:"f"},el("span",{text:"Name"}),name),el("label",{class:"f"},el("span",{text:"Tags (comma separated)"}),tags),
+      el("label",{class:"f",style:"display:flex;align-items:center;gap:10px"},side,el("span",{style:"margin:0",text:"Needs a starch side (pick it per trip)"})),
+      el("div",{class:"f"},el("span",{text:"Ingredients for two"}),rows,el("button",{class:"btn small",type:"button",text:"+ Ingredient",onclick:()=>{addRow({q:1,u:"",n:"",a:"produce",s:false,o:false});rows.lastChild.querySelector(".en").focus();}})),
+      el("label",{class:"f"},el("span",{text:"Prep notes"}),notes),
+      el("div",{class:"row-btns"},el("button",{class:"btn go",text:"Save meal",onclick:()=>{
+        const nm=clip(name.value.trim(),60);if(!nm){name.focus();toast("Give the meal a name");return;}
+        m.name=nm;m.tags=[...new Set(tags.value.split(",").map(t=>norm(t)).filter(Boolean))].slice(0,8).map(t=>clip(t,20));m.side=side.checked;m.notes=clip(notes.value.trim(),600);
+        m.items=[...rows.children].map(r=>r._get()).filter(i=>i.n);
+        const at=S.meals.findIndex(x=>x.id===m.id);if(at>=0)S.meals[at]=m;else S.meals.push(m);save();renderAll();toast("Saved "+m.name);openMeal(m.id);}}),
+        el("button",{class:"btn",text:"Cancel",onclick:()=>orig?openMeal(orig.id):closeSheet()})));},orig?"Edit meal":"New meal");}
+
+function openStaples(){sheet(box=>{box.append(sheetHead("Staples","Things you always keep at home"));const ul=el("ul",{class:"checks"});
+  const draw=()=>{ul.replaceChildren(...S.pantry.map(p=>el("li",null,el("span",{style:"flex:1",text:p}),el("button",{class:"x","aria-label":"Remove "+p,text:"×",onclick:()=>{S.pantry=S.pantry.filter(x=>x!==p);delete S.trip.need[norm(p)];save();renderTrip();renderBadge();draw();}}))));};draw();box.append(ul);},"Staples");}
+
+/* ---------- trip actions ---------- */
+$("#dminus").onclick=()=>{if(S.trip.slots.length<=1)return;const last=S.trip.slots[S.trip.slots.length-1];if(last.m&&!confirm("Dinner "+S.trip.slots.length+" ("+(mealById(last.m)||{}).name+") will come off. OK?"))return;S.trip.slots.pop();save();renderAll();};
+$("#dplus").onclick=()=>{if(S.trip.slots.length>=7)return;S.trip.slots.push({m:null,side:null});save();renderAll();};
+$("#suggest").onclick=()=>{const empty=S.trip.slots.map((s,i)=>s.m?-1:i).filter(i=>i>=0);if(!empty.length){toast("Every dinner is picked. Clear one to get a suggestion.");return;}
+  const used=new Set(S.trip.slots.map(s=>s.m).filter(Boolean));const main=m=>m.tags.find(t=>["chicken","beef","pork","turkey","fish","seafood"].includes(t))||"other";
+  let pool=S.meals.filter(m=>!used.has(m.id));
+  for(const i of empty){if(!pool.length)pool=S.meals.slice();const prev=S.trip.slots[i-1]&&mealById(S.trip.slots[i-1].m),next=S.trip.slots[i+1]&&mealById(S.trip.slots[i+1].m);
+    let opts=pool.filter(m=>(!prev||main(prev)!==main(m))&&(!next||main(next)!==main(m)));if(!opts.length)opts=pool;
+    const pick=opts[Math.floor(Math.random()*opts.length)];S.trip.slots[i]={m:pick.id,side:pick.side?window.KITCHEN_SIDES[Math.floor(Math.random()*window.KITCHEN_SIDES.length)].id:null};pool=pool.filter(m=>m!==pick);}
+  save();renderAll();toast("Filled "+empty.length+" dinner"+(empty.length>1?"s":"")+". Tap one to swap it.");};
+$("#newtrip").onclick=()=>{if(!confirm("Start a new trip? This clears the dinners, the checkmarks and items you added. Meals stay saved."))return;
+  S.trip={slots:Array.from({length:S.trip.slots.length},()=>({m:null,side:null})),got:{},drop:{},need:{},adds:[]};save();renderAll();toast("New trip started");};
+$("#extra-add").onsubmit=e=>{e.preventDefault();const v=$("#extra-in").value.trim();if(!v)return;const it=parseFree(v);S.extras.push({id:uid(),n:it.n,q:it.q||1,u:it.u,a:it.a,on:true});$("#extra-in").value="";save();renderTrip();renderBadge();};
+$("#pantry-add").onsubmit=e=>{e.preventDefault();const v=clip($("#pantry-in").value.trim(),40);if(!v)return;if(S.pantry.some(p=>norm(p)===norm(v))){toast(v+" is already a staple");return;}S.pantry.push(v.charAt(0).toUpperCase()+v.slice(1));$("#pantry-in").value="";save();renderTrip();};
+$("#list-add").onsubmit=e=>{e.preventDefault();const v=$("#list-in").value.trim();if(!v)return;const it=parseFree(v);if(!it.n)return;S.trip.adds.push({id:uid(),q:it.q,u:it.u,n:it.n,a:it.a});delete S.trip.drop[norm(it.n)];$("#list-in").value="";save();renderList();renderBadge();};
+$("#cleargot").onclick=()=>{S.trip.got={};save();renderList();renderBadge();};
+$("#q").addEventListener("input",renderMeals);
+$("#newmeal").onclick=()=>openEditor(null);
+
+/* ---------- share list as text ---------- */
+function listText(){const {buy}=buildList();const shown=buy.filter(g=>!S.trip.drop[g.key]);const lines=["Grocery list"];
+  for(const [aid,aname] of AISLES){const rows=shown.filter(g=>g.a===aid);if(!rows.length)continue;lines.push("",aname);for(const g of rows.sort((a,b)=>a.n.localeCompare(b.n)))lines.push("☐ "+g.n+(g.qty?" — "+g.qty:"")+(g.o?" (optional)":""));}
+  return lines.join("\n");}
+async function shareText(text,title){if(navigator.share){try{await navigator.share({title,text});return;}catch(e){if(e&&e.name==="AbortError")return;}}
+  try{await navigator.clipboard.writeText(text);toast("Copied. Paste it in a text.");}catch(e){sheet(b=>{b.append(sheetHead(title));const t=el("textarea",{class:"f",readonly:true,style:"width:100%;min-height:200px"});t.value=text;b.append(t);},title);}}
+$("#sharelist").onclick=()=>shareText(listText(),"Grocery list");
+
+/* ---------- send / load a trip ---------- */
+const b64u={enc:u8=>{let s="";for(let i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");},
+  dec:s=>{s=s.replace(/-/g,"+").replace(/_/g,"/");const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}};
+async function pipe(u8,stream){return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(stream)).arrayBuffer());}
+async function packCode(obj){const raw=new TextEncoder().encode(JSON.stringify(obj));if(typeof CompressionStream==="function"){try{return "z"+b64u.enc(await pipe(raw,new CompressionStream("deflate-raw")));}catch(e){}}return "j"+b64u.enc(raw);}
+async function unpackCode(code){code=String(code).trim();const m=code.match(/[#&?]share=([A-Za-z0-9_-]+)/);if(m)code=m[1];if(code.length>200000)throw new Error("too long");
+  let u8=b64u.dec(code.slice(1));if(code[0]==="z"){if(typeof DecompressionStream!=="function")throw new Error("old phone");u8=await pipe(u8,new DecompressionStream("deflate-raw"));}else if(code[0]!=="j")throw new Error("bad code");
+  if(u8.length>500000)throw new Error("too big");return JSON.parse(new TextDecoder().decode(u8));}
+// everything that comes in from a link is rebuilt field by field: nothing from the sender is trusted as-is
+function cleanItem(i){if(!i||typeof i!=="object")return null;const n=clip(typeof i.n==="string"?i.n.trim():"",60);if(!n)return null;return {q:num(i.q),u:singular(clip(typeof i.u==="string"?i.u:"",12)),n,a:AISLE_IDS.includes(i.a)?i.a:"other",s:!!i.s,o:!!i.o};}
+function cleanMeal(m){if(!m||typeof m!=="object")return null;const id=clip(String(m.id||""),40).replace(/[^a-z0-9-]/gi,"");const name=clip(typeof m.name==="string"?m.name.trim():"",60);if(!id||!name)return null;
+  return {id,name,src:m.src==="new"?"new":"ours",tags:Array.isArray(m.tags)?m.tags.filter(t=>typeof t==="string").map(t=>clip(norm(t),20)).filter(Boolean).slice(0,8):[],side:!!m.side,notes:clip(typeof m.notes==="string"?m.notes:"",600),
+    items:Array.isArray(m.items)?m.items.slice(0,40).map(cleanItem).filter(Boolean):[]};}
+function cleanPack(p){if(!p||typeof p!=="object"||p.k!=="kitchen")throw new Error("not a trip");
+  const meals=Array.isArray(p.meals)?p.meals.slice(0,300).map(cleanMeal).filter(Boolean):[];
+  let trip=null;if(p.trip&&typeof p.trip==="object"){const ids=new Set([...meals.map(m=>m.id),...S.meals.map(m=>m.id)]);
+    const slots=(Array.isArray(p.trip.slots)?p.trip.slots.slice(0,7):[]).map(s=>({m:s&&typeof s.m==="string"&&ids.has(s.m)?s.m:null,side:s&&sideById(s.side)?s.side:null}));
+    trip={slots:slots.length?slots:[{m:null,side:null}],extras:Array.isArray(p.trip.extras)?p.trip.extras.slice(0,60).map(cleanItem).filter(Boolean):null,adds:Array.isArray(p.trip.adds)?p.trip.adds.slice(0,100).map(cleanItem).filter(Boolean):[],
+      need:Array.isArray(p.trip.need)?p.trip.need.filter(k=>typeof k==="string").slice(0,100).map(k=>norm(clip(k,60))):[]};}
+  if(!meals.length&&!trip)throw new Error("empty");
+  return {meals,trip};}
+async function sendTrip(){const used=new Set(S.trip.slots.map(s=>s.m).filter(Boolean));
+  const pack={k:"kitchen",v:1,meals:S.meals.filter(m=>used.has(m.id)),trip:{slots:S.trip.slots,extras:S.extras.filter(e=>e.on).map(e=>({q:e.q,u:e.u,n:e.n,a:e.a})),adds:S.trip.adds.map(a=>({q:a.q,u:a.u,n:a.n,a:a.a})),need:Object.keys(S.trip.need)}};
+  const url=location.origin+location.pathname+"#share="+await packCode(pack);
+  const names=S.trip.slots.map(s=>s.m&&mealById(s.m)).filter(Boolean).map(m=>m.name);
+  shareText("This trip: "+(names.join(", ")||"no dinners yet")+"\nOpen in The Kitchen: "+url,"This trip");}
+async function sendMeals(){const url=location.origin+location.pathname+"#share="+await packCode({k:"kitchen",v:1,meals:S.meals});shareText("All my Kitchen meals ("+S.meals.length+")\n"+url,"Meals backup");}
+function applyPack(p){let added=0,updated=0;for(const m of p.meals){const at=S.meals.findIndex(x=>x.id===m.id);if(at>=0){if(JSON.stringify(S.meals[at])!==JSON.stringify(m)){S.meals[at]=m;updated++;}}else{S.meals.push(m);added++;}S.removed=S.removed.filter(r=>r!==m.id);}
+  if(p.trip){S.trip={slots:p.trip.slots,got:{},drop:{},need:Object.fromEntries(p.trip.need.map(k=>[k,true])),adds:p.trip.adds.map(a=>({id:uid(),...a}))};
+    if(p.trip.extras){const want=new Map(p.trip.extras.map(e=>[norm(e.n),e]));for(const e of S.extras){e.on=want.has(norm(e.n));want.delete(norm(e.n));}for(const e of want.values())S.extras.push({id:uid(),n:e.n,q:e.q,u:e.u,a:e.a,on:true});}}
+  save();renderAll();return {added,updated};}
+function confirmPack(p){const dinners=p.trip?p.trip.slots.filter(s=>s.m).length:0;
+  sheet(box=>{box.append(sheetHead(p.trip?"Load this trip?":"Load these meals?"));
+    const lines=[];if(p.trip)lines.push(dinners+" dinner"+(dinners===1?"":"s")+": "+p.trip.slots.map(s=>s.m&&(p.meals.find(m=>m.id===s.m)||mealById(s.m))).filter(Boolean).map(m=>m.name).join(", ")+".","It replaces the trip on this phone. Your meals stay.");
+    else lines.push(p.meals.length+" meals. New ones get added and matching ones get updated. Nothing gets deleted.");
+    for(const l of lines)box.append(el("p",{text:l}));
+    box.append(el("div",{class:"row-btns"},el("button",{class:"btn go",text:p.trip?"Load trip":"Load meals",onclick:()=>{const r=applyPack(p);closeSheet();toast(p.trip?"Trip loaded":"Meals loaded: "+r.added+" new, "+r.updated+" updated");}}),el("button",{class:"btn",text:"Cancel",onclick:()=>closeSheet()})));},"Load shared trip");}
+async function tryLoad(code){try{confirmPack(cleanPack(await unpackCode(code)));return true;}catch(e){toast("That link didn't work. Copy the whole message and try again.");return false;}}
+$("#send").onclick=sendTrip;
+$("#load").onclick=()=>sheet(box=>{box.append(sheetHead("Load a trip","Paste the link someone sent you"));const t=el("textarea",{"aria-label":"Shared link",placeholder:"Paste the whole message here",style:"width:100%;min-height:120px;border-radius:10px;border:1.5px solid var(--line);padding:10px"});
+  box.append(t,el("div",{class:"row-btns"},el("button",{class:"btn go",text:"Load",onclick:()=>{if(t.value.trim())tryLoad(t.value);}}),
+    navigator.clipboard&&navigator.clipboard.readText?el("button",{class:"btn",text:"Paste",onclick:async()=>{try{t.value=await navigator.clipboard.readText();}catch(e){toast("Long-press the box and choose Paste");}}}):null));},"Load a trip");
+$("#more").onclick=()=>sheet(box=>{box.append(sheetHead("Meal backup"),el("p",{class:"hint",text:"Send every meal (with your edits) to the other phone, or keep the message as a backup. Load it with Load a trip."}),
+  el("div",{class:"row-btns"},el("button",{class:"btn ink",text:"Send all meals",onclick:sendMeals})),
+  el("p",{class:"hint",style:"margin-top:22px",text:"Bring back any starting meals you deleted. Your edits stay."}),
+  el("div",{class:"row-btns"},el("button",{class:"btn",text:"Restore deleted meals",onclick:()=>{const have=new Set(S.meals.map(m=>m.id));let n=0;for(const m of window.KITCHEN_MEALS)if(!have.has(m.id)){S.meals.push(seedMeal(m));n++;}S.removed=[];save();renderAll();toast(n?"Restored "+n+" meal"+(n>1?"s":""):"Nothing to restore");}})));},"Meal backup");
+
+/* ---------- tabs ---------- */
+function showTab(t){for(const b of document.querySelectorAll("nav [data-tab]"))b.setAttribute("aria-selected",String(b.dataset.tab===t));for(const s of document.querySelectorAll("section.tab"))s.classList.toggle("on",s.id==="t-"+t);
+  if(t==="list")renderList();if(t==="meals")renderMeals();window.scrollTo(0,0);try{sessionStorage.setItem("kitchen-tab",t);}catch(e){}}
+for(const b of document.querySelectorAll("nav [data-tab]"))b.onclick=()=>showTab(b.dataset.tab);
+
+load();renderFilters();renderAll();
+try{const t=sessionStorage.getItem("kitchen-tab");if(t&&["trip","meals","list"].includes(t))showTab(t);}catch(e){}
+if(/[#&]share=/.test(location.hash)){const h=location.hash;history.replaceState(null,"",location.pathname);tryLoad(h);}
+if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(()=>{});
+</script>
+</body>
+</html>

@@ -3,7 +3,8 @@
 // Everything else (look images, fonts, icons) is saved on the phone at install and served from there:
 // each release has a new VERSION, which re-downloads them once, so they're never fetched on a normal open.
 const VERSION = "study-v39";
-const COVERS = "study-covers"; // cover pictures from Open Library / Google Books, kept across updates
+const COVERS = "study-covers";
+// Only "study-" caches are cleaned up: other apps on this site (The Kitchen) keep their own. // cover pictures from Open Library / Google Books, kept across updates
 const COVER_URL = /^https:\/\/(covers\.openlibrary\.org\/b\/|books\.google\.com\/books\/content|books\.googleusercontent\.com\/)/;
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
@@ -105,7 +106,7 @@ self.addEventListener("install", e => {
 });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== COVERS).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k.startsWith("study-") && k !== VERSION && k !== COVERS).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 function withTimeout(promise, ms) {
@@ -124,6 +125,7 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (req.method !== "GET" || url.origin !== location.origin) return;
+  if (url.pathname.includes("/kitchen/")) return; // The Kitchen has its own offline copy
   const isPage = req.mode === "navigate" || /\/(index\.html)?$/.test(url.pathname);
   if (!isPage && !url.pathname.endsWith("/sw.js")) {
     // saved on the phone: answer from the cache, and only go to the network for something never saved
