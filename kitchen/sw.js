@@ -1,7 +1,7 @@
 // The Kitchen: keeps the app on the phone so it opens with no signal (the back of an Aldi has none).
 // The page: newest version when online, saved copy otherwise. Everything else comes from the saved copy.
 // Each release gets a new VERSION. Only "kitchen-" caches are ever cleaned up here, so The Study's are left alone.
-const VERSION = "kitchen-v1";
+const VERSION = "kitchen-v2";
 const FILES = [
   "./", "./index.html", "./meals.js", "./manifest.webmanifest",
   "./icon-180.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png",
