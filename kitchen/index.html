@@ -236,7 +236,12 @@ const UNIT_RE=/^(lbs?|oz|pkgs?|bags?|box(?:es)?|cans?|jars?|bunch(?:es)?|dozen|g
 const FRAC={"½":.5,"¼":.25,"¾":.75};
 function parseFree(text){let s=String(text).trim(),q=0,u="";const m=s.match(/^(\d+(?:\.\d+)?|½|¼|¾)\s*/);if(m){q=FRAC[m[1]]||num(m[1]);s=s.slice(m[0].length);}const um=s.match(UNIT_RE);if(um){u=singular(um[1].toLowerCase());s=s.slice(um[0].length).trim();s=s.replace(/^of\s+/i,"");}s=s.charAt(0).toUpperCase()+s.slice(1);return {q,u,n:clip(s,60),a:guessAisle(s),s:false,o:false};}
 const GUESS=[["frozen",/frozen|ice cream|hash brown|pierog/],["produce",/apple|banana|grape|berr|lettuce|salad|spinach|onion|potato|tomato|pepper|broccoli|carrot|celery|cucumber|avocado|lemon|lime|orange|garlic|herb|cilantro|basil|kale|cabbage|fruit|melon|mushroom|zucchini|asparagus|corn|bean sprout|green bean/],["dairy",/milk|egg|cheese|yogurt|butter|cream|creamer/],["meat",/chicken|beef|steak|pork|turkey|sausage|bacon|salmon|fish|shrimp|tilapia|cod|ham\b|brat|kielbasa/],["deli",/deli|lunch meat|hummus|salami|pepperoni|meatball|tortellini/],["bakery",/bread|bun|roll|bagel|tortilla|naan|muffin|ciabatta|hoagie/],["snacks",/chip|cracker|cookie|pretzel|popcorn|soda|juice|water|candy|bar\b|bars\b|nuts/]];
-function guessAisle(s){const t=norm(s);for(const [a,re] of GUESS)if(re.test(t))return a;return "pantry";}
+// Fresh fruit always shops from Produce, however it got on the list (typed in, a meal, a staple).
+// Fruit that isn't fresh (frozen, dried, canned, juice, vinegar, jam, baked goods) goes where that product lives.
+const FRUIT=/\b(apples?|bananas?|oranges?|clementines?|cuties|mandarins?|tangerines?|grapefruits?|lemons?|limes?|grapes?|(straw|blue|rasp|black|cran)?berr(y|ies)|cherr(y|ies)|pears?|peach(es)?|plums?|nectarines?|apricots?|kiwis?|mangos?|mangoes|pineapples?|(water)?melons?|cantaloupes?|honeydews?|papayas?|pomegranates?|figs?|avocados?|fruit)\b/;
+const NOT_FRESH=/frozen|dried|canned|juice|vinegar|cider|sauce|jam|jelly|preserves|bread|muffin|pie|chips?|bars?\b|cups?\b|snacks?|cereal|yogurt|pepper/;
+function isFreshFruit(s){const t=norm(s);return FRUIT.test(t)&&!NOT_FRESH.test(t);}
+function guessAisle(s){const t=norm(s);if(isFreshFruit(t))return "produce";for(const [a,re] of GUESS){if(a==="produce"&&NOT_FRESH.test(t)&&!/pepper/.test(t))continue;if(re.test(t))return a;}return "pantry";}
 function singular(u){u=String(u||"").toLowerCase();const map={lbs:"lb",pkgs:"pkg",bags:"bag",boxes:"box",cans:"can",jars:"jar",bunches:"bunch",loaves:"loaf",tubs:"tub",heads:"head",bottles:"bottle",packets:"packet",pouches:"pouch",kits:"kit",wedges:"wedge",balls:"ball"};return map[u]||u;}
 function plural(u,q){if(!u||q<=1||/^(lb|oz|gal|dozen)$/.test(u))return u;if(/(x|ch)$/.test(u))return u+"es";if(u==="loaf")return "loaves";return u+"s";}
 function fmtQ(q){if(!q)return "";const w=Math.floor(q),f=Math.round((q-w)*100)/100;const fr={0.5:"½",0.25:"¼",0.75:"¾"}[f];if(fr)return (w?w:"")+fr;return String(Math.round(q*100)/100);}
@@ -283,7 +288,7 @@ function tripItems(){const out=[];
   return out;}
 function buildList(){const map=new Map();
   for(const it of tripItems()){const k=norm(it.n);if(!k)continue;let g=map.get(k);
-    if(!g){g={key:k,n:it.n,a:it.a,qs:[],for:new Set(),s:true,o:true,adds:[]};map.set(k,g);}
+    if(!g){g={key:k,n:it.n,a:isFreshFruit(it.n)?"produce":it.a,qs:[],for:new Set(),s:true,o:true,adds:[]};map.set(k,g);}
     g.qs.push({q:it.q,u:singular(it.u)});if(it.for)g.for.add(it.for);g.s=g.s&&it.s;g.o=g.o&&it.o;if(it.add)g.adds.push(it.add);}
   // staples you're out of
   for(const p of S.pantry){const k=norm(p);if(S.trip.need[k]&&!map.has(k))map.set(k,{key:k,n:p,a:guessAisle(p),qs:[],for:new Set(["Running low"]),s:true,o:false,adds:[]});}
